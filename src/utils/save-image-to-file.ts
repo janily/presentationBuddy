@@ -1,36 +1,40 @@
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
+import { randomUUID } from "crypto";
 
 /**
- * Saves a base64 image to the data folder with the specified filename.
- * @param base64Image - The base64 encoded image string (can include data URL prefix)
- * @param fileName - The filename to use (without extension)
+ * Saves an image to the public/uploads folder and returns the public URL.
+ * Supports both base64 encoded strings and Buffer inputs.
+ *
+ * @param image - The image data as a base64 string (can include data URL prefix) or Buffer
  * @param extension - The file extension (default: 'jpeg')
- * @returns The full path to the saved file
+ * @returns The public URL where the image can be accessed
  */
 export async function saveImageToFile(
-  base64Image: string,
-  fileName: string,
+  image: string | Buffer,
   extension: string = "jpeg",
 ): Promise<string> {
-  // Remove data URL prefix if present (e.g., "data:image/jpeg;base64,")
-  const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
+  // Convert to buffer if it's a base64 string
+  let imageBuffer: Buffer;
+  if (typeof image === "string") {
+    // Remove data URL prefix if present (e.g., "data:image/jpeg;base64,")
+    const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
+    imageBuffer = Buffer.from(base64Data, "base64");
+  } else {
+    imageBuffer = image;
+  }
 
-  // Convert base64 to buffer
-  const imageBuffer = Buffer.from(base64Data, "base64");
+  // Generate unique filename
+  const fileName = `${randomUUID()}.${extension}`;
 
-  // Get the data directory path (relative to project root)
-  const dataDir = path.join(process.cwd(), "data");
+  // Ensure the uploads directory exists
+  const uploadsDir = path.join(process.cwd(), "public", "uploads");
+  await mkdir(uploadsDir, { recursive: true });
 
-  // Ensure the data directory exists
-  await mkdir(dataDir, { recursive: true });
-
-  // Create the file path
-  const fullFileName = `${fileName}.${extension}`;
-  const filePath = path.join(dataDir, fullFileName);
-
-  // Write the file
+  // Save the file
+  const filePath = path.join(uploadsDir, fileName);
   await writeFile(filePath, imageBuffer);
 
-  return filePath;
+  // Return the public URL
+  return `/uploads/${fileName}`;
 }

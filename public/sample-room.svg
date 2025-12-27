@@ -1,0 +1,106 @@
+<svg width="800" height="600" viewBox="0 0 800 600" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background wall -->
+  <rect width="800" height="600" fill="#F5F0E8"/>
+
+  <!-- Wall gradient -->
+  <defs>
+    <linearGradient id="wallGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#FDFBF7;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#EDE5D8;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="floorGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#D4C4A8;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#B8A88C;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="windowGlow" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFF9E8;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#E8DCC8;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Main wall -->
+  <rect x="0" y="0" width="800" height="420" fill="url(#wallGradient)"/>
+
+  <!-- Floor -->
+  <rect x="0" y="420" width="800" height="180" fill="url(#floorGradient)"/>
+
+  <!-- Floor line -->
+  <line x1="0" y1="420" x2="800" y2="420" stroke="#C4B49C" stroke-width="2"/>
+
+  <!-- Window frame -->
+  <rect x="80" y="60" width="200" height="280" rx="4" fill="#FDFAF5" stroke="#8B7355" stroke-width="6"/>
+
+  <!-- Window panes -->
+  <rect x="90" y="70" width="85" height="125" fill="url(#windowGlow)" stroke="#A08B70" stroke-width="2"/>
+  <rect x="185" y="70" width="85" height="125" fill="url(#windowGlow)" stroke="#A08B70" stroke-width="2"/>
+  <rect x="90" y="205" width="85" height="125" fill="url(#windowGlow)" stroke="#A08B70" stroke-width="2"/>
+  <rect x="185" y="205" width="85" height="125" fill="url(#windowGlow)" stroke="#A08B70" stroke-width="2"/>
+
+  <!-- Curtains -->
+  <path d="M60 50 Q70 200 65 350 L80 350 L80 50 Z" fill="#E8DDD0" opacity="0.9"/>
+  <path d="M280 50 Q290 200 285 350 L300 350 L300 50 Z" fill="#E8DDD0" opacity="0.9"/>
+
+  <!-- Sofa -->
+  <rect x="340" y="350" width="380" height="120" rx="20" fill="#7B8B6F"/>
+  <rect x="350" y="320" width="360" height="50" rx="10" fill="#8B9B7F"/>
+  <!-- Sofa cushions -->
+  <rect x="360" y="330" width="100" height="40" rx="8" fill="#6B7B5F"/>
+  <rect x="480" y="330" width="100" height="40" rx="8" fill="#6B7B5F"/>
+  <rect x="600" y="330" width="100" height="40" rx="8" fill="#6B7B5F"/>
+  <!-- Sofa arms -->
+  <rect x="330" y="330" width="30" height="130" rx="10" fill="#6B7B5F"/>
+  <rect x="700" y="330" width="30" height="130" rx="10" fill="#6B7B5F"/>
+
+  <!-- Throw pillows -->
+  <ellipse cx="380" cy="360" rx="35" ry="25" fill="#C45636"/>
+  <ellipse cx="680" cy="360" rx="35" ry="25" fill="#B8965C"/>
+
+  <!-- Coffee table -->
+  <rect x="420" y="490" width="220" height="60" rx="6" fill="#5C4A38"/>
+  <rect x="430" y="500" width="200" height="40" rx="4" fill="#6B5A48"/>
+  <!-- Coffee table legs -->
+  <rect x="435" y="550" width="8" height="30" fill="#4A3828"/>
+  <rect x="617" y="550" width="8" height="30" fill="#4A3828"/>
+
+  <!-- Items on coffee table -->
+  <ellipse cx="480" cy="515" rx="25" ry="8" fill="#2C2825"/>
+  <rect x="530" y="505" width="40" height="25" rx="3" fill="#D4B07A"/>
+  <circle cx="600" cy="515" r="12" fill="#7B8B6F"/>
+
+  <!-- Floor lamp -->
+  <rect x="740" y="200" width="8" height="250" fill="#2C2825"/>
+  <ellipse cx="744" cy="200" rx="45" ry="25" fill="#F5E6D3" stroke="#D4C4A8" stroke-width="2"/>
+  <circle cx="744" cy="200" r="8" fill="#FFF9E8"/>
+
+  <!-- Side table -->
+  <rect x="310" y="430" width="50" height="50" rx="4" fill="#5C4A38"/>
+
+  <!-- Plant -->
+  <ellipse cx="335" cy="430" rx="25" ry="15" fill="#5B7052"/>
+  <ellipse cx="325" cy="420" rx="18" ry="12" fill="#6B8062"/>
+  <ellipse cx="345" cy="415" rx="20" ry="14" fill="#4A6042"/>
+  <rect x="320" y="445" width="30" height="35" rx="3" fill="#C4A882"/>
+
+  <!-- Wall art -->
+  <rect x="450" y="100" width="180" height="140" rx="4" fill="#FDFAF5" stroke="#8B7355" stroke-width="4"/>
+  <rect x="465" y="115" width="150" height="110" fill="#E8DDD0"/>
+  <!-- Abstract art inside frame -->
+  <circle cx="510" cy="160" r="30" fill="#C45636" opacity="0.7"/>
+  <circle cx="560" cy="180" r="25" fill="#B8965C" opacity="0.6"/>
+  <rect x="520" y="150" width="60" height="40" rx="4" fill="#7B8B6F" opacity="0.5"/>
+
+  <!-- Rug under coffee table -->
+  <ellipse cx="530" cy="530" rx="180" ry="60" fill="#D4C4A8" opacity="0.5"/>
+  <ellipse cx="530" cy="530" rx="160" ry="50" fill="#C4B498" opacity="0.3"/>
+
+  <!-- Small decorative elements -->
+  <!-- Books on side table -->
+  <rect x="315" y="420" width="35" height="8" fill="#C45636"/>
+  <rect x="318" y="414" width="30" height="6" fill="#5B7052"/>
+
+  <!-- Light rays from window -->
+  <polygon points="280,340 400,420 500,420 300,340" fill="#FFF9E8" opacity="0.15"/>
+
+  <!-- Baseboard -->
+  <rect x="0" y="400" width="800" height="20" fill="#E8DDD0"/>
+</svg>

@@ -105,7 +105,6 @@ const interiorImageImprovementStep = createStep({
 
     const filePath = await saveImageToFile(
       generatedImageBase64 as string,
-      `${runId}`,
       "png",
     );
 
