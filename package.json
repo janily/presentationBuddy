@@ -19,7 +19,7 @@
     "@mastra/loggers": "^0.10.19",
     "@mastra/memory": "^0.15.13",
     "@openrouter/ai-sdk-provider": "^1.5.4",
-    "ai": "^6.0.3",
+    "ai": "^5.0.97",
     "lucide-react": "^0.562.0",
     "mastra": "^0.18.9",
     "next": "16.1.1",

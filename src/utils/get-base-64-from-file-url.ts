@@ -1,13 +1,12 @@
-import { readFile } from "fs/promises";
-import { fileURLToPath } from "url";
-
 export async function getBase64FromFileUrl(fileUrl: string): Promise<string> {
-  // Convert file:// URL to a file path
-  const filePath = fileURLToPath(fileUrl);
+  const response = await fetch(fileUrl);
 
-  // Read the file as a buffer
-  const fileBuffer = await readFile(filePath);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch image: ${response.statusText}`);
+  }
 
-  // Convert to base64
+  const arrayBuffer = await response.arrayBuffer();
+  const fileBuffer = Buffer.from(arrayBuffer);
+
   return fileBuffer.toString("base64");
 }

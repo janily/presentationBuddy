@@ -8,11 +8,11 @@ export async function POST(request: NextRequest) {
   try {
     const {
       imageUrl,
-      activeRunId,
+      workflowRunId,
       approvedChanges,
     }: {
       imageUrl: string;
-      activeRunId?: string;
+      workflowRunId?: string;
       approvedChanges?: string[];
     } = await request.json();
 
@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
       "interiorImprovementSuggestionWorkflow",
     );
 
-    if (!activeRunId) {
+    if (!workflowRunId) {
       const run = await workflow.createRunAsync();
       const stream = run.stream();
       return createUIMessageStreamResponse({
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const run = await workflow.createRunAsync({ runId: activeRunId });
+    const run = await workflow.createRunAsync({ runId: workflowRunId });
     const stream = run.resumeStream({
       resumeData: {
         approvedChanges,

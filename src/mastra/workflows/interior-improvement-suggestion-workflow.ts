@@ -1,8 +1,11 @@
-import { getBase64FromFileUrl } from "@/src/utils/get-base-64-from-file-url";
-import { saveImageToFile } from "@/src/utils/save-image-to-file";
 import { createStep, createWorkflow } from "@mastra/core";
 import z from "zod";
-import { interiorImprovementSuggestionAgent } from "../agents/interior-improvement-suggestion-agent";
+import type {
+  ImprovementStepData,
+  SuggestionStepData,
+} from "@/src/types/interior-workflow";
+import { getBase64FromFileUrl } from "@/src/utils/get-base-64-from-file-url";
+import { saveImageToFile } from "@/src/utils/save-image-to-file";
 
 export const interiorImprovementSuggestionStep = createStep({
   id: "interior-improvement-suggestion-step",
@@ -20,18 +23,19 @@ export const interiorImprovementSuggestionStep = createStep({
     reason: z.string(),
     suggestedChanges: z.array(z.string()),
   }),
-  execute: async ({ inputData, suspend, resumeData, mastra }) => {
+  execute: async ({ inputData, suspend, resumeData, mastra, writer }) => {
     const { imageUrl } = inputData;
     const { approvedChanges } = resumeData ?? {};
 
     if (!approvedChanges?.length) {
+      console.log("hello");
       const base64Image = await getBase64FromFileUrl(imageUrl);
 
       const suggestionAgent = mastra.getAgent(
         "interiorImprovementSuggestionAgent",
       );
 
-      const result = await suggestionAgent.generate(
+      const stream = await suggestionAgent.stream(
         [
           {
             role: "user",
@@ -52,9 +56,29 @@ export const interiorImprovementSuggestionStep = createStep({
         },
       );
 
+      for await (const chunk of stream.objectStream) {
+        writer.write({
+          type: "data-suggestions",
+          data: {
+            changes: chunk.suggestions,
+            status: "streaming",
+          } satisfies SuggestionStepData,
+        });
+      }
+
+      const result = await stream.object;
+
+      writer.write({
+        type: "data-suggestions",
+        data: {
+          changes: result.suggestions,
+          status: "completed",
+        } satisfies SuggestionStepData,
+      });
+
       await suspend({
         reason: "Awaiting user approval for suggested changes.",
-        suggestedChanges: result.object.suggestions,
+        suggestedChanges: result.suggestions,
       });
     }
 
@@ -74,12 +98,20 @@ const interiorImageImprovementStep = createStep({
   outputSchema: z.object({
     improvedImageUrl: z.string(),
   }),
-  execute: async ({ inputData, mastra, runId }) => {
+  execute: async ({ inputData, mastra, writer }) => {
     const { imageUrl, changes } = inputData;
 
     const base64Image = await getBase64FromFileUrl(imageUrl);
 
     const improvementAgent = mastra.getAgent("interiorImageImprovementAgent");
+
+    writer.write({
+      type: "data-improvedInterior",
+      data: {
+        status: "in-progess",
+        url: "",
+      } satisfies ImprovementStepData,
+    });
 
     const result = await improvementAgent.generate([
       {
@@ -100,16 +132,21 @@ const interiorImageImprovementStep = createStep({
     ]);
 
     // The reason why we get the last file is that the agent might return multiple files during generation
-    const generatedImageBase64 =
-      result.files?.[result.files.length - 1].payload.data;
+    const files = result?.files;
+    const generatedImageBase64 = files?.[files?.length - 1]?.payload.data;
 
-    const filePath = await saveImageToFile(
-      generatedImageBase64 as string,
-      "png",
-    );
+    const url = await saveImageToFile(generatedImageBase64 as string, "png");
+
+    writer.write({
+      type: "data-improvedInterior",
+      data: {
+        status: "completed",
+        url,
+      } satisfies ImprovementStepData,
+    });
 
     return {
-      improvedImageUrl: filePath,
+      improvedImageUrl: url,
     };
   },
 });
