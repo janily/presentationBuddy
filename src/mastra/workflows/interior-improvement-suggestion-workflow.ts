@@ -1,15 +1,17 @@
 import { getBase64FromFileUrl } from "@/src/utils/get-base-64-from-file-url";
+import { saveImageToFile } from "@/src/utils/save-image-to-file";
 import { createStep, createWorkflow } from "@mastra/core";
 import z from "zod";
+import { interiorImprovementSuggestionAgent } from "../agents/interior-improvement-suggestion-agent";
 
-const interiorImprovementSuggestionStep = createStep({
+export const interiorImprovementSuggestionStep = createStep({
   id: "interior-improvement-suggestion-step",
   inputSchema: z.object({
     imageUrl: z.string(),
   }),
   outputSchema: z.object({
     imageUrl: z.string(),
-    suggestions: z.array(z.string()),
+    changes: z.array(z.string()),
   }),
   resumeSchema: z.object({
     approvedChanges: z.array(z.string()),
@@ -50,7 +52,7 @@ const interiorImprovementSuggestionStep = createStep({
         },
       );
 
-      suspend({
+      await suspend({
         reason: "Awaiting user approval for suggested changes.",
         suggestedChanges: result.object.suggestions,
       });
@@ -101,8 +103,29 @@ const interiorImageImprovementStep = createStep({
     const generatedImageBase64 =
       result.files?.[result.files.length - 1].payload.data;
 
+    const filePath = await saveImageToFile(
+      generatedImageBase64 as string,
+      `${runId}`,
+      "png",
+    );
+
     return {
-      improvedImageUrl: result.text,
+      improvedImageUrl: filePath,
     };
   },
 });
+
+export const interiorImprovementSuggestionWorkflow = createWorkflow({
+  id: "interior-improvement-suggestion-workflow",
+  inputSchema: z.object({
+    imageUrl: z.string(),
+  }),
+  outputSchema: z.object({
+    improvedImageUrl: z.string(),
+  }),
+  description:
+    "A workflow that suggests improvements for interior images and applies them upon approval.",
+})
+  .then(interiorImprovementSuggestionStep)
+  .then(interiorImageImprovementStep)
+  .commit();
