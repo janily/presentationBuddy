@@ -8,14 +8,15 @@ interface ProcessingViewProps {
   imageUrl: string;
   suggestions: string[];
   onComplete: () => void;
+  isComplete?: boolean;
 }
 
 const processingSteps = [
-  { id: "analyze", icon: Sparkles, text: "Analyzing room structure..." },
-  { id: "color", icon: Palette, text: "Identifying color palette..." },
-  { id: "lighting", icon: Lamp, text: "Evaluating lighting conditions..." },
-  { id: "furniture", icon: Sofa, text: "Detecting furniture arrangement..." },
-  { id: "decor", icon: Flower2, text: "Finding decoration opportunities..." },
+  { id: "analyze", icon: Sparkles, text: "Analyzing selected improvements..." },
+  { id: "color", icon: Palette, text: "Adjusting color palette..." },
+  { id: "lighting", icon: Lamp, text: "Optimizing lighting..." },
+  { id: "furniture", icon: Sofa, text: "Rendering furniture changes..." },
+  { id: "decor", icon: Flower2, text: "Applying decoration updates..." },
 ];
 
 // Pre-compute particle positions to avoid Math.random during render
@@ -32,47 +33,52 @@ export default function ProcessingView({
   imageUrl,
   suggestions,
   onComplete,
+  isComplete = false,
 }: ProcessingViewProps) {
-  const [progress, setProgress] = useState(0);
+  const [currentStep, setCurrentStep] = useState(0);
   const [currentSuggestion, setCurrentSuggestion] = useState(0);
+  const [scanPosition, setScanPosition] = useState(0);
 
-  // Compute derived state with useMemo instead of useEffect + setState
-  const currentStep = useMemo(() => {
-    if (progress < 60) {
-      const stepIndex = Math.floor((progress / 60) * processingSteps.length);
-      return Math.min(stepIndex, processingSteps.length - 1);
-    }
-    return processingSteps.length - 1;
-  }, [progress]);
-
-  const isApplyingChanges = useMemo(() => progress >= 60, [progress]);
-
+  // Call onComplete when isComplete becomes true
   useEffect(() => {
-    // Simulate progress
-    const progressInterval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(progressInterval);
-          setTimeout(onComplete, 500);
-          return 100;
-        }
-        return prev + 1;
-      });
-    }, 50);
-
-    return () => clearInterval(progressInterval);
-  }, [onComplete]);
-
-  useEffect(() => {
-    // Cycle through suggestions when applying changes
-    if (isApplyingChanges && suggestions.length > 0) {
-      const suggestionInterval = setInterval(() => {
-        setCurrentSuggestion((prev) => (prev + 1) % suggestions.length);
-      }, 1500);
-
-      return () => clearInterval(suggestionInterval);
+    if (isComplete) {
+      const timer = setTimeout(onComplete, 500);
+      return () => clearTimeout(timer);
     }
-  }, [isApplyingChanges, suggestions.length]);
+  }, [isComplete, onComplete]);
+
+  // Cycle through processing steps for visual feedback
+  useEffect(() => {
+    if (isComplete) return;
+
+    const stepInterval = setInterval(() => {
+      setCurrentStep((prev) => (prev + 1) % processingSteps.length);
+    }, 2000);
+
+    return () => clearInterval(stepInterval);
+  }, [isComplete]);
+
+  // Cycle through suggestions
+  useEffect(() => {
+    if (suggestions.length === 0) return;
+
+    const suggestionInterval = setInterval(() => {
+      setCurrentSuggestion((prev) => (prev + 1) % suggestions.length);
+    }, 1500);
+
+    return () => clearInterval(suggestionInterval);
+  }, [suggestions.length]);
+
+  // Animate scan line
+  useEffect(() => {
+    if (isComplete) return;
+
+    const scanInterval = setInterval(() => {
+      setScanPosition((prev) => (prev + 1) % 100);
+    }, 30);
+
+    return () => clearInterval(scanInterval);
+  }, [isComplete]);
 
   const CurrentIcon = processingSteps[currentStep]?.icon || Sparkles;
 
@@ -106,16 +112,18 @@ export default function ProcessingView({
             <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/40" />
 
             {/* Scanning line effect */}
-            <div className="absolute inset-0 overflow-hidden">
-              <div
-                className="absolute left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[var(--accent-terracotta)] to-transparent opacity-80"
-                style={{
-                  top: `${progress % 100}%`,
-                  boxShadow: "0 0 20px 8px rgba(196, 86, 54, 0.4)",
-                  transition: "top 0.1s linear",
-                }}
-              />
-            </div>
+            {!isComplete && (
+              <div className="absolute inset-0 overflow-hidden">
+                <div
+                  className="absolute left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[var(--accent-terracotta)] to-transparent opacity-80"
+                  style={{
+                    top: `${scanPosition}%`,
+                    boxShadow: "0 0 20px 8px rgba(196, 86, 54, 0.4)",
+                    transition: "top 0.03s linear",
+                  }}
+                />
+              </div>
+            )}
 
             {/* Pulsing corners */}
             <div className="absolute inset-4">
@@ -176,29 +184,43 @@ export default function ProcessingView({
                 className="text-xl font-semibold text-[var(--text-primary)] mb-2"
                 style={{ fontFamily: "var(--font-fraunces), Georgia, serif" }}
               >
-                {isApplyingChanges
-                  ? "Applying your improvements..."
-                  : "Redesigning your space..."}
+                {isComplete
+                  ? "Improvements complete!"
+                  : "Applying your improvements..."}
               </h2>
               <p className="text-sm text-[var(--text-secondary)] h-5 transition-all duration-300">
-                {isApplyingChanges && suggestions.length > 0
-                  ? `"${suggestions[currentSuggestion]}"`
-                  : processingSteps[currentStep]?.text}
+                {isComplete
+                  ? "Your redesigned space is ready"
+                  : suggestions.length > 0
+                    ? `"${suggestions[currentSuggestion]}"`
+                    : processingSteps[currentStep]?.text}
               </p>
             </div>
 
-            {/* Progress Bar */}
+            {/* Indeterminate Progress Bar */}
             <div className="relative">
-              <div className="progress-bar h-2">
-                <div
-                  className="progress-fill"
-                  style={{ width: `${progress}%` }}
-                />
+              <div className="progress-bar h-2 overflow-hidden">
+                {isComplete ? (
+                  <div
+                    className="progress-fill transition-all duration-500"
+                    style={{ width: "100%" }}
+                  />
+                ) : (
+                  <div className="absolute inset-0 bg-[var(--bg-secondary)]">
+                    <div
+                      className="h-full bg-gradient-to-r from-transparent via-[var(--accent-terracotta)] to-transparent"
+                      style={{
+                        animation: "indeterminate 1.5s ease-in-out infinite",
+                        width: "40%",
+                      }}
+                    />
+                  </div>
+                )}
               </div>
               <div className="flex justify-between mt-2 text-xs text-[var(--text-muted)]">
-                <span>Analyzing</span>
+                <span>Processing</span>
                 <span className="font-medium text-[var(--accent-terracotta)]">
-                  {progress}%
+                  {isComplete ? "Done!" : "Working..."}
                 </span>
                 <span>Complete</span>
               </div>
@@ -208,8 +230,8 @@ export default function ProcessingView({
             <div className="flex justify-center gap-2 mt-6">
               {processingSteps.map((step, index) => {
                 const StepIcon = step.icon;
-                const isComplete = index < currentStep;
-                const isCurrent = index === currentStep && !isApplyingChanges;
+                const isCurrent = index === currentStep && !isComplete;
+                const isAllComplete = isComplete;
 
                 return (
                   <div
@@ -218,7 +240,7 @@ export default function ProcessingView({
                       w-10 h-10 rounded-xl flex items-center justify-center
                       transition-all duration-300
                       ${
-                        isComplete
+                        isAllComplete
                           ? "bg-[var(--success-bg)] text-[var(--success)]"
                           : isCurrent
                             ? "bg-[var(--accent-terracotta)] text-white scale-110 shadow-md"
@@ -233,17 +255,15 @@ export default function ProcessingView({
             </div>
 
             {/* Applied changes preview */}
-            {isApplyingChanges && suggestions.length > 0 && (
+            {suggestions.length > 0 && (
               <div className="mt-6 p-4 rounded-xl bg-[var(--bg-secondary)] animate-fade-in">
                 <p className="text-xs text-[var(--text-muted)] mb-2">
-                  Changes being applied:
+                  {isComplete ? "Applied changes:" : "Changes being applied:"}
                 </p>
                 <div className="space-y-2">
                   {suggestionsWithKeys.map((suggestion) => {
-                    const isApplied =
-                      suggestion.index <
-                      Math.floor(((progress - 60) / 40) * suggestions.length);
-                    const isApplying = suggestion.index === currentSuggestion;
+                    const isApplying =
+                      suggestion.index === currentSuggestion && !isComplete;
 
                     return (
                       <div
@@ -252,7 +272,7 @@ export default function ProcessingView({
                           flex items-center gap-2 text-sm
                           transition-all duration-300
                           ${
-                            isApplied
+                            isComplete
                               ? "text-[var(--success)]"
                               : isApplying
                                 ? "text-[var(--accent-terracotta)] font-medium"
@@ -264,7 +284,7 @@ export default function ProcessingView({
                           className={`
                           w-4 h-4 rounded-full flex items-center justify-center text-xs
                           ${
-                            isApplied
+                            isComplete
                               ? "bg-[var(--success)] text-white"
                               : isApplying
                                 ? "bg-[var(--accent-terracotta)] text-white animate-pulse"
@@ -272,7 +292,7 @@ export default function ProcessingView({
                           }
                         `}
                         >
-                          {isApplied ? "✓" : suggestion.index + 1}
+                          {isComplete ? "✓" : suggestion.index + 1}
                         </span>
                         <span className="truncate">{suggestion.text}</span>
                       </div>
@@ -286,9 +306,23 @@ export default function ProcessingView({
 
         {/* Bottom hint */}
         <p className="text-center text-sm text-[var(--text-muted)] mt-6 animate-pulse-subtle">
-          This may take a moment... creating something beautiful ✨
+          {isComplete
+            ? "Preparing your reveal..."
+            : "This may take a moment... creating something beautiful ✨"}
         </p>
       </div>
+
+      {/* CSS for indeterminate animation */}
+      <style jsx>{`
+        @keyframes indeterminate {
+          0% {
+            transform: translateX(-100%);
+          }
+          100% {
+            transform: translateX(350%);
+          }
+        }
+      `}</style>
     </div>
   );
 }

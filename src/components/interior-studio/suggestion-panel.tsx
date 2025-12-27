@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Plus, Sparkles, Shuffle, Lightbulb } from "lucide-react";
-import SuggestionCard, { type Suggestion } from "./SuggestionCard";
+import SuggestionCard, { type Suggestion } from "./suggestion-card";
 
 interface SuggestionPanelProps {
   suggestions: Suggestion[];

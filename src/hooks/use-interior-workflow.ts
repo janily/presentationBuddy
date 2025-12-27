@@ -1,7 +1,6 @@
-import { useChat, useCompletion } from "@ai-sdk/react";
+import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { MyUIMessage } from "../types/interior-workflow";
-import { WorkflowDataPart } from "@mastra/ai-sdk";
 import { useMemo } from "react";
 
 export const useInteriorWorkflow = () => {
@@ -11,20 +10,25 @@ export const useInteriorWorkflow = () => {
       prepareSendMessagesRequest: ({ messages }) => {
         const lastMessage = messages[messages.length - 1];
 
-        const userImage = lastMessage.parts.find(
+        const userImagePart = lastMessage.parts.find(
           (item) => item.type === "data-userInitialImage",
         );
-        const approvedChanges = lastMessage.parts.find(
+        const approvedChangesPart = lastMessage.parts.find(
           (item) => item.type === "data-approvedChanges",
         );
-        const workflowRunId = lastMessage.parts.find(
+        const workflowRunIdPart = lastMessage.parts.find(
           (item) => item.type === "data-workflowRunId",
         );
 
+        // Extract actual data values from the parts
+        const imageUrl = userImagePart?.data;
+        const approvedChanges = approvedChangesPart?.data;
+        const workflowRunId = workflowRunIdPart?.data;
+
         return {
           body: {
-            imageUrl: userImage,
-            approvedChanges: approvedChanges,
+            imageUrl,
+            approvedChanges,
             workflowRunId,
           },
         };
@@ -35,20 +39,29 @@ export const useInteriorWorkflow = () => {
   const suggestionStep = useMemo(() => {
     return messages
       .flatMap((m) => m.parts)
-      .find((item) => item.type === "data-improvementSuggestions");
+      .findLast((item) => item.type === "data-suggestions");
   }, [messages]);
 
   const improvementStep = useMemo(() => {
     return messages
       .flatMap((m) => m.parts)
-      .find((item) => item.type === "data-improvedInterior");
+      .findLast((item) => item.type === "data-improvedInterior");
   }, [messages]);
 
   const lastWorkflowPart = messages
     .flatMap((m) => m.parts)
     .findLast((p) => p.type === "data-workflow");
 
-  const activeRunId = lastWorkflowPart?.id;
+  const activeRunId = useMemo(() => {
+    if (lastWorkflowPart && "data" in lastWorkflowPart) {
+      // The workflow part contains the run ID in its data
+      const workflowData = lastWorkflowPart.data as {
+        data?: { runId?: string };
+      };
+      return workflowData?.data?.runId;
+    }
+    return undefined;
+  }, [lastWorkflowPart]);
 
   const sendInteriorImage = (imageUrl: string) => {
     sendMessage({
@@ -63,15 +76,27 @@ export const useInteriorWorkflow = () => {
   };
 
   const suspenseData = useMemo(() => {
-    const workflowPart = messages
-      .flatMap((m) => m.parts)
-      .findLast((p) => p.type === "data-workflow");
-
-    if (!workflowPart) {
+    if (!lastWorkflowPart || !("data" in lastWorkflowPart)) {
       return null;
     }
 
-    const steps = workflowPart.data.data.steps;
+    const workflowData = lastWorkflowPart.data as {
+      data?: {
+        steps?: Record<
+          string,
+          {
+            suspendPayload?: {
+              suggestedChanges?: string[];
+              reason?: string;
+            };
+          }
+        >;
+      };
+    };
+
+    const steps = workflowData?.data?.steps;
+    if (!steps) return null;
+
     const lastStepKey = Object.keys(steps).pop();
     const lastStep = lastStepKey ? steps[lastStepKey] : null;
 
@@ -82,7 +107,7 @@ export const useInteriorWorkflow = () => {
       suggestedChanges,
       reason,
     };
-  }, [messages]);
+  }, [lastWorkflowPart]);
 
   const approveChanges = (approvedChanges: string[]) => {
     sendMessage({

@@ -20,5 +20,6 @@ export type MyUIMessage = UIMessage<
     workflow: WorkflowDataPart;
     improvementSuggestions: SuggestionStepData;
     improvedInterior: ImprovementStepData;
+    suggestions: SuggestionStepData;
   }
 >;

@@ -35,15 +35,6 @@ export default function ImageUploader({ onImageUpload }: ImageUploaderProps) {
 
         const data = await response.json();
 
-        // Call analyze endpoint with the uploaded image URL
-        await fetch("/api/analyze", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ imageUrl: data.url }),
-        });
-
         onImageUpload(data.url);
       } catch (error) {
         console.error("Upload error:", error);
