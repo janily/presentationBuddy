@@ -2,7 +2,7 @@ import { WorkflowDataPart } from "@mastra/ai-sdk";
 import { UIMessage } from "ai";
 
 export type SuggestionStepData = {
-  status: "streaming" | "completed";
+  status: "loading" | "streaming" | "completed";
   changes?: string[];
 };
 

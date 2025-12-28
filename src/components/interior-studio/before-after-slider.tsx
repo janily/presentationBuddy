@@ -186,16 +186,6 @@ export default function BeforeAfterSlider({
     setIsAutoPlaying((prev) => !prev);
   };
 
-  const handleMiniTrackClick = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      const rect = e.currentTarget.getBoundingClientRect();
-      const percentage = ((e.clientX - rect.left) / rect.width) * 100;
-      setSliderPosition(Math.max(0, Math.min(100, percentage)));
-      setIsAutoPlaying(false);
-    },
-    [],
-  );
-
   const confettiColors = useMemo(
     () => [
       "var(--accent-terracotta)",
@@ -408,34 +398,6 @@ export default function BeforeAfterSlider({
                   </>
                 )}
               </button>
-            </div>
-
-            {/* Slider mini track */}
-            <div className="hidden sm:flex items-center gap-3 flex-1 max-w-xs mx-6">
-              <span className="text-xs text-[var(--text-muted)]">0%</span>
-              <div
-                className="flex-1 h-2 rounded-full bg-[var(--bg-secondary)] cursor-pointer"
-                onClick={handleMiniTrackClick}
-                onKeyDown={(e) => {
-                  if (e.key === "ArrowLeft") {
-                    setSliderPosition((prev) => Math.max(0, prev - 5));
-                  } else if (e.key === "ArrowRight") {
-                    setSliderPosition((prev) => Math.min(100, prev + 5));
-                  }
-                }}
-                role="slider"
-                aria-valuenow={Math.round(sliderPosition)}
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-label="Slider position"
-                tabIndex={0}
-              >
-                <div
-                  className="h-full rounded-full bg-[var(--accent-terracotta)] transition-all duration-100"
-                  style={{ width: `${sliderPosition}%` }}
-                />
-              </div>
-              <span className="text-xs text-[var(--text-muted)]">100%</span>
             </div>
 
             <div className="text-xs text-[var(--text-muted)]">

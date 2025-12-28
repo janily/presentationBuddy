@@ -85,8 +85,9 @@ export const useInteriorWorkflow = () => {
     const lastStepKey = Object.keys(steps).pop();
     const lastStep = lastStepKey ? steps[lastStepKey] : null;
 
-    const suggestedChanges = lastStep?.suspendPayload?.suggestedChanges || [];
-    const reason = lastStep?.suspendPayload?.reason || "";
+    const suggestedChanges = (lastStep?.suspendPayload?.suggestedChanges ||
+      []) as string[];
+    const reason = (lastStep?.suspendPayload?.reason || "") as string;
 
     return {
       suggestedChanges,

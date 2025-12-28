@@ -13,6 +13,7 @@ interface SuggestionPanelProps {
   onHoverZone?: (zone: string | null) => void;
   onGenerate: () => void;
   isGenerating?: boolean;
+  isLoading?: boolean;
 }
 
 const quickChips = [
@@ -33,6 +34,7 @@ export default function SuggestionPanel({
   onHoverZone,
   onGenerate,
   isGenerating = false,
+  isLoading = false,
 }: SuggestionPanelProps) {
   const [newSuggestion, setNewSuggestion] = useState("");
   const [isInputFocused, setIsInputFocused] = useState(false);
@@ -97,7 +99,28 @@ export default function SuggestionPanel({
 
       {/* Suggestions List */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {suggestions.length === 0 ? (
+        {isLoading ? (
+          <div className="space-y-3">
+            {/* Skeleton loading cards */}
+            {[1, 2, 3, 4].map((i) => (
+              <div
+                key={i}
+                className="p-4 rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)]/50 animate-pulse"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="w-5 h-5 rounded bg-[var(--border-light)]" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-[var(--border-light)] rounded w-3/4" />
+                    <div className="h-4 bg-[var(--border-light)] rounded w-1/2" />
+                  </div>
+                </div>
+              </div>
+            ))}
+            <p className="text-center text-sm text-[var(--text-muted)] mt-4">
+              Analyzing your space...
+            </p>
+          </div>
+        ) : suggestions.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <div className="w-16 h-16 rounded-full bg-[var(--bg-secondary)] flex items-center justify-center mb-4">
               <Lightbulb className="w-8 h-8 text-[var(--text-muted)]" />

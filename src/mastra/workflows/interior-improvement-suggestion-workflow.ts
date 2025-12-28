@@ -28,7 +28,15 @@ export const interiorImprovementSuggestionStep = createStep({
     const { approvedChanges } = resumeData ?? {};
 
     if (!approvedChanges?.length) {
-      console.log("hello");
+      // Send loading state immediately so UI can show suggestions screen
+      writer.write({
+        type: "data-suggestions",
+        data: {
+          changes: [],
+          status: "loading",
+        } satisfies SuggestionStepData,
+      });
+
       const base64Image = await getBase64FromFileUrl(imageUrl);
 
       const suggestionAgent = mastra.getAgent(

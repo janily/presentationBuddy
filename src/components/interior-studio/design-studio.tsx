@@ -101,6 +101,11 @@ export default function DesignStudio() {
       return "suggestions";
     }
 
+    // Check if suggestion step has started (even with loading state)
+    if (suggestionStep?.data) {
+      return "suggestions";
+    }
+
     // If we're streaming or waiting, show analyzing
     if (status === "streaming" || status === "submitted") {
       return "analyzing";
@@ -113,6 +118,7 @@ export default function DesignStudio() {
     improvementStep,
     hasApprovedChanges,
     suggestions.length,
+    suggestionStep,
     status,
   ]);
 
@@ -275,6 +281,14 @@ export default function DesignStudio() {
     [suggestions],
   );
 
+  // Check if suggestions are still loading
+  const isSuggestionsLoading = useMemo(() => {
+    if (suggestionStep?.data) {
+      return suggestionStep.data.status === "loading";
+    }
+    return false;
+  }, [suggestionStep]);
+
   return (
     <div className="min-h-screen bg-[var(--bg-primary)]">
       {/* Upload Screen */}
@@ -351,6 +365,7 @@ export default function DesignStudio() {
                   onHoverZone={setHighlightedZone}
                   onGenerate={handleGenerate}
                   isGenerating={status === "streaming"}
+                  isLoading={isSuggestionsLoading}
                 />
               </div>
             </div>
