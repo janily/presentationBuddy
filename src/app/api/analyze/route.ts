@@ -15,6 +15,11 @@ export async function POST(request: NextRequest) {
       "interiorImprovementSuggestionWorkflow",
     );
 
+    console.log("Received analyze request:", {
+      imageUrl,
+      workflowRunId,
+      approvedChanges,
+    });
     // Resume an existing workflow run
     if (workflowRunId && approvedChanges) {
       const run = await workflow.createRunAsync({ runId: workflowRunId });

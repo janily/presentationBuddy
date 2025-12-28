@@ -53,14 +53,11 @@ export const useInteriorWorkflow = () => {
     .findLast((p) => p.type === "data-workflow");
 
   const activeRunId = useMemo(() => {
-    if (lastWorkflowPart && "data" in lastWorkflowPart) {
-      // The workflow part contains the run ID in its data
-      const workflowData = lastWorkflowPart.data as {
-        data?: { runId?: string };
-      };
-      return workflowData?.data?.runId;
+    if (!lastWorkflowPart) {
+      return null;
     }
-    return undefined;
+
+    return lastWorkflowPart.id;
   }, [lastWorkflowPart]);
 
   const sendInteriorImage = (imageUrl: string) => {
@@ -76,23 +73,11 @@ export const useInteriorWorkflow = () => {
   };
 
   const suspenseData = useMemo(() => {
-    if (!lastWorkflowPart || !("data" in lastWorkflowPart)) {
+    if (!lastWorkflowPart) {
       return null;
     }
 
-    const workflowData = lastWorkflowPart.data as {
-      data?: {
-        steps?: Record<
-          string,
-          {
-            suspendPayload?: {
-              suggestedChanges?: string[];
-              reason?: string;
-            };
-          }
-        >;
-      };
-    };
+    const workflowData = lastWorkflowPart.data;
 
     const steps = workflowData?.data?.steps;
     if (!steps) return null;

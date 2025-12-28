@@ -44,10 +44,7 @@ export default function DesignStudio() {
 
     // First check streaming suggestions
     if (suggestionStep?.data) {
-      const { changes } = suggestionStep.data as {
-        changes?: string[];
-        status: "streaming" | "completed";
-      };
+      const { changes } = suggestionStep.data;
 
       if (changes && changes.length > 0) {
         return changes.map((text, index) => ({
@@ -83,10 +80,7 @@ export default function DesignStudio() {
 
     // Check if improvement is complete
     if (improvementStep?.data) {
-      const { status: improvementStatus, url } = improvementStep.data as {
-        status: "in-progess" | "completed";
-        url: string;
-      };
+      const { status: improvementStatus, url } = improvementStep.data;
 
       if (improvementStatus === "completed" && url) {
         return "reveal";
