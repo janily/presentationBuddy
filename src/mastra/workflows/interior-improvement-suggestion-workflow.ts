@@ -28,7 +28,6 @@ export const interiorImprovementSuggestionStep = createStep({
     const { approvedChanges } = resumeData ?? {};
 
     if (!approvedChanges?.length) {
-      // Send loading state immediately so UI can show suggestions screen
       writer.write({
         type: "data-suggestions",
         data: {
