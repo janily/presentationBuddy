@@ -16,12 +16,12 @@ export const interiorImprovementSuggestionStep = createStep({
     imageUrl: z.string(),
     changes: z.array(z.string()),
   }),
-  resumeSchema: z.object({
-    approvedChanges: z.array(z.string()),
-  }),
   suspendSchema: z.object({
     reason: z.string(),
     suggestedChanges: z.array(z.string()),
+  }),
+  resumeSchema: z.object({
+    approvedChanges: z.array(z.string()),
   }),
   execute: async ({ inputData, suspend, resumeData, mastra, writer }) => {
     const { imageUrl } = inputData;
