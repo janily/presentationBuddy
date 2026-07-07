@@ -115,7 +115,7 @@ const interiorImageImprovementStep = createStep({
     writer.write({
       type: "data-improvedInterior",
       data: {
-        status: "in-progess",
+        status: "in-progress",
         url: "",
       } satisfies ImprovementStepData,
     });

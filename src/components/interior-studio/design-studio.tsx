@@ -86,7 +86,7 @@ export default function DesignStudio() {
         return "reveal";
       }
 
-      if (improvementStatus === "in-progess" || hasApprovedChanges) {
+      if (improvementStatus === "in-progress" || hasApprovedChanges) {
         return "processing";
       }
     }
@@ -126,7 +126,7 @@ export default function DesignStudio() {
   const isImprovementComplete = useMemo(() => {
     if (improvementStep?.data) {
       const { status: improvementStatus } = improvementStep.data as {
-        status: "in-progess" | "completed";
+        status: "in-progress" | "completed";
       };
       return improvementStatus === "completed";
     }
