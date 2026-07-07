@@ -1,4 +1,5 @@
 export { default as DesignStudio } from "./design-studio";
+export { default as PresentationStudio } from "./design-studio";
 export { default as ImageUploader } from "./image-uploader";
 export { default as ImagePreview } from "./image-preview";
 export { default as SuggestionPanel } from "./suggestion-panel";

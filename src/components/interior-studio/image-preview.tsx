@@ -32,7 +32,7 @@ export default function ImagePreview({
       {/* Toolbar */}
       <div className="flex items-center justify-between p-3 border-b border-[var(--border-light)] bg-[var(--bg-elevated)]">
         <span className="text-sm font-medium text-[var(--text-secondary)]">
-          Room Preview
+          Deck Preview
         </span>
         <div className="flex items-center gap-1">
           <button
@@ -68,7 +68,7 @@ export default function ImagePreview({
         </div>
       </div>
 
-      {/* Image Container */}
+      {/* Deck Container */}
       <div className="relative flex-1 overflow-hidden bg-[var(--bg-secondary)]">
         <div
           className="absolute inset-0 flex items-center justify-center transition-transform duration-300 ease-out"
@@ -78,7 +78,7 @@ export default function ImagePreview({
           <div className="relative w-full h-full">
             <Image
               src={imageUrl}
-              alt="Room preview"
+              alt="Deck preview"
               fill
               className="object-contain"
               sizes="(max-width: 768px) 100vw, 50vw"

@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
-/* Warm Editorial Design System */
+/* Warm Editorial Presentation Design System */
 :root {
-    /* Core Palette - Warm Terracotta & Sage */
+    /* Core Palette - warm keynote terracotta, sage, and brass */
     --bg-primary: #f8f5f0;
     --bg-secondary: #ede8e0;
     --bg-card: #fffdf9;
@@ -88,7 +88,7 @@ body {
     -moz-osx-font-smoothing: grayscale;
 }
 
-/* Paper Texture Background */
+/* Presentation Canvas Texture Background */
 .paper-texture {
     position: relative;
     background: linear-gradient(
@@ -676,7 +676,7 @@ select {
     transition: all var(--transition-base);
 }
 
-/* Image reveal mask animation for before/after */
+/* HTML presentation reveal mask animation for before/after */
 .reveal-mask {
     clip-path: inset(0 0 0 0);
     transition: clip-path 0.6s cubic-bezier(0.4, 0, 0.2, 1);

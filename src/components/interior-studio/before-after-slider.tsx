@@ -210,7 +210,7 @@ export default function BeforeAfterSlider({
                 className="text-2xl md:text-3xl font-semibold text-[var(--text-primary)]"
                 style={{ fontFamily: "var(--font-fraunces), Georgia, serif" }}
               >
-                Your Redesigned Space
+                Your HTML Presentation
               </h1>
               <p className="text-sm text-[var(--text-muted)]">
                 Drag to compare before & after
@@ -281,7 +281,7 @@ export default function BeforeAfterSlider({
             aria-label="Before and after comparison slider"
             tabIndex={0}
           >
-            {/* Before Image (Full) */}
+            {/* Before deck (full) */}
             <div className="absolute inset-0">
               <Image
                 src={beforeImage}
@@ -297,7 +297,7 @@ export default function BeforeAfterSlider({
               </div>
             </div>
 
-            {/* After Image (Clipped) */}
+            {/* HTML presentation (clipped) */}
             <div
               className="absolute inset-0 overflow-hidden"
               style={{ clipPath: `inset(0 ${100 - sliderPosition}% 0 0)` }}
@@ -413,7 +413,7 @@ export default function BeforeAfterSlider({
           </div>
         </div>
 
-        {/* Applied Changes Panel */}
+        {/* Applied Slide Updates Panel */}
         <div className="mt-6 bg-[var(--bg-card)] rounded-2xl border border-[var(--border-light)] overflow-hidden">
           <div className="p-4 border-b border-[var(--border-light)]">
             <div className="flex items-center gap-2">
@@ -422,7 +422,7 @@ export default function BeforeAfterSlider({
                 className="text-lg font-semibold text-[var(--text-primary)]"
                 style={{ fontFamily: "var(--font-fraunces), Georgia, serif" }}
               >
-                Applied Changes
+                Applied Slide Updates
               </h3>
               <span className="px-2 py-0.5 rounded-full bg-[var(--success-bg)] text-[var(--success)] text-xs font-medium">
                 {appliedChanges.length} improvements
@@ -484,7 +484,7 @@ export default function BeforeAfterSlider({
                        transition-all duration-200"
           >
             <RefreshCw className="w-5 h-5" />
-            Try Different Suggestions
+            Try Different Slide Suggestions
           </button>
           <button
             type="button"

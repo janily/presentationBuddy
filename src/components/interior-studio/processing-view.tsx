@@ -102,7 +102,7 @@ export default function ProcessingView({
           <div className="relative aspect-[4/3] overflow-hidden bg-[var(--bg-secondary)]">
             <Image
               src={imageUrl}
-              alt="Processing room"
+              alt="Processing deck"
               fill
               className="object-cover"
               sizes="(max-width: 768px) 100vw, 600px"
@@ -185,12 +185,12 @@ export default function ProcessingView({
                 style={{ fontFamily: "var(--font-fraunces), Georgia, serif" }}
               >
                 {isComplete
-                  ? "Improvements complete!"
-                  : "Applying your improvements..."}
+                  ? "Presentation complete!"
+                  : "Building your HTML presentation..."}
               </h2>
               <p className="text-sm text-[var(--text-secondary)] h-5 transition-all duration-300">
                 {isComplete
-                  ? "Your redesigned space is ready"
+                  ? "Your HTML presentation is ready"
                   : suggestions.length > 0
                     ? `"${suggestions[currentSuggestion]}"`
                     : processingSteps[currentStep]?.text}
@@ -308,7 +308,7 @@ export default function ProcessingView({
         <p className="text-center text-sm text-[var(--text-muted)] mt-6 animate-pulse-subtle">
           {isComplete
             ? "Preparing your reveal..."
-            : "This may take a moment... creating something beautiful ✨"}
+            : "This may take a moment... creating a polished HTML presentation ✨"}
         </p>
       </div>
 

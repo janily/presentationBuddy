@@ -73,7 +73,7 @@ export default function DesignStudio() {
 
   // Derive current step from workflow state
   const currentStep = useMemo((): WorkflowStep => {
-    // If no image uploaded yet
+    // If no presentation source is uploaded yet
     if (!uploadedImage) {
       return "upload";
     }
@@ -111,7 +111,7 @@ export default function DesignStudio() {
       return "analyzing";
     }
 
-    // Default to analyzing if image is uploaded but no suggestions yet
+    // Default to analyzing if source is uploaded but no suggestions yet
     return "analyzing";
   }, [
     uploadedImage,
@@ -133,7 +133,7 @@ export default function DesignStudio() {
     return false;
   }, [improvementStep]);
 
-  // Get the improved image URL
+  // Get the generated HTML presentation URL
   const improvedImageUrl = useMemo(() => {
     if (improvementStep?.data) {
       const { url } = improvementStep.data as { url: string };
@@ -142,7 +142,7 @@ export default function DesignStudio() {
     return uploadedImage || "";
   }, [improvementStep, uploadedImage]);
 
-  // Handle image upload
+  // Handle source upload
   const handleImageUpload = useCallback(
     (imageUrl: string) => {
       setUploadedImage(imageUrl);
@@ -244,7 +244,7 @@ export default function DesignStudio() {
       if (url) {
         const link = document.createElement("a");
         link.href = url;
-        link.download = "improved-interior.png";
+        link.download = "presentation-deck.html";
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -258,8 +258,8 @@ export default function DesignStudio() {
       const { url } = improvementStep.data as { url: string };
       if (url && navigator.share) {
         navigator.share({
-          title: "My Interior Design",
-          text: "Check out my AI-improved interior design!",
+          title: "My Presentation Deck",
+          text: "Check out my AI-generated HTML presentation!",
           url: url,
         });
       }
@@ -307,10 +307,10 @@ export default function DesignStudio() {
               className="text-2xl font-semibold text-[var(--text-primary)] mb-2"
               style={{ fontFamily: "var(--font-fraunces), Georgia, serif" }}
             >
-              Analyzing your room...
+              Analyzing your slides...
             </h2>
             <p className="text-[var(--text-secondary)]">
-              Our AI is studying your space to suggest improvements
+              Our AI is studying your deck to suggest improvements
             </p>
           </div>
         </div>
@@ -326,7 +326,7 @@ export default function DesignStudio() {
                 className="text-xl font-semibold text-[var(--text-primary)]"
                 style={{ fontFamily: "var(--font-fraunces), Georgia, serif" }}
               >
-                Interior Design Studio
+                Presentation Studio
               </h1>
               <button
                 type="button"
@@ -346,7 +346,7 @@ export default function DesignStudio() {
           {/* Main Content */}
           <main className="max-w-7xl mx-auto p-4 md:p-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-120px)]">
-              {/* Image Preview */}
+              {/* Deck Preview */}
               <div className="h-full min-h-[400px]">
                 <ImagePreview
                   imageUrl={uploadedImage}

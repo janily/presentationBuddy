@@ -39,7 +39,7 @@ export default function ImageUploader({ onImageUpload }: ImageUploaderProps) {
       } catch (error) {
         console.error("Upload error:", error);
         setUploadError(
-          error instanceof Error ? error.message : "Failed to upload image",
+          error instanceof Error ? error.message : "Failed to upload source file",
         );
       } finally {
         setIsUploading(false);
@@ -96,17 +96,17 @@ export default function ImageUploader({ onImageUpload }: ImageUploaderProps) {
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--bg-card)] border border-[var(--border-light)] mb-6 animate-fade-in-down">
             <Sparkles className="w-4 h-4 text-[var(--accent-brass)]" />
             <span className="text-sm font-medium text-[var(--text-secondary)]">
-              AI-Powered Design
+              AI-Powered Presentations
             </span>
           </div>
           <h1
             className="text-4xl md:text-5xl font-display text-[var(--text-primary)] mb-4"
             style={{ fontFamily: "var(--font-fraunces), Georgia, serif" }}
           >
-            Interior Design Studio
+            Presentation Studio
           </h1>
           <p className="text-lg text-[var(--text-secondary)] max-w-md mx-auto">
-            Transform your space with AI. Upload a room photo and watch the
+            Turn ideas into an HTML presentation deck with AI. Upload source material and watch the
             magic happen.
           </p>
         </div>
@@ -133,9 +133,9 @@ export default function ImageUploader({ onImageUpload }: ImageUploaderProps) {
             className="sr-only"
           />
 
-          {/* Floating Room Illustration */}
+          {/* Floating Slide Illustration */}
           <div className="relative flex flex-col items-center">
-            {/* Room SVG Animation */}
+            {/* Slide SVG Animation */}
             <div
               className={`
               relative w-40 h-40 mb-8 transition-transform duration-500
@@ -143,7 +143,7 @@ export default function ImageUploader({ onImageUpload }: ImageUploaderProps) {
               ${isDragOver ? "" : "animate-float"}
             `}
             >
-              {/* Room outline SVG */}
+              {/* Slide outline SVG */}
               <svg
                 viewBox="0 0 160 160"
                 fill="none"
@@ -151,8 +151,8 @@ export default function ImageUploader({ onImageUpload }: ImageUploaderProps) {
                 className="w-full h-full"
                 aria-hidden="true"
               >
-                <title>Room illustration</title>
-                {/* Room frame */}
+                <title>Slide illustration</title>
+                {/* Slide frame */}
                 <rect
                   x="20"
                   y="30"
@@ -321,11 +321,11 @@ export default function ImageUploader({ onImageUpload }: ImageUploaderProps) {
                 ? "Uploading..."
                 : isDragOver
                   ? "Release to upload"
-                  : "Drop your room photo here"}
+                  : "Drop your presentation source here"}
             </h3>
             <p className="text-[var(--text-muted)] text-center mb-6">
               {isUploading
-                ? "Please wait while we process your image"
+                ? "Please wait while we process your deck"
                 : "or click to browse from your device"}
             </p>
 
@@ -360,15 +360,15 @@ export default function ImageUploader({ onImageUpload }: ImageUploaderProps) {
         <div className="mt-8 flex flex-wrap justify-center gap-4 text-sm text-[var(--text-muted)]">
           <span className="flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-sage)]" />
-            Well-lit photos work best
+            Clear source files work best
           </span>
           <span className="flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-terracotta)]" />
-            Show the full room
+            Include the full deck outline
           </span>
           <span className="flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-brass)]" />
-            Landscape orientation
+            Presentation-ready structure
           </span>
         </div>
       </div>

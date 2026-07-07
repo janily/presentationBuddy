@@ -17,12 +17,12 @@ interface SuggestionPanelProps {
 }
 
 const quickChips = [
-  { id: "chip-1", text: "Better lighting", icon: "💡" },
-  { id: "chip-2", text: "Add plants", icon: "🌿" },
-  { id: "chip-3", text: "Modern furniture", icon: "🛋️" },
-  { id: "chip-4", text: "Add artwork", icon: "🖼️" },
-  { id: "chip-5", text: "Declutter", icon: "✨" },
-  { id: "chip-6", text: "Change wall color", icon: "🎨" },
+  { id: "chip-1", text: "Sharper story arc", icon: "💡" },
+  { id: "chip-2", text: "Add speaker notes", icon: "🌿" },
+  { id: "chip-3", text: "Modern slide layout", icon: "🛋️" },
+  { id: "chip-4", text: "Add visuals", icon: "🖼️" },
+  { id: "chip-5", text: "Tighten copy", icon: "✨" },
+  { id: "chip-6", text: "Refine theme colors", icon: "🎨" },
 ];
 
 export default function SuggestionPanel({
@@ -117,7 +117,7 @@ export default function SuggestionPanel({
               </div>
             ))}
             <p className="text-center text-sm text-[var(--text-muted)] mt-4">
-              Analyzing your space...
+              Analyzing your deck...
             </p>
           </div>
         ) : suggestions.length === 0 ? (
@@ -264,7 +264,7 @@ export default function SuggestionPanel({
           ) : (
             <>
               <Sparkles className="w-5 h-5" />
-              <span>Generate Improvements</span>
+              <span>Generate HTML Presentation</span>
             </>
           )}
         </button>
