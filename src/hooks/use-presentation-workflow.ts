@@ -3,6 +3,7 @@ import { DefaultChatTransport } from "ai";
 import { useCallback, useMemo, useState } from "react";
 import {
   MyUIMessage,
+  AgentRequestData,
   PresentationBriefData,
   PresentationOutlineData,
 } from "../types/presentation-workflow";
@@ -44,16 +45,28 @@ export const usePresentationWorkflow = () => {
         const workflowRunIdPart = lastMessage.parts.find(
           (item) => item.type === "data-workflowRunId",
         );
+        const agentRequestPart = lastMessage.parts.find(
+          (item) => item.type === "data-agentRequest",
+        );
 
         const presentationBrief = (presentationBriefPart as { data?: unknown } | undefined)?.data;
         const approvedOutline = (approvedOutlinePart as { data?: unknown } | undefined)?.data;
         const workflowRunId = getNonEmptyString((workflowRunIdPart as { data?: unknown } | undefined)?.data);
+        const agentRequest = (agentRequestPart as { data?: unknown } | undefined)?.data;
 
         if (approvedOutline && workflowRunId) {
           return {
             body: {
               approvedOutline,
               workflowRunId,
+            },
+          };
+        }
+
+        if (agentRequest) {
+          return {
+            body: {
+              agentRequest,
             },
           };
         }
@@ -103,6 +116,26 @@ export const usePresentationWorkflow = () => {
         {
           type: "data-presentationBrief",
           data: brief,
+        },
+      ],
+    });
+  };
+
+  const sendAgentRequest = (message: string, context?: AgentRequestData["context"]) => {
+    const trimmedMessage = message.trim();
+    if (!trimmedMessage) return;
+
+    setApprovalError(null);
+    clearError();
+    sendMessage({
+      role: "user",
+      parts: [
+        {
+          type: "data-agentRequest",
+          data: {
+            message: trimmedMessage,
+            context,
+          },
         },
       ],
     });
@@ -164,6 +197,7 @@ export const usePresentationWorkflow = () => {
 
   return {
     sendPresentationBrief,
+    sendAgentRequest,
     approveOutline,
     messages,
     status,

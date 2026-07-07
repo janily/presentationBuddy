@@ -30,6 +30,14 @@ const getErrorMessage = (error: Error | undefined, fallback: string) => {
 
 const makeId = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
+const toDefaultBriefFromAgentRequest = (message: string): PresentationBrief => ({
+  topic: message,
+  audience: "General business audience",
+  slideCount: 6,
+  style: "Polished modern presentation",
+  requirements: message,
+});
+
 const toStreamingSlideItem = (slide: Partial<PresentationOutlineData["slides"][number]>, index: number): SlideOutlineItem => {
   const title = slide.title?.trim() || `Drafting slide ${index + 1}...`;
   const keyPoints = slide.keyPoints?.filter(Boolean) ?? [];
@@ -51,7 +59,7 @@ const toStreamingSlideItem = (slide: Partial<PresentationOutlineData["slides"][n
 
 export default function PresentationStudio() {
   const {
-    sendPresentationBrief,
+    sendAgentRequest,
     approveOutline,
     suspenseData,
     outlineStep,
@@ -149,18 +157,20 @@ export default function PresentationStudio() {
     return () => window.clearTimeout(timeout);
   }, [htmlGenerationStep?.data?.generatedCharacters, htmlGenerationStep?.data?.status, stop]);
 
-  const handleBriefSubmit = useCallback((nextBrief: PresentationBrief) => {
+  const handleAgentRequestSubmit = useCallback((message: string) => {
+    const nextBrief = toDefaultBriefFromAgentRequest(message);
+
     setHtmlWatchdogError(null);
     setBrief(nextBrief);
     setUserModifiedOutline(null);
-    sendPresentationBrief({
+    sendAgentRequest(message, {
       topic: nextBrief.topic,
       audience: nextBrief.audience,
       pageCount: nextBrief.slideCount,
       style: nextBrief.style,
       requirements: nextBrief.requirements,
     });
-  }, [sendPresentationBrief]);
+  }, [sendAgentRequest]);
 
   const handleToggle = useCallback((id: string) => {
     setUserModifiedOutline((current) => (current ?? outline).map((item) => (item.id === id ? { ...item, selected: !item.selected } : item)));
@@ -256,7 +266,7 @@ export default function PresentationStudio() {
       ) : null}
 
       {currentStep === "brief" ? (
-        <AgentPanel onSubmit={handleBriefSubmit} />
+        <AgentPanel onSubmit={handleAgentRequestSubmit} />
       ) : (
         <div className="min-h-[520px] flex-1">
           <OutlinePanel items={outline} isLoading={currentStep === "outlining"} onToggle={handleToggle} onEdit={handleEdit} onDelete={handleDelete} onAdd={handleAdd} onGenerate={handleGenerate} generateDisabledReason={!activeRunId ? (approvalError ?? "Waiting for the workflow run ID before generating HTML.") : approvalError} />
