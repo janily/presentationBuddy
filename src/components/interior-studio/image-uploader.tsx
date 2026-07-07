@@ -23,7 +23,7 @@ export default function ImageUploader({ onImageUpload }: ImageUploaderProps) {
         const formData = new FormData();
         formData.append("file", file);
 
-        const response = await fetch("/api/upload", {
+        const response = await fetch("/api/source-materials", {
           method: "POST",
           body: formData,
         });
@@ -69,9 +69,7 @@ export default function ImageUploader({ onImageUpload }: ImageUploaderProps) {
       const files = e.dataTransfer.files;
       if (files?.[0]) {
         const file = files[0];
-        if (file.type.startsWith("image/")) {
-          uploadFile(file);
-        }
+        uploadFile(file);
       }
     },
     [uploadFile],
@@ -128,7 +126,7 @@ export default function ImageUploader({ onImageUpload }: ImageUploaderProps) {
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*"
+            accept="image/*,.txt,.md,.pdf,.ppt,.pptx,.doc,.docx,text/plain,text/markdown,application/pdf"
             onChange={handleFileSelect}
             className="sr-only"
           />

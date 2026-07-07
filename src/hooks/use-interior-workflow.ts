@@ -13,6 +13,12 @@ export const useInteriorWorkflow = () => {
         const userImagePart = lastMessage.parts.find(
           (item) => item.type === "data-userInitialImage",
         );
+        const sourceMaterialUrlsPart = lastMessage.parts.find(
+          (item) => item.type === "data-sourceMaterialUrls",
+        );
+        const sourceTextPart = lastMessage.parts.find(
+          (item) => item.type === "data-sourceText",
+        );
         const approvedChangesPart = lastMessage.parts.find(
           (item) => item.type === "data-approvedChanges",
         );
@@ -22,12 +28,16 @@ export const useInteriorWorkflow = () => {
 
         // Extract actual data values from the parts
         const imageUrl = userImagePart?.data;
+        const sourceMaterialUrls = sourceMaterialUrlsPart?.data;
+        const sourceText = sourceTextPart?.data;
         const approvedChanges = approvedChangesPart?.data;
         const workflowRunId = workflowRunIdPart?.data;
 
         return {
           body: {
             imageUrl,
+            sourceMaterialUrls,
+            sourceText,
             approvedChanges,
             workflowRunId,
           },
@@ -60,7 +70,10 @@ export const useInteriorWorkflow = () => {
     return lastWorkflowPart.id;
   }, [lastWorkflowPart]);
 
-  const sendInteriorImage = (imageUrl: string) => {
+  const sendInteriorImage = (
+    imageUrl: string,
+    options?: { sourceMaterialUrls?: string[]; sourceText?: string },
+  ) => {
     sendMessage({
       role: "user",
       parts: [
@@ -68,6 +81,22 @@ export const useInteriorWorkflow = () => {
           type: "data-userInitialImage",
           data: imageUrl,
         },
+        ...(options?.sourceMaterialUrls
+          ? [
+              {
+                type: "data-sourceMaterialUrls" as const,
+                data: options.sourceMaterialUrls,
+              },
+            ]
+          : []),
+        ...(options?.sourceText
+          ? [
+              {
+                type: "data-sourceText" as const,
+                data: options.sourceText,
+              },
+            ]
+          : []),
       ],
     });
   };

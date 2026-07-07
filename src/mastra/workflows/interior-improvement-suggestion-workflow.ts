@@ -11,6 +11,8 @@ export const interiorImprovementSuggestionStep = createStep({
   id: "interior-improvement-suggestion-step",
   inputSchema: z.object({
     imageUrl: z.string(),
+    sourceMaterialUrls: z.array(z.string()).optional(),
+    sourceText: z.string().optional(),
   }),
   outputSchema: z.object({
     imageUrl: z.string(),
@@ -24,7 +26,7 @@ export const interiorImprovementSuggestionStep = createStep({
     approvedChanges: z.array(z.string()),
   }),
   execute: async ({ inputData, suspend, resumeData, mastra, writer }) => {
-    const { imageUrl } = inputData;
+    const { imageUrl, sourceMaterialUrls, sourceText } = inputData;
     const { approvedChanges } = resumeData ?? {};
 
     if (!approvedChanges?.length) {
@@ -51,6 +53,22 @@ export const interiorImprovementSuggestionStep = createStep({
                 type: "image",
                 image: base64Image,
               },
+              ...(sourceText
+                ? [
+                    {
+                      type: "text" as const,
+                      text: `Use this source text as presentation/workflow context: ${sourceText}`,
+                    },
+                  ]
+                : []),
+              ...(sourceMaterialUrls?.length
+                ? [
+                    {
+                      type: "text" as const,
+                      text: `Source material URLs: ${sourceMaterialUrls.join(", ")}`,
+                    },
+                  ]
+                : []),
             ],
           },
         ],
@@ -162,6 +180,8 @@ export const interiorImprovementSuggestionWorkflow = createWorkflow({
   id: "interior-improvement-suggestion-workflow",
   inputSchema: z.object({
     imageUrl: z.string(),
+    sourceMaterialUrls: z.array(z.string()).optional(),
+    sourceText: z.string().optional(),
   }),
   outputSchema: z.object({
     improvedImageUrl: z.string(),

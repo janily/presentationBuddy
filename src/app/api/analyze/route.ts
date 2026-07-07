@@ -9,6 +9,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const imageUrl = body.imageUrl as string | undefined;
     const workflowRunId = body.workflowRunId as string | undefined;
+    const sourceMaterialUrls = body.sourceMaterialUrls as string[] | undefined;
+    const sourceText = body.sourceText as string | undefined;
     const approvedChanges = body.approvedChanges as string[] | undefined;
 
     const workflow = mastra.getWorkflow(
@@ -19,6 +21,8 @@ export async function POST(request: NextRequest) {
       imageUrl,
       workflowRunId,
       approvedChanges,
+      sourceMaterialUrls,
+      sourceText,
     });
     // Resume an existing workflow run
     if (workflowRunId && approvedChanges) {
@@ -27,7 +31,7 @@ export async function POST(request: NextRequest) {
         step: "interior-improvement-suggestion-step",
         resumeData: {
           approvedChanges,
-        } as unknown as { imageUrl: string },
+        },
       });
 
       return createUIMessageStreamResponse({
@@ -49,6 +53,8 @@ export async function POST(request: NextRequest) {
     const stream = run.streamVNext({
       inputData: {
         imageUrl,
+        sourceMaterialUrls,
+        sourceText,
       },
     });
 

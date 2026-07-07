@@ -15,6 +15,8 @@ export type MyUIMessage = UIMessage<
   unknown,
   {
     userInitialImage: string;
+    sourceMaterialUrls?: string[];
+    sourceText?: string;
     approvedChanges?: string[];
     workflowRunId?: string;
     workflow: WorkflowDataPart;
