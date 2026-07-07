@@ -11,6 +11,21 @@ import PresentationProcessingView from "./presentation-processing-view";
 import { type SlideOutlineItem } from "./slide-outline-card";
 
 type WorkflowStep = "brief" | "outlining" | "review" | "generating" | "preview";
+type WorkflowErrorKind = "outline" | "html" | "resume";
+
+const getErrorMessage = (error: Error | undefined, fallback: string) => {
+  if (!error?.message) return fallback;
+
+  try {
+    const parsed = JSON.parse(error.message) as { error?: unknown; message?: unknown };
+    if (typeof parsed.error === "string") return parsed.error;
+    if (typeof parsed.message === "string") return parsed.message;
+  } catch {
+    // The AI SDK can expose plain-text error messages; use those as-is.
+  }
+
+  return error.message;
+};
 
 const makeId = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
@@ -74,6 +89,8 @@ export default function PresentationStudio() {
     activeRunId,
     approvalError,
     canApproveOutline,
+    error,
+    clearError,
   } = usePresentationWorkflow();
   const [brief, setBrief] = useState<PresentationBrief | null>(null);
   const [userModifiedOutline, setUserModifiedOutline] = useState<SlideOutlineItem[] | null>(null);
@@ -97,14 +114,44 @@ export default function PresentationStudio() {
 
   const selectedSlides = useMemo(() => outline.filter((item) => item.selected), [outline]);
   const generatedHtml = htmlGenerationStep?.data?.html ?? "";
+  const workflowError = useMemo((): { kind: WorkflowErrorKind; message: string } | null => {
+    if (approvalError) {
+      return {
+        kind: "resume",
+        message: approvalError,
+      };
+    }
+
+    if (!error) return null;
+
+    if (!activeRunId && baseOutline?.slides?.length) {
+      return {
+        kind: "resume",
+        message: "Workflow run ID is missing. Please create the outline again before generating HTML.",
+      };
+    }
+
+    if (baseOutline?.slides?.length) {
+      return {
+        kind: "html",
+        message: getErrorMessage(error, "HTML generation failed. Please retry from the approved outline."),
+      };
+    }
+
+    return {
+      kind: "outline",
+      message: getErrorMessage(error, "Outline generation failed. Please return to the brief and try again."),
+    };
+  }, [activeRunId, approvalError, baseOutline, error]);
 
   const currentStep = useMemo((): WorkflowStep => {
     if (!brief) return "brief";
     if (htmlGenerationStep?.data?.status === "completed" && generatedHtml) return "preview";
+    if (workflowError) return "review";
     if (htmlGenerationStep?.data?.status === "in-progress") return "generating";
     if (status === "submitted" || (status === "streaming" && !baseOutline?.slides?.length)) return "outlining";
     return "review";
-  }, [baseOutline, brief, generatedHtml, htmlGenerationStep, status]);
+  }, [baseOutline, brief, generatedHtml, htmlGenerationStep, status, workflowError]);
 
   const handleBriefSubmit = useCallback((nextBrief: PresentationBrief) => {
     setBrief(nextBrief);
@@ -151,9 +198,21 @@ export default function PresentationStudio() {
   }, [approveOutline, baseOutline, canApproveOutline, outline, selectedSlides.length]);
 
   const handleStartOver = useCallback(() => {
+    clearError();
     setBrief(null);
     setUserModifiedOutline(null);
-  }, []);
+  }, [clearError]);
+
+  const handleRetryBrief = useCallback(() => {
+    clearError();
+    setUserModifiedOutline(null);
+    setBrief(null);
+  }, [clearError]);
+
+  const handleRetryHtml = useCallback(() => {
+    clearError();
+    handleGenerate();
+  }, [clearError, handleGenerate]);
 
   if (currentStep === "brief") return <BriefForm onSubmit={handleBriefSubmit} />;
 
@@ -172,6 +231,20 @@ export default function PresentationStudio() {
         </div>
       </header>
       <main className="mx-auto grid max-w-7xl gap-6 p-4 md:p-6 lg:grid-cols-[0.8fr_1.2fr]">
+        {workflowError && (
+          <section className="lg:col-span-2 rounded-2xl border border-red-200 bg-red-50 p-4 text-red-900 shadow-sm">
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-red-700">Generation issue</p>
+            <p className="mt-2 text-sm">{workflowError.message}</p>
+            <div className="mt-4 flex flex-wrap gap-3">
+              {workflowError.kind === "html" && (
+                <button type="button" onClick={handleRetryHtml} className="rounded-xl bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">Retry HTML generation</button>
+              )}
+              {(workflowError.kind === "outline" || workflowError.kind === "resume") && (
+                <button type="button" onClick={handleRetryBrief} className="rounded-xl bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">Back to brief</button>
+              )}
+            </div>
+          </section>
+        )}
         <section className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-card)] p-6">
           <p className="text-sm font-medium uppercase tracking-[0.2em] text-[var(--accent-brass)]">Brief</p>
           <h2 className="mt-3 text-3xl font-semibold text-[var(--text-primary)]" style={{ fontFamily: "var(--font-fraunces), Georgia, serif" }}>{brief?.topic}</h2>
