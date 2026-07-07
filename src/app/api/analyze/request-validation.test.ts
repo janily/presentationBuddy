@@ -59,6 +59,22 @@ describe("analyze request validation", () => {
     }
   });
 
+  it("treats null resume fields from the chat transport as a start request", () => {
+    expect(isResumeWorkflowRequest({
+      presentationBrief: { topic: "AI" },
+      workflowRunId: null,
+      approvedOutline: undefined,
+    })).toBe(false);
+
+    const result = validatePresentationWorkflowRequest({
+      presentationBrief: { topic: "AI", audience: "PMs", pageCount: 4, style: "visual" },
+      workflowRunId: null,
+      approvedOutline: undefined,
+    });
+
+    expect(result).toMatchObject({ success: true, action: "start" });
+  });
+
   it("returns resume validation errors when the run id or outline is missing", () => {
     const result = validatePresentationWorkflowRequest({ workflowRunId: "" });
 

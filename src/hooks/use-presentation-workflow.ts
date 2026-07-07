@@ -49,11 +49,18 @@ export const usePresentationWorkflow = () => {
         const approvedOutline = (approvedOutlinePart as { data?: unknown } | undefined)?.data;
         const workflowRunId = getNonEmptyString((workflowRunIdPart as { data?: unknown } | undefined)?.data);
 
+        if (approvedOutline && workflowRunId) {
+          return {
+            body: {
+              approvedOutline,
+              workflowRunId,
+            },
+          };
+        }
+
         return {
           body: {
             presentationBrief,
-            approvedOutline,
-            workflowRunId,
           },
         };
       },
