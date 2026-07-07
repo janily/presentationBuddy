@@ -7,11 +7,12 @@ import { NextResponse } from "next/server";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const topic = body.topic as string | undefined;
-    const audience = body.audience as string | undefined;
-    const pageCount = body.pageCount as number | undefined;
-    const style = body.style as string | undefined;
-    const requirements = body.requirements as string | undefined;
+    const presentationBrief = body.presentationBrief ?? body;
+    const topic = presentationBrief.topic as string | undefined;
+    const audience = presentationBrief.audience as string | undefined;
+    const pageCount = presentationBrief.pageCount as number | undefined;
+    const style = presentationBrief.style as string | undefined;
+    const requirements = presentationBrief.requirements as string | undefined;
     const workflowRunId = body.workflowRunId as string | undefined;
     const approvedOutline = body.approvedOutline as unknown | undefined;
 

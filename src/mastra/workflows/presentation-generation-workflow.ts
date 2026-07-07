@@ -1,5 +1,6 @@
 import { createStep, createWorkflow } from "@mastra/core";
 import z from "zod";
+import { saveHtmlToFile } from "@/src/utils/save-html-to-file";
 
 const presentationInputSchema = z.object({
   topic: z.string(),
@@ -33,6 +34,7 @@ type PresentationOutlineStepData = {
 type PresentationHtmlStepData = {
   status: "in-progress" | "completed";
   html?: string;
+  htmlUrl?: string;
 };
 
 export const presentationOutlineSuggestionStep = createStep({
@@ -155,17 +157,20 @@ const presentationHtmlGenerationStep = createStep({
     );
 
     const html = result.object.html;
+    const htmlUrl = await saveHtmlToFile(html, { prefix: "presentation-deck" });
 
     writer.write({
       type: "data-presentationHtml",
       data: {
         status: "completed",
         html,
+        htmlUrl,
       } satisfies PresentationHtmlStepData,
     });
 
     return {
       html,
+      htmlUrl,
     };
   },
 });
