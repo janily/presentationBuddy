@@ -1,5 +1,5 @@
-import { DesignStudio } from "../components/interior-studio";
+import { PresentationStudio } from "../components/presentation-studio";
 
 export default function Home() {
-  return <DesignStudio />;
+  return <PresentationStudio />;
 }

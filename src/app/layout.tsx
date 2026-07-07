@@ -17,8 +17,8 @@ const commissioner = Commissioner({
 });
 
 export const metadata: Metadata = {
-  title: "Interior Design Studio",
-  description: "AI-powered interior design transformation",
+  title: "Presentation Studio",
+  description: "AI-powered HTML presentation generation",
 };
 
 export default function RootLayout({
