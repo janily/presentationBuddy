@@ -6,7 +6,7 @@ import { useMemo } from "react";
 export const useInteriorWorkflow = () => {
   const { sendMessage, messages, status } = useChat<MyUIMessage>({
     transport: new DefaultChatTransport({
-      api: "/api/analyze",
+      api: "/api/presentation",
       prepareSendMessagesRequest: ({ messages }) => {
         const lastMessage = messages[messages.length - 1];
 

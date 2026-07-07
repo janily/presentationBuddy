@@ -4,30 +4,40 @@ import type { NextRequest } from "next/server";
 import { toAISdkFormat } from "@mastra/ai-sdk";
 import { NextResponse } from "next/server";
 
+type PresentationRequestBody = {
+  brief?: string;
+  topic?: string;
+  audience?: string;
+  pageCount?: number;
+  style?: string;
+  requirements?: string;
+  workflowRunId?: string;
+  approvedOutline?: string[];
+};
+
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const imageUrl = body.imageUrl as string | undefined;
-    const workflowRunId = body.workflowRunId as string | undefined;
-    const approvedChanges = body.approvedChanges as string[] | undefined;
-
-    const workflow = mastra.getWorkflow(
-      "interiorImprovementSuggestionWorkflow",
-    );
-
-    console.log("Received analyze request:", {
-      imageUrl,
+    const body = (await request.json()) as PresentationRequestBody;
+    const {
+      brief,
+      topic,
+      audience,
+      pageCount,
+      style,
+      requirements,
       workflowRunId,
-      approvedChanges,
-    });
-    // Resume an existing workflow run
-    if (workflowRunId && approvedChanges) {
+      approvedOutline,
+    } = body;
+
+    const workflow = mastra.getWorkflow("presentationGenerationWorkflow");
+
+    if (workflowRunId && approvedOutline) {
       const run = await workflow.createRunAsync({ runId: workflowRunId });
       const stream = run.resumeStreamVNext({
-        step: "interior-improvement-suggestion-step",
+        step: "presentation-outline-suggestion-step",
         resumeData: {
-          approvedChanges,
-        } as unknown as { imageUrl: string },
+          approvedOutline,
+        } as never,
       });
 
       return createUIMessageStreamResponse({
@@ -37,10 +47,9 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Start a new workflow run
-    if (!imageUrl) {
+    if (!topic && !brief) {
       return NextResponse.json(
-        { error: "No image URL provided" },
+        { error: "No presentation topic or brief provided" },
         { status: 400 },
       );
     }
@@ -48,7 +57,12 @@ export async function POST(request: NextRequest) {
     const run = await workflow.createRunAsync();
     const stream = run.streamVNext({
       inputData: {
-        imageUrl,
+        brief,
+        topic,
+        audience,
+        pageCount,
+        style,
+        requirements,
       },
     });
 
@@ -58,9 +72,9 @@ export async function POST(request: NextRequest) {
       }),
     });
   } catch (error) {
-    console.error("Analyze error:", error);
+    console.error("Presentation request error:", error);
     return NextResponse.json(
-      { error: "Failed to process request" },
+      { error: "Failed to process presentation request" },
       { status: 500 },
     );
   }
