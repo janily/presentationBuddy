@@ -22,12 +22,23 @@ const emptyOutline = (brief: PresentationBrief): PresentationOutlineData => ({
   designGuidance: [],
 });
 
-const toSlideItem = (slide: PresentationOutlineData["slides"][number]): SlideOutlineItem => ({
-  id: `${slide.pageNumber}-${slide.title}`,
-  title: slide.title,
-  notes: [slide.purpose, ...slide.keyPoints, slide.designSuggestion].filter(Boolean).join(" "),
-  selected: true,
-});
+const formatSlideNotes = (slide: Pick<PresentationOutlineData["slides"][number], "purpose" | "keyPoints" | "designSuggestion">) =>
+  [slide.purpose, ...slide.keyPoints, slide.designSuggestion].filter(Boolean).join(" ");
+
+const toSlideItem = (slide: PresentationOutlineData["slides"][number]): SlideOutlineItem => {
+  const notes = formatSlideNotes(slide);
+
+  return {
+    id: `${slide.pageNumber}-${slide.title}`,
+    title: slide.title,
+    notes,
+    selected: true,
+    purpose: slide.purpose,
+    keyPoints: [...slide.keyPoints],
+    designSuggestion: slide.designSuggestion,
+    originalNotes: notes,
+  };
+};
 
 const toApprovedOutline = (
   baseOutline: PresentationOutlineData,
@@ -36,13 +47,20 @@ const toApprovedOutline = (
   ...baseOutline,
   slides: items
     .filter((item) => item.selected)
-    .map((item, index) => ({
-      pageNumber: index + 1,
-      title: item.title,
-      purpose: item.notes,
-      keyPoints: [item.notes],
-      designSuggestion: baseOutline.designGuidance.join(" ") || "Use a polished, readable slide layout.",
-    })),
+    .map((item, index) => {
+      const notesWereEdited = item.originalNotes !== undefined && item.notes !== item.originalNotes;
+      const baseKeyPoints = item.keyPoints?.length ? [...item.keyPoints] : [item.notes].filter(Boolean);
+      const keyPoints = notesWereEdited && item.notes ? [...baseKeyPoints, `User notes: ${item.notes}`] : baseKeyPoints;
+
+      return {
+        pageNumber: index + 1,
+        title: item.title,
+        purpose: item.purpose || item.notes,
+        keyPoints,
+        designSuggestion:
+          item.designSuggestion || baseOutline.designGuidance.join(" ") || "Use a polished, readable slide layout.",
+      };
+    }),
 });
 
 export default function PresentationStudio() {
@@ -115,9 +133,17 @@ export default function PresentationStudio() {
   const handleAdd = useCallback((title: string) => {
     setUserModifiedOutline((current) => [
       ...(current ?? outline),
-      { id: makeId(), title, notes: "Add supporting detail, examples, and speaker notes for this slide.", selected: true },
+      {
+        id: makeId(),
+        title,
+        notes: "Add supporting detail, examples, and speaker notes for this slide.",
+        selected: true,
+        purpose: "Add supporting detail, examples, and speaker notes for this slide.",
+        keyPoints: ["Add supporting detail, examples, and speaker notes for this slide."],
+        designSuggestion: baseOutline?.designGuidance.join(" ") || "Use a polished, readable slide layout.",
+      },
     ]);
-  }, [outline]);
+  }, [baseOutline, outline]);
 
   const handleGenerate = useCallback(() => {
     if (!baseOutline || selectedSlides.length === 0 || !canApproveOutline) return;
