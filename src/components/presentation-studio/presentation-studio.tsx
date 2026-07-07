@@ -158,19 +158,22 @@ export default function PresentationStudio() {
   }, [htmlGenerationStep?.data?.generatedCharacters, htmlGenerationStep?.data?.status, stop]);
 
   const handleAgentRequestSubmit = useCallback((message: string) => {
+    const contextualMessage = generatedHtml
+      ? `${message}\n\nCurrent deck context: revise the generated presentation rather than switching away from the workspace.`
+      : message;
     const nextBrief = toDefaultBriefFromAgentRequest(message);
 
     setHtmlWatchdogError(null);
     setBrief(nextBrief);
     setUserModifiedOutline(null);
-    sendAgentRequest(message, {
+    sendAgentRequest(contextualMessage, {
       topic: nextBrief.topic,
       audience: nextBrief.audience,
       pageCount: nextBrief.slideCount,
       style: nextBrief.style,
       requirements: nextBrief.requirements,
     });
-  }, [sendAgentRequest]);
+  }, [generatedHtml, sendAgentRequest]);
 
   const handleToggle = useCallback((id: string) => {
     setUserModifiedOutline((current) => (current ?? outline).map((item) => (item.id === id ? { ...item, selected: !item.selected } : item)));
@@ -267,6 +270,16 @@ export default function PresentationStudio() {
 
       {currentStep === "brief" ? (
         <AgentPanel onSubmit={handleAgentRequestSubmit} />
+      ) : currentStep === "preview" ? (
+        <AgentPanel
+          onSubmit={handleAgentRequestSubmit}
+          title="Keep refining this deck"
+          subtitle="Ask for style, slide, or content changes without leaving the preview."
+          initialMessage="演示文稿已生成。你可以继续说：调整风格、删掉第 3 页、换成更商务，或补充新的内容要求。"
+          helperText="发送后会基于当前预览继续在同一工作区处理，右侧对话保持可用。"
+          quickPrompts={["调整风格", "删掉第 3 页", "换成更商务"]}
+          placeholder="例如：把整体风格换成更商务，删掉第 3 页，并加强结尾 CTA。"
+        />
       ) : (
         <div className="min-h-[520px] flex-1">
           <OutlinePanel items={outline} isLoading={currentStep === "outlining"} onToggle={handleToggle} onEdit={handleEdit} onDelete={handleDelete} onAdd={handleAdd} onGenerate={handleGenerate} generateDisabledReason={!activeRunId ? (approvalError ?? "Waiting for the workflow run ID before generating HTML.") : approvalError} />
@@ -277,7 +290,7 @@ export default function PresentationStudio() {
 
   return (
     <PresentationWorkspace
-      previewContent={<PresentationPreviewPane step={currentStep} html={generatedHtml} outline={outline} htmlGeneration={htmlGenerationStep?.data} />}
+      previewContent={<PresentationPreviewPane currentStep={currentStep} generatedHtml={generatedHtml} outline={outline} htmlGeneration={htmlGenerationStep?.data} />}
       agentContent={agentContent}
       onStartOver={handleStartOver}
     />

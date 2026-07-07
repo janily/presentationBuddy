@@ -11,11 +11,17 @@ type AgentMessage = {
 
 interface AgentPanelProps {
   onSubmit: (message: string) => void;
+  title?: string;
+  subtitle?: string;
+  initialMessage?: string;
+  helperText?: string;
+  quickPrompts?: string[];
+  placeholder?: string;
 }
 
 const guidance = "告诉我你想做什么演示文稿：主题、受众、页数、风格或任何特殊要求都可以直接说。";
 
-const quickPrompts = [
+const defaultQuickPrompts = [
   "帮我做一份融资路演",
   "生成产品发布会 deck",
   "优化现有演示结构",
@@ -23,21 +29,30 @@ const quickPrompts = [
 
 const makeMessageId = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
-export default function AgentPanel({ onSubmit }: AgentPanelProps) {
+export default function AgentPanel({
+  onSubmit,
+  title = "Tell the agent what to build",
+  subtitle = "Use natural language to create your first outline.",
+  initialMessage = guidance,
+  helperText,
+  quickPrompts = defaultQuickPrompts,
+  placeholder = "例如：为 SaaS 产品发布会做 8 页演示，面向企业客户，风格简洁高级，需要包含痛点、产品能力和 CTA。",
+}: AgentPanelProps) {
   const [messages, setMessages] = useState<AgentMessage[]>([
     {
       id: "initial-guidance",
       role: "assistant",
-      content: guidance,
+      content: initialMessage,
     },
   ]);
   const [input, setInput] = useState("");
   const canSend = input.trim().length > 0;
 
-  const helperText = useMemo(() => {
+  const computedHelperText = useMemo(() => {
+    if (helperText) return helperText;
     if (messages.length <= 1) return "你可以先点一个快捷提示词，也可以直接输入完整需求。";
     return "我会先把你的自然语言作为主题和需求生成大纲，后续可继续细化 brief 提取逻辑。";
-  }, [messages.length]);
+  }, [helperText, messages.length]);
 
   const sendPrompt = (prompt: string) => {
     const trimmedPrompt = prompt.trim();
@@ -69,8 +84,8 @@ export default function AgentPanel({ onSubmit }: AgentPanelProps) {
             <Sparkles className="h-5 w-5" />
           </div>
           <div>
-            <h3 className="font-semibold text-[var(--text-primary)]">Tell the agent what to build</h3>
-            <p className="text-xs text-[var(--text-muted)]">Use natural language to create your first outline.</p>
+            <h3 className="font-semibold text-[var(--text-primary)]">{title}</h3>
+            <p className="text-xs text-[var(--text-muted)]">{subtitle}</p>
           </div>
         </div>
       </div>
@@ -105,7 +120,7 @@ export default function AgentPanel({ onSubmit }: AgentPanelProps) {
             id="agent-prompt"
             value={input}
             onChange={(event) => setInput(event.target.value)}
-            placeholder="例如：为 SaaS 产品发布会做 8 页演示，面向企业客户，风格简洁高级，需要包含痛点、产品能力和 CTA。"
+            placeholder={placeholder}
             className="input min-h-24 flex-1 resize-none"
           />
           <button
@@ -117,7 +132,7 @@ export default function AgentPanel({ onSubmit }: AgentPanelProps) {
             <Send className="h-5 w-5" />
           </button>
         </form>
-        <p className="text-xs leading-5 text-[var(--text-muted)]">{helperText}</p>
+        <p className="text-xs leading-5 text-[var(--text-muted)]">{computedHelperText}</p>
       </div>
     </section>
   );
