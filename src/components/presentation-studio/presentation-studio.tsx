@@ -1,13 +1,11 @@
 "use client";
 
-import { RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePresentationWorkflow } from "@/src/hooks/use-presentation-workflow";
 import type { PresentationOutlineData } from "@/src/types/presentation-workflow";
-import BriefForm, { type PresentationBrief } from "./brief-form";
-import HtmlPreview from "./html-preview";
+import { type PresentationBrief } from "./brief-form";
 import OutlinePanel from "./outline-panel";
-import PresentationProcessingView from "./presentation-processing-view";
+import PresentationWorkspace from "./presentation-workspace";
 import { emptyOutline, toApprovedOutline, toSlideItem } from "./presentation-outline-utils";
 import { type SlideOutlineItem } from "./slide-outline-card";
 
@@ -214,50 +212,66 @@ export default function PresentationStudio() {
     handleGenerate();
   }, [clearError, handleGenerate]);
 
-  if (currentStep === "brief") return <BriefForm onSubmit={handleBriefSubmit} />;
+  const previewOverlay = currentStep === "generating" ? (
+    <div className="pointer-events-none absolute inset-x-6 bottom-6 rounded-2xl border border-[var(--border-light)] bg-[var(--bg-card)]/95 p-4 shadow-lg backdrop-blur">
+      <p className="text-sm font-semibold text-[var(--text-primary)]">Generating your HTML presentation...</p>
+      <p className="mt-1 text-sm text-[var(--text-secondary)]">{htmlGenerationStep?.data?.message ?? "Preparing the selected slides for the live preview."}</p>
+      <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--bg-secondary)]">
+        <div className="h-full rounded-full bg-[var(--accent-terracotta)] transition-all duration-500" style={{ width: `${htmlGenerationStep?.data?.progress ?? 25}%` }} />
+      </div>
+    </div>
+  ) : null;
 
-  if (currentStep === "generating") {
-    return <PresentationProcessingView slideTitles={selectedSlides.map((slide) => slide.title)} htmlGeneration={htmlGenerationStep?.data} isComplete={false} onComplete={() => undefined} />;
-  }
+  const agentContent = (
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
+      {workflowError && (
+        <section className="rounded-2xl border border-red-200 bg-red-50 p-4 text-red-900 shadow-sm">
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-red-700">Generation issue</p>
+          <p className="mt-2 text-sm">{workflowError.message}</p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            {workflowError.kind === "html" && (
+              <button type="button" onClick={handleRetryHtml} className="rounded-xl bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">Retry HTML generation</button>
+            )}
+            {(workflowError.kind === "outline" || workflowError.kind === "resume") && (
+              <button type="button" onClick={handleRetryBrief} className="rounded-xl bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">Reset brief</button>
+            )}
+          </div>
+        </section>
+      )}
 
-  if (currentStep === "preview") return <HtmlPreview html={generatedHtml} onStartOver={handleStartOver} />;
-
-  return (
-    <div className="min-h-screen paper-texture">
-      <header className="sticky top-0 z-20 border-b border-[var(--border-light)] bg-[var(--bg-card)]/90 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
-          <h1 className="text-xl font-semibold text-[var(--text-primary)]" style={{ fontFamily: "var(--font-fraunces), Georgia, serif" }}>Presentation Buddy</h1>
-          <button type="button" onClick={handleStartOver} className="flex items-center gap-2 rounded-xl border border-[var(--border-light)] bg-[var(--bg-card)] px-4 py-2 text-sm font-medium text-[var(--text-secondary)]"><RotateCcw className="h-4 w-4" />Start over</button>
-        </div>
-      </header>
-      <main className="mx-auto grid max-w-7xl gap-6 p-4 md:p-6 lg:grid-cols-[0.8fr_1.2fr]">
-        {workflowError && (
-          <section className="lg:col-span-2 rounded-2xl border border-red-200 bg-red-50 p-4 text-red-900 shadow-sm">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-red-700">Generation issue</p>
-            <p className="mt-2 text-sm">{workflowError.message}</p>
-            <div className="mt-4 flex flex-wrap gap-3">
-              {workflowError.kind === "html" && (
-                <button type="button" onClick={handleRetryHtml} className="rounded-xl bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">Retry HTML generation</button>
-              )}
-              {(workflowError.kind === "outline" || workflowError.kind === "resume") && (
-                <button type="button" onClick={handleRetryBrief} className="rounded-xl bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">Back to brief</button>
-              )}
-            </div>
-          </section>
-        )}
-        <section className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-card)] p-6">
-          <p className="text-sm font-medium uppercase tracking-[0.2em] text-[var(--accent-brass)]">Brief</p>
-          <h2 className="mt-3 text-3xl font-semibold text-[var(--text-primary)]" style={{ fontFamily: "var(--font-fraunces), Georgia, serif" }}>{brief?.topic}</h2>
-          <dl className="mt-6 space-y-4 text-sm">
-            <div><dt className="font-medium text-[var(--text-muted)]">Audience</dt><dd className="text-[var(--text-primary)]">{brief?.audience}</dd></div>
-            <div><dt className="font-medium text-[var(--text-muted)]">Style</dt><dd className="text-[var(--text-primary)]">{brief?.style}</dd></div>
-            <div><dt className="font-medium text-[var(--text-muted)]">Narrative goal</dt><dd className="text-[var(--text-primary)]">{baseOutline?.narrativeGoal ?? suspenseData?.reason}</dd></div>
+      {brief ? (
+        <section className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-elevated)] p-4">
+          <p className="text-xs font-medium uppercase tracking-[0.2em] text-[var(--accent-brass)]">Current request</p>
+          <h3 className="mt-2 text-xl font-semibold text-[var(--text-primary)]" style={{ fontFamily: "var(--font-fraunces), Georgia, serif" }}>{brief.topic}</h3>
+          <dl className="mt-4 space-y-2 text-sm">
+            <div><dt className="font-medium text-[var(--text-muted)]">Audience</dt><dd className="text-[var(--text-primary)]">{brief.audience}</dd></div>
+            <div><dt className="font-medium text-[var(--text-muted)]">Style</dt><dd className="text-[var(--text-primary)]">{brief.style}</dd></div>
+            <div><dt className="font-medium text-[var(--text-muted)]">Narrative goal</dt><dd className="text-[var(--text-primary)]">{baseOutline?.narrativeGoal ?? suspenseData?.reason ?? "The agent will suggest a narrative after outline generation starts."}</dd></div>
           </dl>
         </section>
-        <div className="h-[calc(100vh-120px)] min-h-[620px]">
+      ) : null}
+
+      {currentStep === "brief" ? (
+        <section className="rounded-2xl border border-dashed border-[var(--border-light)] bg-[var(--bg-elevated)] p-4 text-sm text-[var(--text-secondary)]">
+          Start by sending the structured brief above. The preview area will stay visible while the agent drafts, reviews, and generates your deck.
+        </section>
+      ) : (
+        <div className="min-h-[520px] flex-1">
           <OutlinePanel items={outline} isLoading={currentStep === "outlining"} onToggle={handleToggle} onEdit={handleEdit} onDelete={handleDelete} onAdd={handleAdd} onGenerate={handleGenerate} generateDisabledReason={!activeRunId ? (approvalError ?? "Waiting for the workflow run ID before generating HTML.") : approvalError} />
         </div>
-      </main>
+      )}
     </div>
+  );
+
+  return (
+    <PresentationWorkspace
+      brief={brief}
+      generatedHtml={generatedHtml}
+      previewOverlay={previewOverlay}
+      agentContent={agentContent}
+      htmlGeneration={htmlGenerationStep?.data}
+      onBriefSubmit={handleBriefSubmit}
+      onStartOver={handleStartOver}
+    />
   );
 }
