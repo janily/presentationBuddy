@@ -8,6 +8,10 @@ export interface SlideOutlineItem {
   title: string;
   notes: string;
   selected: boolean;
+  purpose?: string;
+  keyPoints?: string[];
+  designSuggestion?: string;
+  originalNotes?: string;
 }
 
 interface SlideOutlineCardProps {
