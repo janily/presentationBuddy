@@ -1,5 +1,23 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Environment Variables
+
+Create a `.env.local` file and configure the AI provider credentials and model IDs used by the presentation agents:
+
+```bash
+# Required when using OpenRouter as the AI provider.
+# If you switch to a different provider, configure that provider's API key instead.
+OPENROUTER_API_KEY=your-openrouter-api-key
+
+# Optional. Defaults to google/gemini-3-flash-preview.
+PRESENTATION_OUTLINE_MODEL=google/gemini-3-flash-preview
+
+# Optional. Defaults to google/gemini-3-flash-preview.
+PRESENTATION_HTML_MODEL=google/gemini-3-flash-preview
+```
+
+The presentation outline and HTML generation agents use the shared OpenRouter provider helper in `src/utils/openrouter.ts`, so OpenRouter API key configuration stays centralized. Model names may be provided either as raw OpenRouter model IDs such as `google/gemini-3-flash-preview` or with the legacy `openrouter/` prefix.
+
 ## Getting Started
 
 First, run the development server:

@@ -1,4 +1,7 @@
 import { Agent } from "@mastra/core";
+import { getOpenRouterModelId, openrouter } from "../../utils/openrouter";
+
+const DEFAULT_PRESENTATION_OUTLINE_MODEL = "google/gemini-3-flash-preview";
 
 export const presentationOutlineSuggestionAgent = new Agent({
   id: "presentation-outline-suggestion-agent",
@@ -13,5 +16,5 @@ Your output must be practical for a human to review before generation. Include:
 - Global design guidance for visual style, typography, color, and layout
 
 Keep recommendations specific, audience-aware, and directly actionable.`,
-  model: "openrouter/google/gemini-3-flash-preview",
+  model: openrouter(getOpenRouterModelId(process.env.PRESENTATION_OUTLINE_MODEL, DEFAULT_PRESENTATION_OUTLINE_MODEL)),
 });
