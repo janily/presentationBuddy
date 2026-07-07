@@ -1,13 +1,13 @@
 import { Mastra } from "@mastra/core/mastra";
 import { LibSQLStore } from "@mastra/libsql";
-import { interiorImprovementSuggestionAgent } from "./agents/interior-improvement-suggestion-agent";
-import { interiorImageImprovementAgent } from "./agents/interior-image-improvement-agent";
+import { presentationHtmlAgent } from "./agents/presentation-html-agent";
+import { presentationOutlineAgent } from "./agents/presentation-outline-agent";
 import { interiorImprovementSuggestionWorkflow } from "./workflows/interior-improvement-suggestion-workflow";
 
 export const mastra = new Mastra({
   agents: {
-    interiorImprovementSuggestionAgent,
-    interiorImageImprovementAgent,
+    presentationOutlineAgent,
+    presentationHtmlAgent,
   },
   workflows: {
     interiorImprovementSuggestionWorkflow,
