@@ -11,8 +11,18 @@ export const resumeWorkflowRequestSchema = z.object({
 
 export type WorkflowRequestAction = "start" | "resume";
 
+function hasNonNullProperty(body: Record<string, unknown>, property: "workflowRunId" | "approvedOutline") {
+  return property in body && body[property] !== null && body[property] !== undefined;
+}
+
 export function isResumeWorkflowRequest(body: unknown) {
-  return typeof body === "object" && body !== null && ("workflowRunId" in body || "approvedOutline" in body);
+  if (typeof body !== "object" || body === null) {
+    return false;
+  }
+
+  const request = body as Record<string, unknown>;
+
+  return hasNonNullProperty(request, "workflowRunId") || hasNonNullProperty(request, "approvedOutline");
 }
 
 export function getPresentationBriefSource(body: unknown) {
