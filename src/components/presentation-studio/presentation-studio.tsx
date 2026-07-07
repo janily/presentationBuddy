@@ -53,6 +53,9 @@ export default function PresentationStudio() {
     outlineStep,
     htmlGenerationStep,
     status,
+    activeRunId,
+    approvalError,
+    canApproveOutline,
   } = usePresentationWorkflow();
   const [brief, setBrief] = useState<PresentationBrief | null>(null);
   const [userModifiedOutline, setUserModifiedOutline] = useState<SlideOutlineItem[] | null>(null);
@@ -117,9 +120,9 @@ export default function PresentationStudio() {
   }, [outline]);
 
   const handleGenerate = useCallback(() => {
-    if (!baseOutline || selectedSlides.length === 0) return;
+    if (!baseOutline || selectedSlides.length === 0 || !canApproveOutline) return;
     approveOutline(toApprovedOutline(baseOutline, outline));
-  }, [approveOutline, baseOutline, outline, selectedSlides.length]);
+  }, [approveOutline, baseOutline, canApproveOutline, outline, selectedSlides.length]);
 
   const handleStartOver = useCallback(() => {
     setBrief(null);
@@ -153,7 +156,7 @@ export default function PresentationStudio() {
           </dl>
         </section>
         <div className="h-[calc(100vh-120px)] min-h-[620px]">
-          <OutlinePanel items={outline} isLoading={currentStep === "outlining"} onToggle={handleToggle} onEdit={handleEdit} onDelete={handleDelete} onAdd={handleAdd} onGenerate={handleGenerate} />
+          <OutlinePanel items={outline} isLoading={currentStep === "outlining"} onToggle={handleToggle} onEdit={handleEdit} onDelete={handleDelete} onAdd={handleAdd} onGenerate={handleGenerate} generateDisabledReason={!activeRunId ? (approvalError ?? "Waiting for the workflow run ID before generating HTML.") : approvalError} />
         </div>
       </main>
     </div>
