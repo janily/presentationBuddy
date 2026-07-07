@@ -54,7 +54,14 @@ function classifyProcessingError(error: unknown) {
     };
   }
 
-  if (lowerMessage.includes("model") || lowerMessage.includes("provider") || lowerMessage.includes("generate") || lowerMessage.includes("stream")) {
+  if (
+    lowerMessage.includes("model")
+    || lowerMessage.includes("provider")
+    || lowerMessage.includes("generate")
+    || lowerMessage.includes("stream")
+    || lowerMessage.includes("timed out")
+    || lowerMessage.includes("idle")
+  ) {
     return {
       code: "model_call_failed" as const,
       message: "The AI model request failed. Please retry the current generation step.",

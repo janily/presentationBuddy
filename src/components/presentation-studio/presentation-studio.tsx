@@ -1,7 +1,7 @@
 "use client";
 
 import { RotateCcw } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePresentationWorkflow } from "@/src/hooks/use-presentation-workflow";
 import type { PresentationOutlineData } from "@/src/types/presentation-workflow";
 import BriefForm, { type PresentationBrief } from "./brief-form";
@@ -62,9 +62,11 @@ export default function PresentationStudio() {
     canApproveOutline,
     error,
     clearError,
+    stop,
   } = usePresentationWorkflow();
   const [brief, setBrief] = useState<PresentationBrief | null>(null);
   const [userModifiedOutline, setUserModifiedOutline] = useState<SlideOutlineItem[] | null>(null);
+  const [htmlWatchdogError, setHtmlWatchdogError] = useState<string | null>(null);
 
   const workflowOutline = useMemo(() => {
     return outlineStep?.data?.outline ?? suspenseData?.outline ?? null;
@@ -87,6 +89,13 @@ export default function PresentationStudio() {
   const selectedSlides = useMemo(() => outline.filter((item) => item.selected), [outline]);
   const generatedHtml = htmlGenerationStep?.data?.html ?? "";
   const workflowError = useMemo((): { kind: WorkflowErrorKind; message: string } | null => {
+    if (htmlWatchdogError) {
+      return {
+        kind: "html",
+        message: htmlWatchdogError,
+      };
+    }
+
     if (approvalError) {
       return {
         kind: "resume",
@@ -114,7 +123,7 @@ export default function PresentationStudio() {
       kind: "outline",
       message: getErrorMessage(error, "Outline generation failed. Please return to the brief and try again."),
     };
-  }, [activeRunId, approvalError, baseOutline, error]);
+  }, [activeRunId, approvalError, baseOutline, error, htmlWatchdogError]);
 
   const currentStep = useMemo((): WorkflowStep => {
     if (!brief) return "brief";
@@ -125,7 +134,22 @@ export default function PresentationStudio() {
     return "review";
   }, [baseOutline, brief, generatedHtml, htmlGenerationStep, status, workflowError]);
 
+  useEffect(() => {
+    if (htmlGenerationStep?.data?.status !== "in-progress") return;
+
+    const generatedCharacters = htmlGenerationStep.data.generatedCharacters ?? 0;
+    const timeout = window.setTimeout(() => {
+      if (generatedCharacters === 0) {
+        stop();
+        setHtmlWatchdogError("HTML generation did not receive any model output for 45 seconds. Please retry HTML generation or reduce the number of selected slides.");
+      }
+    }, 45_000);
+
+    return () => window.clearTimeout(timeout);
+  }, [htmlGenerationStep?.data?.generatedCharacters, htmlGenerationStep?.data?.status, stop]);
+
   const handleBriefSubmit = useCallback((nextBrief: PresentationBrief) => {
+    setHtmlWatchdogError(null);
     setBrief(nextBrief);
     setUserModifiedOutline(null);
     sendPresentationBrief({
@@ -166,23 +190,27 @@ export default function PresentationStudio() {
 
   const handleGenerate = useCallback(() => {
     if (!baseOutline || selectedSlides.length === 0 || !canApproveOutline) return;
+    setHtmlWatchdogError(null);
     approveOutline(toApprovedOutline(baseOutline, outline));
   }, [approveOutline, baseOutline, canApproveOutline, outline, selectedSlides.length]);
 
   const handleStartOver = useCallback(() => {
     clearError();
+    setHtmlWatchdogError(null);
     setBrief(null);
     setUserModifiedOutline(null);
   }, [clearError]);
 
   const handleRetryBrief = useCallback(() => {
     clearError();
+    setHtmlWatchdogError(null);
     setUserModifiedOutline(null);
     setBrief(null);
   }, [clearError]);
 
   const handleRetryHtml = useCallback(() => {
     clearError();
+    setHtmlWatchdogError(null);
     handleGenerate();
   }, [clearError, handleGenerate]);
 
