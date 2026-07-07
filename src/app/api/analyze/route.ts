@@ -43,6 +43,18 @@ function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
+function streamErrorMessage(error: unknown) {
+  const classification = classifyProcessingError(error);
+
+  console.error("Presentation workflow stream failed:", {
+    code: classification.code,
+    message: getErrorMessage(error),
+    error,
+  });
+
+  return classification.message;
+}
+
 function classifyProcessingError(error: unknown) {
   const message = getErrorMessage(error);
   const lowerMessage = message.toLowerCase();
@@ -114,8 +126,13 @@ export async function POST(request: NextRequest) {
       }
 
       return createUIMessageStreamResponse({
-        stream: toAISdkFormat(stream, {
-          from: "workflow",
+        stream: createUIMessageStream({
+          execute: ({ writer }) => {
+            writer.merge(toAISdkFormat(stream, {
+              from: "workflow",
+            }));
+          },
+          onError: streamErrorMessage,
         }),
       });
     }
@@ -172,6 +189,7 @@ export async function POST(request: NextRequest) {
             from: "workflow",
           }));
         },
+        onError: streamErrorMessage,
       }),
     });
   } catch (error) {
