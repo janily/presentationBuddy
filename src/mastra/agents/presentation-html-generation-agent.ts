@@ -1,5 +1,5 @@
 import { Agent } from "@mastra/core";
-import { getOpenRouterModelId, openrouter } from "../../utils/openrouter";
+import { getConfiguredModel } from "../../utils/model-provider";
 
 const DEFAULT_PRESENTATION_HTML_MODEL = "google/gemini-3-flash-preview";
 
@@ -15,5 +15,9 @@ Requirements:
 - Include speaker-friendly hierarchy, concise copy, and visual layout details that match the requested style.
 - Do not reference external assets unless the user explicitly requires them.
 - Make the result suitable to save as a standalone .html file.`,
-  model: openrouter(getOpenRouterModelId(process.env.PRESENTATION_HTML_MODEL, DEFAULT_PRESENTATION_HTML_MODEL)),
+  model: getConfiguredModel(
+    process.env.PRESENTATION_HTML_MODEL,
+    DEFAULT_PRESENTATION_HTML_MODEL,
+    process.env.PRESENTATION_HTML_PROVIDER,
+  ),
 });

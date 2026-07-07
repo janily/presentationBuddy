@@ -1,5 +1,5 @@
 import { Agent } from "@mastra/core";
-import { getOpenRouterModelId, openrouter } from "../../utils/openrouter";
+import { getConfiguredModel } from "../../utils/model-provider";
 
 const DEFAULT_PRESENTATION_OUTLINE_MODEL = "google/gemini-3-flash-preview";
 
@@ -16,5 +16,9 @@ Your output must be practical for a human to review before generation. Include:
 - Global design guidance for visual style, typography, color, and layout
 
 Keep recommendations specific, audience-aware, and directly actionable.`,
-  model: openrouter(getOpenRouterModelId(process.env.PRESENTATION_OUTLINE_MODEL, DEFAULT_PRESENTATION_OUTLINE_MODEL)),
+  model: getConfiguredModel(
+    process.env.PRESENTATION_OUTLINE_MODEL,
+    DEFAULT_PRESENTATION_OUTLINE_MODEL,
+    process.env.PRESENTATION_OUTLINE_PROVIDER,
+  ),
 });

@@ -30,22 +30,34 @@ pnpm mastra
 
 ## Environment variables and model provider
 
-Create a `.env.local` file in the repository root. The presentation agents currently use the shared OpenRouter provider helper in `src/utils/openrouter.ts`, so OpenRouter credentials are required unless you change the provider implementation in code.
+Create a `.env.local` file in the repository root. Presentation agents use the shared provider helper in `src/utils/model-provider.ts`, so the model provider can be selected without code changes.
 
 ```bash
-# Required for the current OpenRouter provider configuration.
-OPENROUTER_API_KEY=your-openrouter-api-key
+# Optional. Defaults to openrouter. Supported values: openrouter, openai, google,
+# and openai-compatible. Individual agents can override this with
+# PRESENTATION_OUTLINE_PROVIDER or PRESENTATION_HTML_PROVIDER.
+MODEL_PROVIDER=openrouter
+
+# Required by the selected provider. You can use MODEL_API_KEY for any provider,
+# or provider-specific keys such as OPENROUTER_API_KEY, OPENAI_API_KEY,
+# GOOGLE_GENERATIVE_AI_API_KEY, or GOOGLE_API_KEY.
+MODEL_API_KEY=your-provider-api-key
+
+# Optional. Useful for OpenAI-compatible providers or proxies. Provider-specific
+# alternatives such as OPENROUTER_BASE_URL, OPENAI_BASE_URL, and
+# GOOGLE_GENERATIVE_AI_BASE_URL are also supported.
+MODEL_BASE_URL=https://your-provider-base-url.example/v1
 
 # Optional. Defaults to google/gemini-3-flash-preview.
 PRESENTATION_OUTLINE_MODEL=google/gemini-3-flash-preview
+PRESENTATION_OUTLINE_PROVIDER=openrouter
 
 # Optional. Defaults to google/gemini-3-flash-preview.
 PRESENTATION_HTML_MODEL=google/gemini-3-flash-preview
+PRESENTATION_HTML_PROVIDER=openrouter
 ```
 
-Model values may be raw OpenRouter model IDs such as `google/gemini-3-flash-preview`. The helper also accepts the legacy `openrouter/` prefix and strips it before sending the model ID to OpenRouter.
-
-To use a different model provider, update the provider helper and the presentation agents that call it, then replace `OPENROUTER_API_KEY` with the credential required by that provider.
+Model values may be raw provider model IDs such as `google/gemini-3-flash-preview`. For backward compatibility, the helper also accepts `openrouter/`, `openai/`, `google/`, and `google-generative-ai/` prefixes and strips them before sending the model ID to the selected provider.
 
 ## Main directories and files
 
