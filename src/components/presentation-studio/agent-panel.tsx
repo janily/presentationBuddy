@@ -10,7 +10,7 @@ type AgentMessage = {
 };
 
 interface AgentPanelProps {
-  onSubmit: (message: string) => void;
+  onSubmit: (message: string) => string | void;
   title?: string;
   subtitle?: string;
   initialMessage?: string;
@@ -58,17 +58,18 @@ export default function AgentPanel({
     const trimmedPrompt = prompt.trim();
     if (!trimmedPrompt) return;
 
+    const assistantReply = onSubmit(trimmedPrompt) ?? "收到，我会继续根据这段需求推进。";
+
     setMessages((current) => [
       ...current,
       { id: makeMessageId(), role: "user", content: trimmedPrompt },
       {
         id: makeMessageId(),
         role: "assistant",
-        content: "收到，我会先根据这段需求生成演示文稿大纲。",
+        content: assistantReply,
       },
     ]);
     setInput("");
-    onSubmit(trimmedPrompt);
   };
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
