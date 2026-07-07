@@ -30,6 +30,25 @@ const getErrorMessage = (error: Error | undefined, fallback: string) => {
 
 const makeId = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
+const toStreamingSlideItem = (slide: Partial<PresentationOutlineData["slides"][number]>, index: number): SlideOutlineItem => {
+  const title = slide.title?.trim() || `Drafting slide ${index + 1}...`;
+  const keyPoints = slide.keyPoints?.filter(Boolean) ?? [];
+  const purpose = slide.purpose?.trim() || "Drafting purpose and key points...";
+  const designSuggestion = slide.designSuggestion?.trim() || "Choosing an appropriate visual treatment...";
+  const notes = [purpose, ...keyPoints, designSuggestion].filter(Boolean).join(" ");
+
+  return {
+    id: `${slide.pageNumber ?? index + 1}-${title}`,
+    title,
+    notes,
+    selected: true,
+    purpose,
+    keyPoints,
+    designSuggestion,
+    originalNotes: notes,
+  };
+};
+
 export default function PresentationStudio() {
   const {
     sendPresentationBrief,
@@ -61,8 +80,9 @@ export default function PresentationStudio() {
 
   const outline = useMemo(() => {
     if (userModifiedOutline) return userModifiedOutline;
-    return baseOutline?.slides?.map(toSlideItem) ?? [];
-  }, [baseOutline, userModifiedOutline]);
+    if (baseOutline?.slides?.length) return baseOutline.slides.map(toSlideItem);
+    return workflowOutline?.slides?.map(toStreamingSlideItem) ?? [];
+  }, [baseOutline, userModifiedOutline, workflowOutline]);
 
   const selectedSlides = useMemo(() => outline.filter((item) => item.selected), [outline]);
   const generatedHtml = htmlGenerationStep?.data?.html ?? "";
@@ -169,7 +189,7 @@ export default function PresentationStudio() {
   if (currentStep === "brief") return <BriefForm onSubmit={handleBriefSubmit} />;
 
   if (currentStep === "generating") {
-    return <PresentationProcessingView slideTitles={selectedSlides.map((slide) => slide.title)} isComplete={false} onComplete={() => undefined} />;
+    return <PresentationProcessingView slideTitles={selectedSlides.map((slide) => slide.title)} htmlGeneration={htmlGenerationStep?.data} isComplete={false} onComplete={() => undefined} />;
   }
 
   if (currentStep === "preview") return <HtmlPreview html={generatedHtml} onStartOver={handleStartOver} />;

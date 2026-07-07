@@ -32,6 +32,10 @@ export type OutlineStepData = {
 
 export type HtmlGenerationStepData = {
   status: "in-progress" | "completed";
+  phase?: "structure" | "html" | "styles" | "bundle";
+  message?: string;
+  progress?: number;
+  generatedCharacters?: number;
   htmlUrl?: string;
   html?: string;
 };

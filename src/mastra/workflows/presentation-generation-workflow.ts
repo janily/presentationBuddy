@@ -10,9 +10,30 @@ type PresentationOutlineStepData = {
 
 type PresentationHtmlStepData = {
   status: "in-progress" | "completed";
+  phase?: "structure" | "html" | "styles" | "bundle";
+  message?: string;
+  progress?: number;
+  generatedCharacters?: number;
   html?: string;
   htmlUrl?: string;
 };
+
+const OUTLINE_GENERATION_TIMEOUT_MS = 90_000;
+const HTML_GENERATION_TIMEOUT_MS = 120_000;
+
+function stripHtmlCodeFence(html: string) {
+  return html
+    .trim()
+    .replace(/^```(?:html)?\s*/i, "")
+    .replace(/```$/i, "")
+    .trim();
+}
+
+function timeoutAfter(ms: number) {
+  return new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error(`HTML generation timed out after ${Math.round(ms / 1000)} seconds`)), ms);
+  });
+}
 
 export const presentationOutlineSuggestionStep = createStep({
   id: "presentation-outline-suggestion-step",
@@ -63,7 +84,18 @@ export const presentationOutlineSuggestionStep = createStep({
       },
     );
 
+    const outlineStartedAt = Date.now();
+    let lastOutlineSnapshot = "";
+
     for await (const chunk of stream.objectStream) {
+      if (Date.now() - outlineStartedAt > OUTLINE_GENERATION_TIMEOUT_MS) {
+        throw new Error(`Outline generation timed out after ${Math.round(OUTLINE_GENERATION_TIMEOUT_MS / 1000)} seconds`);
+      }
+
+      const outlineSnapshot = JSON.stringify(chunk);
+      if (outlineSnapshot === lastOutlineSnapshot) continue;
+      lastOutlineSnapshot = outlineSnapshot;
+
       writer.write({
         type: "data-presentationOutline",
         data: {
@@ -109,37 +141,93 @@ const presentationHtmlGenerationStep = createStep({
       type: "data-presentationHtml",
       data: {
         status: "in-progress",
+        phase: "structure",
+        message: "Preparing selected slides for HTML generation...",
+        progress: 10,
       } satisfies PresentationHtmlStepData,
     });
 
     const generationAgent = mastra.getAgent("presentationHtmlGenerationAgent");
-    const result = await generationAgent.generate(
-      [
+    const stream = await Promise.race([
+      generationAgent.stream([
         {
           role: "user",
-          content: `Generate a standalone HTML presentation from this approved outline and original request:\n${JSON.stringify(
+          content: `Generate a standalone HTML presentation from this approved outline and original request. Return only the complete HTML document, starting with <!doctype html> or <html>, and do not wrap it in Markdown fences:\n${JSON.stringify(
             inputData,
             null,
             2,
           )}`,
         },
-      ],
-      {
-        structuredOutput: {
-          schema: z.object({
-            html: z.string(),
-          }),
-        },
-      },
-    );
+      ]),
+      timeoutAfter(HTML_GENERATION_TIMEOUT_MS),
+    ]);
 
-    const html = result.object.html;
+    let html = "";
+    let lastProgressWrite = 0;
+
+    writer.write({
+      type: "data-presentationHtml",
+      data: {
+        status: "in-progress",
+        phase: "html",
+        message: "Writing slide markup...",
+        progress: 30,
+      } satisfies PresentationHtmlStepData,
+    });
+
+    const htmlStartedAt = Date.now();
+
+    for await (const chunk of stream.fullStream) {
+      if (Date.now() - htmlStartedAt > HTML_GENERATION_TIMEOUT_MS) {
+        throw new Error(`HTML generation timed out after ${Math.round(HTML_GENERATION_TIMEOUT_MS / 1000)} seconds`);
+      }
+
+      if (chunk.type !== "text-delta") continue;
+
+      html += chunk.payload.text;
+
+      if (html.length - lastProgressWrite >= 800) {
+        lastProgressWrite = html.length;
+        writer.write({
+          type: "data-presentationHtml",
+          data: {
+            status: "in-progress",
+            phase: html.length > 4_000 ? "styles" : "html",
+            message: html.length > 4_000 ? "Applying layout and visual styling..." : "Writing slide markup...",
+            progress: Math.min(85, 30 + Math.floor(html.length / 250)),
+            generatedCharacters: html.length,
+          } satisfies PresentationHtmlStepData,
+        });
+      }
+    }
+
+    html = stripHtmlCodeFence(html);
+
+    writer.write({
+      type: "data-presentationHtml",
+      data: {
+        status: "in-progress",
+        phase: "bundle",
+        message: "Saving preview document...",
+        progress: 92,
+        generatedCharacters: html.length,
+      } satisfies PresentationHtmlStepData,
+    });
+
+    if (!html) {
+      throw new Error("HTML generation finished without returning any HTML content");
+    }
+
     const htmlUrl = await saveHtmlToFile(html, { prefix: "presentation-deck" });
 
     writer.write({
       type: "data-presentationHtml",
       data: {
         status: "completed",
+        phase: "bundle",
+        message: "HTML presentation ready.",
+        progress: 100,
+        generatedCharacters: html.length,
         html,
         htmlUrl,
       } satisfies PresentationHtmlStepData,

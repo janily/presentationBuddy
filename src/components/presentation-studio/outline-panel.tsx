@@ -34,10 +34,15 @@ export default function OutlinePanel({ items, isLoading = false, onToggle, onEdi
           <h2 className="text-lg font-semibold text-[var(--text-primary)]" style={{ fontFamily: "var(--font-fraunces), Georgia, serif" }}>Slide outline</h2>
         </div>
         <p className="mt-1 text-sm text-[var(--text-muted)]">Review, select, edit, delete, or add outline items before generating HTML.</p>
+        {isLoading && items.length > 0 ? (
+          <p className="mt-3 rounded-xl bg-[var(--accent-terracotta)]/10 px-3 py-2 text-sm text-[var(--accent-terracotta)]">
+            Drafting outline in real time — cards update as the model adds titles, key points, and design notes.
+          </p>
+        ) : null}
       </div>
 
       <div className="flex-1 space-y-3 overflow-y-auto p-4">
-        {isLoading ? (
+        {isLoading && items.length === 0 ? (
           [1, 2, 3, 4].map((item) => <div key={item} className="h-28 animate-pulse rounded-2xl bg-[var(--bg-secondary)]" />)
         ) : (
           items.map((item, index) => <SlideOutlineCard key={item.id} item={item} index={index} onToggle={onToggle} onEdit={onEdit} onDelete={onDelete} />)
