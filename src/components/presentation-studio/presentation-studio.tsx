@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { ChevronDown, ChevronRight, Sparkles } from "lucide-react";
 import { usePresentationWorkflow } from "@/src/hooks/use-presentation-workflow";
 import type { PresentationOutlineData } from "@/src/types/presentation-workflow";
 import AgentPanel from "./agent-panel";
@@ -76,6 +77,7 @@ export default function PresentationStudio() {
   const [brief, setBrief] = useState<PresentationBrief | null>(null);
   const [userModifiedOutline, setUserModifiedOutline] = useState<SlideOutlineItem[] | null>(null);
   const [htmlWatchdogError, setHtmlWatchdogError] = useState<string | null>(null);
+  const [isAdvancedOutlineOpen, setIsAdvancedOutlineOpen] = useState(false);
 
   const workflowOutline = useMemo(() => {
     return outlineStep?.data?.outline ?? suspenseData?.outline ?? null;
@@ -166,6 +168,7 @@ export default function PresentationStudio() {
     setHtmlWatchdogError(null);
     setBrief(nextBrief);
     setUserModifiedOutline(null);
+    setIsAdvancedOutlineOpen(false);
     sendAgentRequest(contextualMessage, {
       topic: nextBrief.topic,
       audience: nextBrief.audience,
@@ -204,21 +207,26 @@ export default function PresentationStudio() {
 
   const handleGenerate = useCallback(() => {
     if (!baseOutline || selectedSlides.length === 0 || !canApproveOutline) return;
+    setIsAdvancedOutlineOpen(false);
     setHtmlWatchdogError(null);
     approveOutline(toApprovedOutline(baseOutline, outline));
   }, [approveOutline, baseOutline, canApproveOutline, outline, selectedSlides.length]);
+
+  const generateDisabledReason = !activeRunId ? (approvalError ?? "Waiting for the workflow run ID before generating HTML.") : approvalError;
 
   const handleStartOver = useCallback(() => {
     resetWorkflow();
     setHtmlWatchdogError(null);
     setBrief(null);
     setUserModifiedOutline(null);
+    setIsAdvancedOutlineOpen(false);
   }, [resetWorkflow]);
 
   const handleRetryBrief = useCallback(() => {
     clearError();
     setHtmlWatchdogError(null);
     setUserModifiedOutline(null);
+    setIsAdvancedOutlineOpen(false);
     setBrief(null);
   }, [clearError]);
 
@@ -268,6 +276,23 @@ export default function PresentationStudio() {
         </section>
       ) : null}
 
+      {currentStep === "review" && outline.length > 0 ? (
+        <section className="rounded-2xl border border-[var(--accent-terracotta)]/30 bg-[var(--accent-terracotta)]/10 p-4 shadow-sm">
+          <div className="flex items-start gap-3">
+            <div className="rounded-xl bg-white/70 p-2 text-[var(--accent-terracotta)]"><Sparkles className="h-5 w-5" /></div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium uppercase tracking-[0.2em] text-[var(--accent-brass)]">Agent message</p>
+              <h3 className="mt-1 font-semibold text-[var(--text-primary)]">我已准备好大纲，要生成预览吗？</h3>
+              <p className="mt-1 text-sm text-[var(--text-secondary)]">你可以直接生成 HTML preview，也可以继续用自然语言要求我调整结构；高级大纲编辑入口保留在下方。</p>
+              <button type="button" onClick={handleGenerate} disabled={selectedSlides.length === 0 || !canApproveOutline || Boolean(generateDisabledReason)} className="mt-4 rounded-xl bg-[var(--accent-terracotta)] px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:bg-[var(--accent-terracotta-light)] disabled:cursor-not-allowed disabled:opacity-50">
+                Generate preview ({selectedSlides.length} slides)
+              </button>
+              {generateDisabledReason ? <p className="mt-2 text-xs text-[var(--accent-terracotta)]">{generateDisabledReason}</p> : null}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
       {currentStep === "brief" ? (
         <AgentPanel onSubmit={handleAgentRequestSubmit} />
       ) : currentStep === "preview" ? (
@@ -281,10 +306,33 @@ export default function PresentationStudio() {
           placeholder="例如：把整体风格换成更商务，删掉第 3 页，并加强结尾 CTA。"
         />
       ) : (
-        <div className="min-h-[520px] flex-1">
-          <OutlinePanel items={outline} isLoading={currentStep === "outlining"} onToggle={handleToggle} onEdit={handleEdit} onDelete={handleDelete} onAdd={handleAdd} onGenerate={handleGenerate} generateDisabledReason={!activeRunId ? (approvalError ?? "Waiting for the workflow run ID before generating HTML.") : approvalError} />
-        </div>
+        <AgentPanel
+          onSubmit={handleAgentRequestSubmit}
+          title={currentStep === "outlining" ? "Agent is drafting" : "Continue with the agent"}
+          subtitle="Natural language stays the primary path; use the advanced outline only when needed."
+          initialMessage={currentStep === "outlining" ? "我正在生成大纲。你仍然可以继续补充要求，我会基于新的上下文重新推进。" : "大纲已准备好。可以点击生成预览，也可以继续告诉我你想如何调整。"}
+          helperText="无需先完成卡片编辑；继续输入自然语言即可推进或重做大纲。"
+          quickPrompts={["增加案例页", "让叙事更有说服力", "改成高端商务风"]}
+          placeholder="例如：把第 2 页拆成两页，并把整体语气调整得更适合董事会。"
+        />
       )}
+
+      {brief && outline.length > 0 ? (
+        <section className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-elevated)] shadow-sm">
+          <button type="button" onClick={() => setIsAdvancedOutlineOpen((value) => !value)} className="flex w-full items-center justify-between gap-3 p-4 text-left">
+            <span>
+              <span className="block text-sm font-semibold text-[var(--text-primary)]">Advanced outline editing</span>
+              <span className="mt-1 block text-xs text-[var(--text-muted)]">Optional: select, edit, delete, or add slides without blocking the agent conversation.</span>
+            </span>
+            {isAdvancedOutlineOpen ? <ChevronDown className="h-5 w-5 text-[var(--text-muted)]" /> : <ChevronRight className="h-5 w-5 text-[var(--text-muted)]" />}
+          </button>
+          {isAdvancedOutlineOpen ? (
+            <div className="h-[560px] border-t border-[var(--border-light)] p-3">
+              <OutlinePanel items={outline} isLoading={currentStep === "outlining"} onToggle={handleToggle} onEdit={handleEdit} onDelete={handleDelete} onAdd={handleAdd} onGenerate={handleGenerate} generateDisabledReason={generateDisabledReason} />
+            </div>
+          ) : null}
+        </section>
+      ) : null}
     </div>
   );
 
