@@ -1,14 +1,17 @@
 "use client";
 
-import { Download, FileCode2, LayoutTemplate, Sparkles } from "lucide-react";
+import { FileCode2, LayoutTemplate, Sparkles } from "lucide-react";
+import HtmlPreview from "./html-preview";
 import type { HtmlGenerationStepData } from "@/src/types/presentation-workflow";
 import type { SlideOutlineItem } from "./slide-outline-card";
 
 type PreviewPaneStep = "brief" | "outlining" | "review" | "generating" | "preview";
 
 interface PresentationPreviewPaneProps {
-  step: PreviewPaneStep;
-  html: string;
+  step?: PreviewPaneStep;
+  currentStep?: PreviewPaneStep;
+  html?: string;
+  generatedHtml?: string;
   outline: SlideOutlineItem[];
   htmlGeneration?: HtmlGenerationStepData;
 }
@@ -19,18 +22,6 @@ const generationSteps = [
   { id: "styles", text: "Applying presentation styles...", icon: Sparkles },
   { id: "bundle", text: "Preparing preview document...", icon: FileCode2 },
 ] as const;
-
-function downloadHtml(html: string) {
-  const blob = new Blob([html], { type: "text/html" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = "presentation.html";
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
-}
 
 function EmptyPreview() {
   return (
@@ -96,25 +87,19 @@ function GenerationProgress({ htmlGeneration }: { htmlGeneration?: HtmlGeneratio
   );
 }
 
-export default function PresentationPreviewPane({ step, html, outline, htmlGeneration }: PresentationPreviewPaneProps) {
-  if (step === "preview" && html) {
-    return (
-      <div className="relative h-[calc(100vh-112px)] min-h-[620px] bg-white">
-        <div className="absolute right-4 top-4 z-10">
-          <button type="button" onClick={() => downloadHtml(html)} className="flex items-center gap-2 rounded-xl bg-[var(--accent-terracotta)] px-4 py-2 text-sm font-medium text-white shadow-md">
-            <Download className="h-4 w-4" />Download HTML
-          </button>
-        </div>
-        <iframe title="Generated HTML presentation" sandbox="allow-same-origin" srcDoc={html} className="h-full w-full" />
-      </div>
-    );
+export default function PresentationPreviewPane({ step, currentStep, html, generatedHtml, outline, htmlGeneration }: PresentationPreviewPaneProps) {
+  const activeStep = currentStep ?? step ?? "brief";
+  const activeHtml = generatedHtml ?? html ?? "";
+
+  if (activeStep === "preview" && activeHtml) {
+    return <HtmlPreview html={activeHtml} />;
   }
 
-  if (step === "outlining" || step === "review" || step === "generating") {
+  if (activeStep === "outlining" || activeStep === "review" || activeStep === "generating") {
     return (
       <div className="relative">
-        <OutlinePreview outline={outline} isLoading={step === "outlining"} />
-        {step === "generating" ? <GenerationProgress htmlGeneration={htmlGeneration} /> : null}
+        <OutlinePreview outline={outline} isLoading={activeStep === "outlining"} />
+        {activeStep === "generating" ? <GenerationProgress htmlGeneration={htmlGeneration} /> : null}
       </div>
     );
   }
