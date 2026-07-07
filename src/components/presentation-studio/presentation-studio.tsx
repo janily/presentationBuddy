@@ -5,6 +5,7 @@ import { usePresentationWorkflow } from "@/src/hooks/use-presentation-workflow";
 import type { PresentationOutlineData } from "@/src/types/presentation-workflow";
 import { type PresentationBrief } from "./brief-form";
 import OutlinePanel from "./outline-panel";
+import PresentationPreviewPane from "./presentation-preview-pane";
 import PresentationWorkspace from "./presentation-workspace";
 import { emptyOutline, toApprovedOutline, toSlideItem } from "./presentation-outline-utils";
 import { type SlideOutlineItem } from "./slide-outline-card";
@@ -61,6 +62,7 @@ export default function PresentationStudio() {
     error,
     clearError,
     stop,
+    resetWorkflow,
   } = usePresentationWorkflow();
   const [brief, setBrief] = useState<PresentationBrief | null>(null);
   const [userModifiedOutline, setUserModifiedOutline] = useState<SlideOutlineItem[] | null>(null);
@@ -193,11 +195,11 @@ export default function PresentationStudio() {
   }, [approveOutline, baseOutline, canApproveOutline, outline, selectedSlides.length]);
 
   const handleStartOver = useCallback(() => {
-    clearError();
+    resetWorkflow();
     setHtmlWatchdogError(null);
     setBrief(null);
     setUserModifiedOutline(null);
-  }, [clearError]);
+  }, [resetWorkflow]);
 
   const handleRetryBrief = useCallback(() => {
     clearError();
@@ -211,16 +213,6 @@ export default function PresentationStudio() {
     setHtmlWatchdogError(null);
     handleGenerate();
   }, [clearError, handleGenerate]);
-
-  const previewOverlay = currentStep === "generating" ? (
-    <div className="pointer-events-none absolute inset-x-6 bottom-6 rounded-2xl border border-[var(--border-light)] bg-[var(--bg-card)]/95 p-4 shadow-lg backdrop-blur">
-      <p className="text-sm font-semibold text-[var(--text-primary)]">Generating your HTML presentation...</p>
-      <p className="mt-1 text-sm text-[var(--text-secondary)]">{htmlGenerationStep?.data?.message ?? "Preparing the selected slides for the live preview."}</p>
-      <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--bg-secondary)]">
-        <div className="h-full rounded-full bg-[var(--accent-terracotta)] transition-all duration-500" style={{ width: `${htmlGenerationStep?.data?.progress ?? 25}%` }} />
-      </div>
-    </div>
-  ) : null;
 
   const agentContent = (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
@@ -251,6 +243,17 @@ export default function PresentationStudio() {
         </section>
       ) : null}
 
+      {currentStep === "generating" ? (
+        <section className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-elevated)] p-4 shadow-sm">
+          <p className="text-xs font-medium uppercase tracking-[0.2em] text-[var(--accent-brass)]">Agent message</p>
+          <p className="mt-2 text-sm font-semibold text-[var(--text-primary)]">Generating your HTML presentation...</p>
+          <p className="mt-1 text-sm text-[var(--text-secondary)]">{htmlGenerationStep?.data?.message ?? "Preparing the selected slides for the live preview."}</p>
+          <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--bg-secondary)]">
+            <div className="h-full rounded-full bg-[var(--accent-terracotta)] transition-all duration-500" style={{ width: `${htmlGenerationStep?.data?.progress ?? 25}%` }} />
+          </div>
+        </section>
+      ) : null}
+
       {currentStep === "brief" ? (
         <section className="rounded-2xl border border-dashed border-[var(--border-light)] bg-[var(--bg-elevated)] p-4 text-sm text-[var(--text-secondary)]">
           Start by sending the structured brief above. The preview area will stay visible while the agent drafts, reviews, and generates your deck.
@@ -266,10 +269,8 @@ export default function PresentationStudio() {
   return (
     <PresentationWorkspace
       brief={brief}
-      generatedHtml={generatedHtml}
-      previewOverlay={previewOverlay}
+      previewContent={<PresentationPreviewPane step={currentStep} html={generatedHtml} outline={outline} htmlGeneration={htmlGenerationStep?.data} />}
       agentContent={agentContent}
-      htmlGeneration={htmlGenerationStep?.data}
       onBriefSubmit={handleBriefSubmit}
       onStartOver={handleStartOver}
     />
