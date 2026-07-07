@@ -29,7 +29,7 @@ const getWorkflowSteps = (workflowData: unknown) => {
 
 export const usePresentationWorkflow = () => {
   const [approvalError, setApprovalError] = useState<string | null>(null);
-  const { sendMessage, messages, status } = useChat<MyUIMessage>({
+  const { sendMessage, messages, status, error, clearError } = useChat<MyUIMessage>({
     transport: new DefaultChatTransport({
       api: "/api/analyze",
       prepareSendMessagesRequest: ({ messages }) => {
@@ -89,6 +89,7 @@ export const usePresentationWorkflow = () => {
 
   const sendPresentationBrief = (brief: PresentationBriefData) => {
     setApprovalError(null);
+    clearError();
     sendMessage({
       role: "user",
       parts: [
@@ -131,6 +132,7 @@ export const usePresentationWorkflow = () => {
     }
 
     setApprovalError(null);
+    clearError();
     sendMessage({
       role: "user",
       parts: [
@@ -144,13 +146,15 @@ export const usePresentationWorkflow = () => {
         },
       ],
     });
-  }, [activeRunId, sendMessage]);
+  }, [activeRunId, clearError, sendMessage]);
 
   return {
     sendPresentationBrief,
     approveOutline,
     messages,
     status,
+    error,
+    clearError,
     suspenseData,
     activeRunId,
     approvalError,
