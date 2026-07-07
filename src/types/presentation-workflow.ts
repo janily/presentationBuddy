@@ -1,6 +1,22 @@
 import { WorkflowDataPart } from "@mastra/ai-sdk";
 import { UIMessage } from "ai";
 
+export type SlideOutlineData = {
+  pageNumber: number;
+  title: string;
+  purpose: string;
+  keyPoints: string[];
+  designSuggestion: string;
+};
+
+export type PresentationOutlineData = {
+  title: string;
+  narrativeGoal: string;
+  sections: string[];
+  slides: SlideOutlineData[];
+  designGuidance: string[];
+};
+
 export type PresentationBriefData = {
   topic: string;
   audience: string;
@@ -11,7 +27,7 @@ export type PresentationBriefData = {
 
 export type OutlineStepData = {
   status: "loading" | "streaming" | "completed";
-  outline?: string[];
+  outline?: Partial<PresentationOutlineData>;
 };
 
 export type HtmlGenerationStepData = {
@@ -24,9 +40,11 @@ export type MyUIMessage = UIMessage<
   unknown,
   {
     presentationBrief: PresentationBriefData;
-    approvedOutline?: string[];
+    approvedOutline?: PresentationOutlineData;
     workflowRunId?: string;
     workflow: WorkflowDataPart;
+    presentationOutline: OutlineStepData;
+    presentationHtml: HtmlGenerationStepData;
     outlineSuggestions: OutlineStepData;
     generatedPresentation: HtmlGenerationStepData;
   }

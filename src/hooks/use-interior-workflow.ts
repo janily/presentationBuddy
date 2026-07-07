@@ -21,9 +21,9 @@ export const useInteriorWorkflow = () => {
         );
 
         // Extract actual data values from the parts
-        const imageUrl = userImagePart?.data;
-        const approvedChanges = approvedChangesPart?.data;
-        const workflowRunId = workflowRunIdPart?.data;
+        const imageUrl = (userImagePart as { data?: unknown } | undefined)?.data;
+        const approvedChanges = (approvedChangesPart as { data?: unknown } | undefined)?.data;
+        const workflowRunId = (workflowRunIdPart as { data?: unknown } | undefined)?.data;
 
         return {
           body: {
@@ -33,7 +33,7 @@ export const useInteriorWorkflow = () => {
           },
         };
       },
-    }),
+    }) as never,
   });
 
   const suggestionStep = useMemo(() => {
@@ -79,7 +79,7 @@ export const useInteriorWorkflow = () => {
 
     const workflowData = lastWorkflowPart.data;
 
-    const steps = workflowData?.data?.steps;
+    const steps = (workflowData as { data?: { steps?: Record<string, { suspendPayload?: Record<string, unknown> }> } } | undefined)?.data?.steps;
     if (!steps) return null;
 
     const lastStepKey = Object.keys(steps).pop();

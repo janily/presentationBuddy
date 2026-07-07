@@ -1,7 +1,9 @@
 "use client";
 
 import { RotateCcw } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { usePresentationWorkflow } from "@/src/hooks/use-presentation-workflow";
+import type { PresentationOutlineData } from "@/src/types/presentation-workflow";
 import BriefForm, { type PresentationBrief } from "./brief-form";
 import HtmlPreview from "./html-preview";
 import OutlinePanel from "./outline-panel";
@@ -10,114 +12,90 @@ import { type SlideOutlineItem } from "./slide-outline-card";
 
 type WorkflowStep = "brief" | "outlining" | "review" | "generating" | "preview";
 
-type GenerationStatus = "idle" | "outlining" | "generating" | "complete";
-
 const makeId = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
-function createOutline(brief: PresentationBrief): SlideOutlineItem[] {
-  const base = [
-    ["Opening story", `Frame ${brief.topic} for ${brief.audience}.`],
-    ["Why it matters", "Summarize the business stakes and current friction."],
-    ["Core idea", `Introduce the recommended approach in a ${brief.style.toLowerCase()} style.`],
-    ["Execution plan", "Break the work into practical phases and owners."],
-    ["Success metrics", "Define the KPIs, signals, and review cadence."],
-    ["Call to action", "Close with the next decision and immediate steps."],
-  ];
+const emptyOutline = (brief: PresentationBrief): PresentationOutlineData => ({
+  title: brief.topic,
+  narrativeGoal: `Create a ${brief.style} presentation for ${brief.audience}.`,
+  sections: [],
+  slides: [],
+  designGuidance: [],
+});
 
-  return Array.from({ length: brief.slideCount }, (_, index) => {
-    const [title, notes] = base[index] ?? [`Deep dive ${index + 1}`, "Add supporting evidence, examples, and speaker notes."];
-    return {
-      id: makeId(),
-      title,
-      notes: `${notes}${brief.requirements ? ` Requirement: ${brief.requirements}` : ""}`,
-      selected: true,
-    };
-  });
-}
+const toSlideItem = (slide: PresentationOutlineData["slides"][number]): SlideOutlineItem => ({
+  id: `${slide.pageNumber}-${slide.title}`,
+  title: slide.title,
+  notes: [slide.purpose, ...slide.keyPoints, slide.designSuggestion].filter(Boolean).join(" "),
+  selected: true,
+});
 
-function createHtml(brief: PresentationBrief | null, slides: SlideOutlineItem[]) {
-  const safe = (value: string) => value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
-  const slideMarkup = slides
-    .map(
-      (slide, index) => `<section class="slide">
-  <p class="eyebrow">Slide ${index + 1}</p>
-  <h2>${safe(slide.title)}</h2>
-  <p>${safe(slide.notes)}</p>
-</section>`,
-    )
-    .join("\n");
-
-  return `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>${safe(brief?.topic ?? "Generated presentation")}</title>
-  <style>
-    body { margin: 0; font-family: Inter, ui-sans-serif, system-ui, sans-serif; background: #251812; color: #fff8ef; }
-    .deck { display: grid; gap: 32px; padding: 48px; }
-    .cover, .slide { min-height: 520px; border-radius: 32px; padding: 56px; background: linear-gradient(135deg, #3a241b, #7f3f2f); box-shadow: 0 24px 80px rgba(0,0,0,.28); }
-    .cover { display: flex; flex-direction: column; justify-content: center; }
-    .eyebrow { color: #d7b56d; font-size: 14px; font-weight: 800; letter-spacing: .24em; text-transform: uppercase; }
-    h1 { max-width: 920px; font-size: clamp(48px, 8vw, 92px); line-height: .95; margin: 16px 0; }
-    h2 { max-width: 800px; font-size: clamp(38px, 6vw, 72px); line-height: 1; margin: 16px 0 24px; }
-    p { max-width: 820px; font-size: 24px; line-height: 1.45; }
-  </style>
-</head>
-<body>
-  <main class="deck">
-    <section class="cover">
-      <p class="eyebrow">${safe(brief?.style ?? "Presentation")}</p>
-      <h1>${safe(brief?.topic ?? "Generated presentation")}</h1>
-      <p>Prepared for ${safe(brief?.audience || "your audience")}</p>
-    </section>
-    ${slideMarkup}
-  </main>
-</body>
-</html>`;
-}
+const toApprovedOutline = (
+  baseOutline: PresentationOutlineData,
+  items: SlideOutlineItem[],
+): PresentationOutlineData => ({
+  ...baseOutline,
+  slides: items
+    .filter((item) => item.selected)
+    .map((item, index) => ({
+      pageNumber: index + 1,
+      title: item.title,
+      purpose: item.notes,
+      keyPoints: [item.notes],
+      designSuggestion: baseOutline.designGuidance.join(" ") || "Use a polished, readable slide layout.",
+    })),
+});
 
 export default function PresentationStudio() {
+  const {
+    sendPresentationBrief,
+    approveOutline,
+    suspenseData,
+    outlineStep,
+    htmlGenerationStep,
+    status,
+  } = usePresentationWorkflow();
   const [brief, setBrief] = useState<PresentationBrief | null>(null);
-  const [workflowStatus, setWorkflowStatus] = useState<GenerationStatus>("idle");
   const [userModifiedOutline, setUserModifiedOutline] = useState<SlideOutlineItem[] | null>(null);
-  const [generatedHtml, setGeneratedHtml] = useState("");
 
-  const outline = useMemo(() => userModifiedOutline ?? (brief ? createOutline(brief) : []), [brief, userModifiedOutline]);
+  const workflowOutline = useMemo(() => {
+    return outlineStep?.data?.outline ?? suspenseData?.outline ?? null;
+  }, [outlineStep, suspenseData]);
+
+  const baseOutline = useMemo(() => {
+    if (workflowOutline?.title && workflowOutline.slides) {
+      return workflowOutline as PresentationOutlineData;
+    }
+
+    return brief ? emptyOutline(brief) : null;
+  }, [brief, workflowOutline]);
+
+  const outline = useMemo(() => {
+    if (userModifiedOutline) return userModifiedOutline;
+    return baseOutline?.slides?.map(toSlideItem) ?? [];
+  }, [baseOutline, userModifiedOutline]);
+
   const selectedSlides = useMemo(() => outline.filter((item) => item.selected), [outline]);
+  const generatedHtml = htmlGenerationStep?.data?.html ?? "";
 
   const currentStep = useMemo((): WorkflowStep => {
     if (!brief) return "brief";
-    if (workflowStatus === "outlining") return "outlining";
-    if (workflowStatus === "generating") return "generating";
-    if (workflowStatus === "complete" && generatedHtml) return "preview";
+    if (htmlGenerationStep?.data?.status === "completed" && generatedHtml) return "preview";
+    if (htmlGenerationStep?.data?.status === "in-progress") return "generating";
+    if (status === "submitted" || (status === "streaming" && !baseOutline?.slides?.length)) return "outlining";
     return "review";
-  }, [brief, generatedHtml, workflowStatus]);
-
-  useEffect(() => {
-    if (workflowStatus !== "outlining" || !brief) return;
-    const timer = setTimeout(() => {
-      setUserModifiedOutline(createOutline(brief));
-      setWorkflowStatus("idle");
-    }, 900);
-    return () => clearTimeout(timer);
-  }, [brief, workflowStatus]);
-
-  useEffect(() => {
-    if (workflowStatus !== "generating") return;
-    const timer = setTimeout(() => {
-      setGeneratedHtml(createHtml(brief, selectedSlides));
-      setWorkflowStatus("complete");
-    }, 2200);
-    return () => clearTimeout(timer);
-  }, [brief, selectedSlides, workflowStatus]);
+  }, [baseOutline, brief, generatedHtml, htmlGenerationStep, status]);
 
   const handleBriefSubmit = useCallback((nextBrief: PresentationBrief) => {
     setBrief(nextBrief);
     setUserModifiedOutline(null);
-    setGeneratedHtml("");
-    setWorkflowStatus("outlining");
-  }, []);
+    sendPresentationBrief({
+      topic: nextBrief.topic,
+      audience: nextBrief.audience,
+      pageCount: nextBrief.slideCount,
+      style: nextBrief.style,
+      requirements: nextBrief.requirements,
+    });
+  }, [sendPresentationBrief]);
 
   const handleToggle = useCallback((id: string) => {
     setUserModifiedOutline((current) => (current ?? outline).map((item) => (item.id === id ? { ...item, selected: !item.selected } : item)));
@@ -138,17 +116,20 @@ export default function PresentationStudio() {
     ]);
   }, [outline]);
 
+  const handleGenerate = useCallback(() => {
+    if (!baseOutline || selectedSlides.length === 0) return;
+    approveOutline(toApprovedOutline(baseOutline, outline));
+  }, [approveOutline, baseOutline, outline, selectedSlides.length]);
+
   const handleStartOver = useCallback(() => {
     setBrief(null);
-    setWorkflowStatus("idle");
     setUserModifiedOutline(null);
-    setGeneratedHtml("");
   }, []);
 
   if (currentStep === "brief") return <BriefForm onSubmit={handleBriefSubmit} />;
 
   if (currentStep === "generating") {
-    return <PresentationProcessingView slideTitles={selectedSlides.map((slide) => slide.title)} isComplete={workflowStatus === "complete"} onComplete={() => undefined} />;
+    return <PresentationProcessingView slideTitles={selectedSlides.map((slide) => slide.title)} isComplete={false} onComplete={() => undefined} />;
   }
 
   if (currentStep === "preview") return <HtmlPreview html={generatedHtml} onStartOver={handleStartOver} />;
@@ -157,7 +138,7 @@ export default function PresentationStudio() {
     <div className="min-h-screen paper-texture">
       <header className="sticky top-0 z-20 border-b border-[var(--border-light)] bg-[var(--bg-card)]/90 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
-          <h1 className="text-xl font-semibold text-[var(--text-primary)]" style={{ fontFamily: "var(--font-fraunces), Georgia, serif" }}>Presentation Studio</h1>
+          <h1 className="text-xl font-semibold text-[var(--text-primary)]" style={{ fontFamily: "var(--font-fraunces), Georgia, serif" }}>Presentation Buddy</h1>
           <button type="button" onClick={handleStartOver} className="flex items-center gap-2 rounded-xl border border-[var(--border-light)] bg-[var(--bg-card)] px-4 py-2 text-sm font-medium text-[var(--text-secondary)]"><RotateCcw className="h-4 w-4" />Start over</button>
         </div>
       </header>
@@ -168,11 +149,11 @@ export default function PresentationStudio() {
           <dl className="mt-6 space-y-4 text-sm">
             <div><dt className="font-medium text-[var(--text-muted)]">Audience</dt><dd className="text-[var(--text-primary)]">{brief?.audience}</dd></div>
             <div><dt className="font-medium text-[var(--text-muted)]">Style</dt><dd className="text-[var(--text-primary)]">{brief?.style}</dd></div>
-            <div><dt className="font-medium text-[var(--text-muted)]">Additional requirements</dt><dd className="text-[var(--text-primary)]">{brief?.requirements}</dd></div>
+            <div><dt className="font-medium text-[var(--text-muted)]">Narrative goal</dt><dd className="text-[var(--text-primary)]">{baseOutline?.narrativeGoal ?? suspenseData?.reason}</dd></div>
           </dl>
         </section>
         <div className="h-[calc(100vh-120px)] min-h-[620px]">
-          <OutlinePanel items={outline} isLoading={currentStep === "outlining"} onToggle={handleToggle} onEdit={handleEdit} onDelete={handleDelete} onAdd={handleAdd} onGenerate={() => setWorkflowStatus("generating")} />
+          <OutlinePanel items={outline} isLoading={currentStep === "outlining"} onToggle={handleToggle} onEdit={handleEdit} onDelete={handleDelete} onAdd={handleAdd} onGenerate={handleGenerate} />
         </div>
       </main>
     </div>

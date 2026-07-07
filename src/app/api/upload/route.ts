@@ -13,23 +13,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
-    // Validate file type
-    if (!file.type.startsWith("image/")) {
-      return NextResponse.json(
-        { error: "File must be an image" },
-        { status: 400 },
-      );
-    }
-
-    // Get file extension from mime type
     const mimeToExt: Record<string, string> = {
       "image/jpeg": "jpg",
       "image/jpg": "jpg",
       "image/png": "png",
       "image/webp": "webp",
       "image/gif": "gif",
+      "image/svg+xml": "svg",
+      "text/html": "html",
+      "application/pdf": "pdf",
+      "text/markdown": "md",
+      "text/plain": "txt",
     };
-    const extension = mimeToExt[file.type] || "jpg";
+
+    const extension = mimeToExt[file.type];
+
+    if (!extension) {
+      return NextResponse.json(
+        { error: "Unsupported file type" },
+        { status: 400 },
+      );
+    }
+
+    const assetType = file.type.startsWith("image/")
+      ? "image"
+      : file.type === "text/html"
+        ? "html"
+        : file.type === "application/pdf"
+          ? "pdf"
+          : "document";
 
     // Generate unique filename
     const fileName = `${randomUUID()}.${extension}`;
@@ -53,6 +65,8 @@ export async function POST(request: NextRequest) {
       success: true,
       url,
       fileName,
+      assetType,
+      contentType: file.type,
     });
   } catch (error) {
     console.error("Upload error:", error);

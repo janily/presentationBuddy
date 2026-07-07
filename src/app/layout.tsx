@@ -17,8 +17,8 @@ const commissioner = Commissioner({
 });
 
 export const metadata: Metadata = {
-  title: "Presentation Studio",
-  description: "AI-powered HTML presentation generation",
+  title: "Presentation Buddy",
+  description: "AI-assisted outline review and HTML presentation generation",
 };
 
 export default function RootLayout({

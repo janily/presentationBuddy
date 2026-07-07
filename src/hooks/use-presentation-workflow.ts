@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import {
   MyUIMessage,
   PresentationBriefData,
+  PresentationOutlineData,
 } from "../types/presentation-workflow";
 
 export const usePresentationWorkflow = () => {
@@ -23,9 +24,9 @@ export const usePresentationWorkflow = () => {
           (item) => item.type === "data-workflowRunId",
         );
 
-        const presentationBrief = presentationBriefPart?.data;
-        const approvedOutline = approvedOutlinePart?.data;
-        const workflowRunId = workflowRunIdPart?.data;
+        const presentationBrief = (presentationBriefPart as { data?: unknown } | undefined)?.data;
+        const approvedOutline = (approvedOutlinePart as { data?: unknown } | undefined)?.data;
+        const workflowRunId = (workflowRunIdPart as { data?: unknown } | undefined)?.data;
 
         return {
           body: {
@@ -35,19 +36,19 @@ export const usePresentationWorkflow = () => {
           },
         };
       },
-    }),
+    }) as never,
   });
 
   const outlineStep = useMemo(() => {
     return messages
       .flatMap((m) => m.parts)
-      .findLast((item) => item.type === "data-outlineSuggestions");
+      .findLast((item) => item.type === "data-presentationOutline");
   }, [messages]);
 
   const htmlGenerationStep = useMemo(() => {
     return messages
       .flatMap((m) => m.parts)
-      .findLast((item) => item.type === "data-generatedPresentation");
+      .findLast((item) => item.type === "data-presentationHtml");
   }, [messages]);
 
   const lastWorkflowPart = messages
@@ -81,13 +82,15 @@ export const usePresentationWorkflow = () => {
 
     const workflowData = lastWorkflowPart.data;
 
-    const steps = workflowData?.data?.steps;
+    const steps = (workflowData as { data?: { steps?: Record<string, { suspendPayload?: Record<string, unknown> }> } } | undefined)?.data?.steps;
     if (!steps) return null;
 
     const lastStepKey = Object.keys(steps).pop();
     const lastStep = lastStepKey ? steps[lastStepKey] : null;
 
-    const outline = (lastStep?.suspendPayload?.outline || []) as string[];
+    const outline = lastStep?.suspendPayload?.suggestedOutline as
+      | PresentationOutlineData
+      | undefined;
     const reason = (lastStep?.suspendPayload?.reason || "") as string;
 
     return {
@@ -96,7 +99,7 @@ export const usePresentationWorkflow = () => {
     };
   }, [lastWorkflowPart]);
 
-  const approveOutline = (approvedOutline: string[]) => {
+  const approveOutline = (approvedOutline: PresentationOutlineData) => {
     sendMessage({
       role: "user",
       parts: [
