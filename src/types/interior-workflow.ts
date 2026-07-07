@@ -11,6 +11,11 @@ export type ImprovementStepData = {
   url: string;
 };
 
+export type GeneratedPresentationStepData = {
+  status: "in-progess" | "completed";
+  url: string;
+};
+
 export type MyUIMessage = UIMessage<
   unknown,
   {
@@ -20,6 +25,7 @@ export type MyUIMessage = UIMessage<
     workflow: WorkflowDataPart;
     improvementSuggestions: SuggestionStepData;
     improvedInterior: ImprovementStepData;
+    generatedPresentation: GeneratedPresentationStepData;
     suggestions: SuggestionStepData;
   }
 >;
