@@ -1,25 +1,10 @@
 import { mastra } from "@/src/mastra";
-import {
-  presentationInputSchema,
-  presentationOutlineSchema,
-} from "@/src/mastra/workflows/presentation-generation-workflow";
 import { createUIMessageStream, createUIMessageStreamResponse } from "ai";
 import type { NextRequest } from "next/server";
 import { toAISdkFormat } from "@mastra/ai-sdk";
 import { NextResponse } from "next/server";
 import z from "zod";
-
-const resumeWorkflowRequestSchema = z.object({
-  workflowRunId: z.string().trim().min(1, "Workflow run ID is required"),
-  approvedOutline: presentationOutlineSchema,
-});
-
-function formatValidationErrors(error: z.ZodError) {
-  return error.issues.map((issue) => ({
-    field: issue.path.length > 0 ? issue.path.join(".") : "request",
-    message: issue.message,
-  }));
-}
+import { formatValidationErrors, validatePresentationWorkflowRequest } from "./request-validation";
 
 function validationErrorResponse(error: z.ZodError, action: "start" | "resume") {
   const fields = formatValidationErrors(error);
@@ -86,17 +71,14 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const workflow = mastra.getWorkflow("presentationGenerationWorkflow");
-    const isResumeRequest =
-      "workflowRunId" in body || "approvedOutline" in body;
+    const validation = validatePresentationWorkflowRequest(body);
 
-    if (isResumeRequest) {
-      const resumeRequest = resumeWorkflowRequestSchema.safeParse(body);
+    if (!validation.success) {
+      return validationErrorResponse(validation.error, validation.action);
+    }
 
-      if (!resumeRequest.success) {
-        return validationErrorResponse(resumeRequest.error, "resume");
-      }
-
-      const { workflowRunId, approvedOutline } = resumeRequest.data;
+    if (validation.action === "resume") {
+      const { workflowRunId, approvedOutline } = validation.data;
 
       console.log("Received presentation workflow resume request:", {
         workflowRunId,
@@ -131,17 +113,8 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const presentationBriefSource = body.presentationBrief ?? body;
-    const presentationBrief = presentationInputSchema.safeParse(
-      presentationBriefSource,
-    );
-
-    if (!presentationBrief.success) {
-      return validationErrorResponse(presentationBrief.error, "start");
-    }
-
     const { topic, audience, pageCount, style, requirements } =
-      presentationBrief.data;
+      validation.data;
 
     console.log("Received presentation generation request:", {
       topic,
