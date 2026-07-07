@@ -10,7 +10,7 @@ type AgentMessage = {
 };
 
 interface AgentPanelProps {
-  onSubmit: (message: string) => void;
+  onSubmit: (message: string) => Promise<string | void> | string | void;
   title?: string;
   subtitle?: string;
   initialMessage?: string;
@@ -46,7 +46,8 @@ export default function AgentPanel({
     },
   ]);
   const [input, setInput] = useState("");
-  const canSend = input.trim().length > 0;
+  const [isSending, setIsSending] = useState(false);
+  const canSend = input.trim().length > 0 && !isSending;
 
   const computedHelperText = useMemo(() => {
     if (helperText) return helperText;
@@ -54,21 +55,31 @@ export default function AgentPanel({
     return "我会先把你的自然语言作为主题和需求生成大纲，后续可继续细化 brief 提取逻辑。";
   }, [helperText, messages.length]);
 
-  const sendPrompt = (prompt: string) => {
+  const sendPrompt = async (prompt: string) => {
     const trimmedPrompt = prompt.trim();
-    if (!trimmedPrompt) return;
+    if (!trimmedPrompt || isSending) return;
 
+    setInput("");
+    setIsSending(true);
     setMessages((current) => [
       ...current,
       { id: makeMessageId(), role: "user", content: trimmedPrompt },
-      {
-        id: makeMessageId(),
-        role: "assistant",
-        content: "收到，我会先根据这段需求生成演示文稿大纲。",
-      },
     ]);
-    setInput("");
-    onSubmit(trimmedPrompt);
+
+    try {
+      const assistantReply = await onSubmit(trimmedPrompt) ?? "收到，我会继续根据这段需求推进。";
+
+      setMessages((current) => [
+        ...current,
+        {
+          id: makeMessageId(),
+          role: "assistant",
+          content: assistantReply,
+        },
+      ]);
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -129,7 +140,7 @@ export default function AgentPanel({
             className="self-end rounded-xl bg-[var(--accent-terracotta)] p-3 text-white shadow-md transition hover:bg-[var(--accent-terracotta-light)] disabled:cursor-not-allowed disabled:opacity-50"
             aria-label="Send presentation request"
           >
-            <Send className="h-5 w-5" />
+            <Send className={`h-5 w-5 ${isSending ? "animate-pulse" : ""}`} />
           </button>
         </form>
         <p className="text-xs leading-5 text-[var(--text-muted)]">{computedHelperText}</p>

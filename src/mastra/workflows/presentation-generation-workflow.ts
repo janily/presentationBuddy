@@ -21,6 +21,7 @@ type PresentationHtmlStepData = {
 const OUTLINE_GENERATION_TIMEOUT_MS = 90_000;
 const HTML_GENERATION_TIMEOUT_MS = 120_000;
 const HTML_STREAM_IDLE_TIMEOUT_MS = 30_000;
+const OUTLINE_STREAM_IDLE_TIMEOUT_MS = 30_000;
 
 function stripHtmlCodeFence(html: string) {
   return html
@@ -34,6 +35,27 @@ function timeoutAfter(ms: number, message: string) {
   return new Promise<never>((_, reject) => {
     setTimeout(() => reject(new Error(message)), ms);
   });
+}
+
+async function nextWithTimeout<T>(
+  iterator: AsyncIterator<T>,
+  ms: number,
+  message: string,
+) {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+  try {
+    return await Promise.race([
+      iterator.next(),
+      new Promise<IteratorResult<T>>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error(message)), ms);
+      }),
+    ]);
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
 }
 
 function getTextDelta(chunk: unknown) {
@@ -98,12 +120,22 @@ export const presentationOutlineSuggestionStep = createStep({
 
     const outlineStartedAt = Date.now();
     let lastOutlineSnapshot = "";
+    const outlineIterator = stream.objectStream[Symbol.asyncIterator]();
 
-    for await (const chunk of stream.objectStream) {
+    while (true) {
       if (Date.now() - outlineStartedAt > OUTLINE_GENERATION_TIMEOUT_MS) {
         throw new Error(`Outline generation timed out after ${Math.round(OUTLINE_GENERATION_TIMEOUT_MS / 1000)} seconds`);
       }
 
+      const result = await nextWithTimeout(
+        outlineIterator,
+        OUTLINE_STREAM_IDLE_TIMEOUT_MS,
+        `Outline generation did not produce an update for ${Math.round(OUTLINE_STREAM_IDLE_TIMEOUT_MS / 1000)} seconds`,
+      );
+
+      if (result.done) break;
+
+      const chunk = result.value;
       const outlineSnapshot = JSON.stringify(chunk);
       if (outlineSnapshot === lastOutlineSnapshot) continue;
       lastOutlineSnapshot = outlineSnapshot;
@@ -117,7 +149,13 @@ export const presentationOutlineSuggestionStep = createStep({
       });
     }
 
-    const outline = await stream.object;
+    const outline = await Promise.race([
+      stream.object,
+      timeoutAfter(
+        OUTLINE_STREAM_IDLE_TIMEOUT_MS,
+        `Outline generation did not finish after the stream closed within ${Math.round(OUTLINE_STREAM_IDLE_TIMEOUT_MS / 1000)} seconds`,
+      ),
+    ]);
 
     writer.write({
       type: "data-presentationOutline",

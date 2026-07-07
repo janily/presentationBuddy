@@ -39,6 +39,33 @@ const toDefaultBriefFromAgentRequest = (message: string): PresentationBrief => (
   requirements: message,
 });
 
+const confirmationPattern = /^(确认|确认生成|确定|可以开始|开始生成|没问题|ok|yes|go)$/i;
+
+function isConfirmationMessage(message: string) {
+  return confirmationPattern.test(message.trim());
+}
+
+async function getBriefAgentReply(message: string, pendingRequest: string | null) {
+  const response = await fetch("/api/agent-chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      message,
+      pendingRequest: pendingRequest ?? undefined,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Brief agent request failed");
+  }
+
+  const data = await response.json() as { reply?: unknown };
+
+  return typeof data.reply === "string" && data.reply.trim()
+    ? data.reply.trim()
+    : "我已经收到你的补充。在生成前，请继续补充目标受众、页数和风格；如果方向已经确认，请回复“确认生成”。";
+}
+
 const toStreamingSlideItem = (slide: Partial<PresentationOutlineData["slides"][number]>, index: number): SlideOutlineItem => {
   const title = slide.title?.trim() || `Drafting slide ${index + 1}...`;
   const keyPoints = slide.keyPoints?.filter(Boolean) ?? [];
@@ -77,6 +104,7 @@ export default function PresentationStudio() {
   const [brief, setBrief] = useState<PresentationBrief | null>(null);
   const [userModifiedOutline, setUserModifiedOutline] = useState<SlideOutlineItem[] | null>(null);
   const [htmlWatchdogError, setHtmlWatchdogError] = useState<string | null>(null);
+  const [pendingAgentRequest, setPendingAgentRequest] = useState<string | null>(null);
   const [isAdvancedOutlineOpen, setIsAdvancedOutlineOpen] = useState(false);
 
   const workflowOutline = useMemo(() => {
@@ -159,7 +187,7 @@ export default function PresentationStudio() {
     return () => window.clearTimeout(timeout);
   }, [htmlGenerationStep?.data?.generatedCharacters, htmlGenerationStep?.data?.status, stop]);
 
-  const handleAgentRequestSubmit = useCallback((message: string) => {
+  const startGenerationFromAgentRequest = useCallback((message: string) => {
     const contextualMessage = generatedHtml
       ? `${message}\n\nCurrent deck context: revise the generated presentation rather than switching away from the workspace.`
       : message;
@@ -177,6 +205,35 @@ export default function PresentationStudio() {
       requirements: nextBrief.requirements,
     });
   }, [generatedHtml, sendAgentRequest]);
+
+  const handleBriefAgentSubmit = useCallback(async (message: string) => {
+    const combinedRequest = pendingAgentRequest ? `${pendingAgentRequest}\n${message}` : message;
+
+    setHtmlWatchdogError(null);
+
+    if (pendingAgentRequest && isConfirmationMessage(message)) {
+      startGenerationFromAgentRequest(pendingAgentRequest);
+      setPendingAgentRequest(null);
+      return "好的，需求已确认。我现在开始生成演示文稿大纲，稍后会在左侧进入预览和确认流程。";
+    }
+
+    if (brief) {
+      resetWorkflow();
+      setBrief(null);
+      setUserModifiedOutline(null);
+      setIsAdvancedOutlineOpen(false);
+    }
+
+    setPendingAgentRequest(combinedRequest);
+
+    try {
+      return await getBriefAgentReply(message, pendingAgentRequest);
+    } catch {
+      return "我已经收到你的补充。在生成前，请继续补充目标受众、页数和风格；如果方向已经确认，请回复“确认生成”。";
+    }
+  }, [brief, pendingAgentRequest, resetWorkflow, startGenerationFromAgentRequest]);
+
+  const handleAgentRequestSubmit = handleBriefAgentSubmit;
 
   const handleToggle = useCallback((id: string) => {
     setUserModifiedOutline((current) => (current ?? outline).map((item) => (item.id === id ? { ...item, selected: !item.selected } : item)));
@@ -218,6 +275,7 @@ export default function PresentationStudio() {
     resetWorkflow();
     setHtmlWatchdogError(null);
     setBrief(null);
+    setPendingAgentRequest(null);
     setUserModifiedOutline(null);
     setIsAdvancedOutlineOpen(false);
   }, [resetWorkflow]);
@@ -228,6 +286,7 @@ export default function PresentationStudio() {
     setUserModifiedOutline(null);
     setIsAdvancedOutlineOpen(false);
     setBrief(null);
+    setPendingAgentRequest(null);
   }, [clearError]);
 
   const handleRetryHtml = useCallback(() => {
@@ -283,7 +342,7 @@ export default function PresentationStudio() {
       ) : null}
 
       {currentStep === "brief" ? (
-        <AgentPanel onSubmit={handleAgentRequestSubmit} />
+        <AgentPanel onSubmit={handleBriefAgentSubmit} />
       ) : currentStep === "preview" ? (
         <AgentPanel
           onSubmit={handleAgentRequestSubmit}
