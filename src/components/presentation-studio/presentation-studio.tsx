@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, Sparkles } from "lucide-react";
 import { usePresentationWorkflow } from "@/src/hooks/use-presentation-workflow";
 import type { PresentationOutlineData } from "@/src/types/presentation-workflow";
-import AgentPanel from "./agent-panel";
+import AgentPanel, { type AgentMessage } from "./agent-panel";
 import { type PresentationBrief } from "./brief-form";
 import OutlinePanel from "./outline-panel";
 import PresentationPreviewPane from "./presentation-preview-pane";
@@ -14,6 +14,21 @@ import { type SlideOutlineItem } from "./slide-outline-card";
 
 type WorkflowStep = "brief" | "outlining" | "review" | "generating" | "preview";
 type WorkflowErrorKind = "outline" | "html" | "resume";
+
+type AgentBriefData = {
+  topic: string;
+  audience: string;
+  pageCount: number;
+  style: string;
+  requirements?: string;
+};
+
+type AgentChatResponse = {
+  reply?: string;
+  readyToGenerate?: boolean;
+  brief?: AgentBriefData | null;
+  error?: string;
+};
 
 const getErrorMessage = (error: Error | undefined, fallback: string) => {
   if (!error?.message) return fallback;
@@ -31,58 +46,10 @@ const getErrorMessage = (error: Error | undefined, fallback: string) => {
 
 const makeId = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
-const toDefaultBriefFromAgentRequest = (message: string): PresentationBrief => ({
-  topic: message,
-  audience: "General business audience",
-  slideCount: 6,
-  style: "Polished modern presentation",
-  requirements: message,
-});
-
-const confirmationPattern = /^(确认|确认生成|确定|可以开始|开始生成|没问题|ok|yes|go)$/i;
-
-function isConfirmationMessage(message: string) {
-  return confirmationPattern.test(message.trim());
-}
-
-async function getBriefAgentReply(message: string, pendingRequest: string | null) {
-  const response = await fetch("/api/agent-chat", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      message,
-      pendingRequest: pendingRequest ?? undefined,
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error("Brief agent request failed");
-  }
-
-  const data = await response.json() as { reply?: unknown };
-
-  return typeof data.reply === "string" && data.reply.trim()
-    ? data.reply.trim()
-    : "我已经收到你的补充。在生成前，请继续补充目标受众、页数和风格；如果方向已经确认，请回复“确认生成”。";
-}
-
-const toStreamingSlideItem = (slide: Partial<PresentationOutlineData["slides"][number]>, index: number): SlideOutlineItem => {
-  const title = slide.title?.trim() || `Drafting slide ${index + 1}...`;
-  const keyPoints = slide.keyPoints?.filter(Boolean) ?? [];
-  const purpose = slide.purpose?.trim() || "Drafting purpose and key points...";
-  const designSuggestion = slide.designSuggestion?.trim() || "Choosing an appropriate visual treatment...";
-  const notes = [purpose, ...keyPoints, designSuggestion].filter(Boolean).join(" ");
-
-  return {
-    id: `${slide.pageNumber ?? index + 1}-${title}`,
-    title,
-    notes,
-    selected: true,
-    purpose,
-    keyPoints,
-    designSuggestion,
-    originalNotes: notes,
-  };
+const initialGuidanceMessage: AgentMessage = {
+  id: "initial-guidance",
+  role: "assistant",
+  content: "告诉我你想做什么演示文稿：主题、受众、页数、风格或任何特殊要求都可以直接说。我理清需求后会自动开始生成，不需要额外的确认口令。",
 };
 
 export default function PresentationStudio() {
@@ -104,8 +71,9 @@ export default function PresentationStudio() {
   const [brief, setBrief] = useState<PresentationBrief | null>(null);
   const [userModifiedOutline, setUserModifiedOutline] = useState<SlideOutlineItem[] | null>(null);
   const [htmlWatchdogError, setHtmlWatchdogError] = useState<string | null>(null);
-  const [pendingAgentRequest, setPendingAgentRequest] = useState<string | null>(null);
   const [isAdvancedOutlineOpen, setIsAdvancedOutlineOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState<AgentMessage[]>([initialGuidanceMessage]);
+  const [isAgentReplying, setIsAgentReplying] = useState(false);
 
   const workflowOutline = useMemo(() => {
     return outlineStep?.data?.outline ?? suspenseData?.outline ?? null;
@@ -180,60 +148,77 @@ export default function PresentationStudio() {
     const timeout = window.setTimeout(() => {
       if (generatedCharacters === 0) {
         stop();
-        setHtmlWatchdogError("HTML generation did not receive any model output for 45 seconds. Please retry HTML generation or reduce the number of selected slides.");
+        setHtmlWatchdogError("HTML generation did not receive any model output for 150 seconds. Please retry HTML generation or reduce the number of selected slides.");
       }
-    }, 45_000);
+    }, 150_000);
 
     return () => window.clearTimeout(timeout);
   }, [htmlGenerationStep?.data?.generatedCharacters, htmlGenerationStep?.data?.status, stop]);
 
-  const startGenerationFromAgentRequest = useCallback((message: string) => {
-    const contextualMessage = generatedHtml
-      ? `${message}\n\nCurrent deck context: revise the generated presentation rather than switching away from the workspace.`
-      : message;
-    const nextBrief = toDefaultBriefFromAgentRequest(message);
+  const startGenerationFromBrief = useCallback((agentBrief: AgentBriefData) => {
+    const nextBrief: PresentationBrief = {
+      topic: agentBrief.topic,
+      audience: agentBrief.audience,
+      slideCount: agentBrief.pageCount,
+      style: agentBrief.style,
+      requirements: agentBrief.requirements?.trim() ?? "",
+    };
+
+    // Restart cleanly when a deck/outline already exists (revision flow).
+    if (brief) {
+      resetWorkflow();
+    }
 
     setHtmlWatchdogError(null);
     setBrief(nextBrief);
     setUserModifiedOutline(null);
     setIsAdvancedOutlineOpen(false);
-    sendAgentRequest(contextualMessage, {
+    sendAgentRequest(nextBrief.requirements || nextBrief.topic, {
       topic: nextBrief.topic,
       audience: nextBrief.audience,
       pageCount: nextBrief.slideCount,
       style: nextBrief.style,
-      requirements: nextBrief.requirements,
     });
-  }, [generatedHtml, sendAgentRequest]);
+  }, [brief, resetWorkflow, sendAgentRequest]);
 
-  const handleBriefAgentSubmit = useCallback(async (message: string) => {
-    const combinedRequest = pendingAgentRequest ? `${pendingAgentRequest}\n${message}` : message;
+  const handleAgentSend = useCallback(async (message: string) => {
+    const userMessage: AgentMessage = { id: makeId(), role: "user", content: message };
+    const history = [...chatMessages, userMessage];
 
     setHtmlWatchdogError(null);
-
-    if (pendingAgentRequest && isConfirmationMessage(message)) {
-      startGenerationFromAgentRequest(pendingAgentRequest);
-      setPendingAgentRequest(null);
-      return "好的，需求已确认。我现在开始生成演示文稿大纲，稍后会在左侧进入预览和确认流程。";
-    }
-
-    if (brief) {
-      resetWorkflow();
-      setBrief(null);
-      setUserModifiedOutline(null);
-      setIsAdvancedOutlineOpen(false);
-    }
-
-    setPendingAgentRequest(combinedRequest);
+    setChatMessages(history);
+    setIsAgentReplying(true);
 
     try {
-      return await getBriefAgentReply(message, pendingAgentRequest);
-    } catch {
-      return "我已经收到你的补充。在生成前，请继续补充目标受众、页数和风格；如果方向已经确认，请回复“确认生成”。";
-    }
-  }, [brief, pendingAgentRequest, resetWorkflow, startGenerationFromAgentRequest]);
+      const response = await fetch("/api/agent-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: history.map(({ role, content }) => ({ role, content })),
+          hasGeneratedDeck: Boolean(generatedHtml),
+        }),
+      });
+      const data = await response.json().catch(() => ({})) as AgentChatResponse;
 
-  const handleAgentRequestSubmit = handleBriefAgentSubmit;
+      if (!response.ok || !data.reply) {
+        throw new Error(data.error || `对话请求失败（HTTP ${response.status}）`);
+      }
+
+      setChatMessages((current) => [...current, { id: makeId(), role: "assistant", content: data.reply! }]);
+
+      if (data.readyToGenerate && data.brief) {
+        startGenerationFromBrief(data.brief);
+      }
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      setChatMessages((current) => [
+        ...current,
+        { id: makeId(), role: "assistant", content: `抱歉，我这边出错了：${detail}\n\n请稍后重试；如果反复失败，请检查模型与 API Key 配置。` },
+      ]);
+    } finally {
+      setIsAgentReplying(false);
+    }
+  }, [chatMessages, generatedHtml, startGenerationFromBrief]);
 
   const handleToggle = useCallback((id: string) => {
     setUserModifiedOutline((current) => (current ?? outline).map((item) => (item.id === id ? { ...item, selected: !item.selected } : item)));
@@ -275,9 +260,10 @@ export default function PresentationStudio() {
     resetWorkflow();
     setHtmlWatchdogError(null);
     setBrief(null);
-    setPendingAgentRequest(null);
     setUserModifiedOutline(null);
     setIsAdvancedOutlineOpen(false);
+    setChatMessages([initialGuidanceMessage]);
+    setIsAgentReplying(false);
   }, [resetWorkflow]);
 
   const handleRetryBrief = useCallback(() => {
@@ -286,7 +272,6 @@ export default function PresentationStudio() {
     setUserModifiedOutline(null);
     setIsAdvancedOutlineOpen(false);
     setBrief(null);
-    setPendingAgentRequest(null);
   }, [clearError]);
 
   const handleRetryHtml = useCallback(() => {
@@ -294,6 +279,40 @@ export default function PresentationStudio() {
     setHtmlWatchdogError(null);
     handleGenerate();
   }, [clearError, handleGenerate]);
+
+  const agentPanelProps = useMemo(() => {
+    if (currentStep === "preview") {
+      return {
+        title: "Keep refining this deck",
+        subtitle: "Ask for style, slide, or content changes without leaving the preview.",
+        helperText: "继续描述修改需求，我会基于当前 deck 重新生成。",
+        quickPrompts: ["调整风格", "删掉第 3 页", "换成更商务"],
+        placeholder: "例如：把整体风格换成更商务，删掉第 3 页，并加强结尾 CTA。",
+      };
+    }
+
+    if (currentStep === "outlining" || currentStep === "generating") {
+      return {
+        title: "Agent is working",
+        subtitle: "You can keep talking; new requirements restart the draft with fresh context.",
+        helperText: "生成过程中仍可继续补充要求，我会基于新的上下文重新推进。",
+        quickPrompts: ["增加案例页", "让叙事更有说服力", "改成高端商务风"],
+        placeholder: "例如：把第 2 页拆成两页，并把整体语气调整得更适合董事会。",
+      };
+    }
+
+    if (currentStep === "review") {
+      return {
+        title: "Continue with the agent",
+        subtitle: "Natural language stays the primary path; use the advanced outline only when needed.",
+        helperText: "大纲已准备好。可以点击生成预览，也可以继续告诉我你想如何调整。",
+        quickPrompts: ["增加案例页", "让叙事更有说服力", "改成高端商务风"],
+        placeholder: "例如：把第 2 页拆成两页，并把整体语气调整得更适合董事会。",
+      };
+    }
+
+    return {};
+  }, [currentStep]);
 
   const agentContent = (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
@@ -341,29 +360,12 @@ export default function PresentationStudio() {
         </section>
       ) : null}
 
-      {currentStep === "brief" ? (
-        <AgentPanel onSubmit={handleBriefAgentSubmit} />
-      ) : currentStep === "preview" ? (
-        <AgentPanel
-          onSubmit={handleAgentRequestSubmit}
-          title="Keep refining this deck"
-          subtitle="Ask for style, slide, or content changes without leaving the preview."
-          initialMessage="演示文稿已生成。你可以继续说：调整风格、删掉第 3 页、换成更商务，或补充新的内容要求。"
-          helperText="发送后会基于当前预览继续在同一工作区处理，右侧对话保持可用。"
-          quickPrompts={["调整风格", "删掉第 3 页", "换成更商务"]}
-          placeholder="例如：把整体风格换成更商务，删掉第 3 页，并加强结尾 CTA。"
-        />
-      ) : (
-        <AgentPanel
-          onSubmit={handleAgentRequestSubmit}
-          title={currentStep === "outlining" ? "Agent is drafting" : "Continue with the agent"}
-          subtitle="Natural language stays the primary path; use the advanced outline only when needed."
-          initialMessage={currentStep === "outlining" ? "我正在生成大纲。你仍然可以继续补充要求，我会基于新的上下文重新推进。" : "大纲已准备好。可以点击生成预览，也可以继续告诉我你想如何调整。"}
-          helperText="无需先完成卡片编辑；继续输入自然语言即可推进或重做大纲。"
-          quickPrompts={["增加案例页", "让叙事更有说服力", "改成高端商务风"]}
-          placeholder="例如：把第 2 页拆成两页，并把整体语气调整得更适合董事会。"
-        />
-      )}
+      <AgentPanel
+        messages={chatMessages}
+        isSending={isAgentReplying}
+        onSend={handleAgentSend}
+        {...agentPanelProps}
+      />
 
       {brief && outline.length > 0 ? (
         <section className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-elevated)] shadow-sm">
@@ -392,3 +394,22 @@ export default function PresentationStudio() {
     />
   );
 }
+
+const toStreamingSlideItem = (slide: Partial<PresentationOutlineData["slides"][number]>, index: number): SlideOutlineItem => {
+  const title = slide.title?.trim() || `Drafting slide ${index + 1}...`;
+  const keyPoints = slide.keyPoints?.filter(Boolean) ?? [];
+  const purpose = slide.purpose?.trim() || "Drafting purpose and key points...";
+  const designSuggestion = slide.designSuggestion?.trim() || "Choosing an appropriate visual treatment...";
+  const notes = [purpose, ...keyPoints, designSuggestion].filter(Boolean).join(" ");
+
+  return {
+    id: `${slide.pageNumber ?? index + 1}-${title}`,
+    title,
+    notes,
+    selected: true,
+    purpose,
+    keyPoints,
+    designSuggestion,
+    originalNotes: notes,
+  };
+};

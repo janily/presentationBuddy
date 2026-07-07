@@ -18,10 +18,12 @@ type PresentationHtmlStepData = {
   htmlUrl?: string;
 };
 
-const OUTLINE_GENERATION_TIMEOUT_MS = 90_000;
-const HTML_GENERATION_TIMEOUT_MS = 120_000;
-const HTML_STREAM_IDLE_TIMEOUT_MS = 30_000;
-const OUTLINE_STREAM_IDLE_TIMEOUT_MS = 30_000;
+// Free-tier reasoning models (e.g. tencent/hy3:free) can think for a long time
+// before emitting the first structured token, so idle timeouts must be generous.
+const OUTLINE_GENERATION_TIMEOUT_MS = 300_000;
+const HTML_GENERATION_TIMEOUT_MS = 300_000;
+const HTML_STREAM_IDLE_TIMEOUT_MS = 120_000;
+const OUTLINE_STREAM_IDLE_TIMEOUT_MS = 120_000;
 
 function stripHtmlCodeFence(html: string) {
   return html

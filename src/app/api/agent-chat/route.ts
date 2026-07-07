@@ -1,17 +1,21 @@
 import { mastra } from "@/src/mastra";
+import { briefDecisionSchema } from "@/src/mastra/agents/presentation-brief-conversation-agent";
+import type { ModelMessage } from "ai";
 import { NextResponse } from "next/server";
 import z from "zod";
 
-const agentChatRequestSchema = z.object({
-  message: z.string().trim().min(1),
-  pendingRequest: z.string().trim().optional(),
+const chatMessageSchema = z.object({
+  role: z.enum(["user", "assistant"]),
+  content: z.string().trim().min(1),
 });
 
-function fallbackBriefReply(message: string, pendingRequest?: string) {
-  const combined = [pendingRequest, message].filter(Boolean).join("\n");
+const agentChatRequestSchema = z.object({
+  messages: z.array(chatMessageSchema).min(1),
+  hasGeneratedDeck: z.boolean().optional(),
+});
 
-  return `我理解你想做的是：${combined}\n\n在开始生成前，我还需要确认几个关键信息：\n1. 目标受众是谁？\n2. 期望页数是多少？\n3. 风格更偏技术教程、商务汇报，还是产品发布？\n\n如果这些信息已经包含在你的描述里，并且方向没问题，请回复“确认生成”。`;
-}
+// Keep the request bounded; the agent only needs recent turns to stay coherent.
+const MAX_HISTORY_MESSAGES = 20;
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
@@ -21,22 +25,47 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid agent chat request" }, { status: 400 });
   }
 
-  const { message, pendingRequest } = validation.data;
+  const { messages, hasGeneratedDeck } = validation.data;
   const conversationAgent = mastra.getAgent("presentationBriefConversationAgent");
+  const history: ModelMessage[] = messages
+    .slice(-MAX_HISTORY_MESSAGES)
+    .map((message) => message.role === "user"
+      ? { role: "user", content: message.content }
+      : { role: "assistant", content: message.content });
+
+  if (hasGeneratedDeck) {
+    history.unshift({
+      role: "assistant",
+      content: "(context note: a deck has already been generated for this conversation; treat further requests as revisions)",
+    });
+  }
 
   try {
-    const result = await conversationAgent.generate([
-      {
-        role: "user",
-        content: `Existing unconfirmed requirements:\n${pendingRequest || "(none)"}\n\nLatest user message:\n${message}\n\nRespond as the brief conversation agent.`,
+    const result = await conversationAgent.generate(history, {
+      structuredOutput: {
+        schema: briefDecisionSchema,
       },
-    ]);
-    const reply = result.text?.trim() || fallbackBriefReply(message, pendingRequest);
+    });
 
-    return NextResponse.json({ reply });
+    const decision = result.object;
+
+    if (!decision?.reply) {
+      throw new Error("Brief agent returned no structured decision");
+    }
+
+    return NextResponse.json({
+      reply: decision.reply,
+      readyToGenerate: decision.readyToGenerate && Boolean(decision.brief),
+      brief: decision.brief,
+    });
   } catch (error) {
     console.error("Presentation brief conversation failed:", error);
 
-    return NextResponse.json({ reply: fallbackBriefReply(message, pendingRequest) });
+    const message = error instanceof Error ? error.message : "Unknown error";
+
+    return NextResponse.json(
+      { error: `对话模型调用失败：${message}` },
+      { status: 502 },
+    );
   }
 }

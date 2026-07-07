@@ -1,8 +1,15 @@
 const DEFAULT_PROVIDER = "openrouter";
 
-const PROVIDER_MODEL_PREFIXES = ["openrouter/", "openai/", "google/", "google-generative-ai/"];
-
 type ModelProviderName = "openrouter" | "openai" | "google" | "openai-compatible";
+
+// Only strip a prefix when it duplicates the provider itself. OpenRouter model IDs
+// keep their vendor prefix (e.g. "google/gemini-3-flash-preview" stays intact).
+const PROVIDER_STRIPPABLE_PREFIXES: Record<ModelProviderName, string[]> = {
+  openrouter: ["openrouter/"],
+  openai: ["openai/"],
+  google: ["google/", "google-generative-ai/"],
+  "openai-compatible": [],
+};
 
 type MastraProviderModelConfig = {
   id: `${string}/${string}`;
@@ -64,9 +71,9 @@ function getMastraProviderId(provider: ModelProviderName) {
   return provider;
 }
 
-export function getModelId(envValue: string | undefined, defaultModel: string) {
+export function getModelId(envValue: string | undefined, defaultModel: string, provider: ModelProviderName = DEFAULT_PROVIDER) {
   const model = envValue?.trim() || defaultModel;
-  const matchingPrefix = PROVIDER_MODEL_PREFIXES.find((prefix) => model.startsWith(prefix));
+  const matchingPrefix = PROVIDER_STRIPPABLE_PREFIXES[provider].find((prefix) => model.startsWith(prefix));
 
   return matchingPrefix ? model.slice(matchingPrefix.length) : model;
 }
@@ -77,7 +84,7 @@ export function getConfiguredModel(
   providerEnvValue?: string,
 ): MastraProviderModelConfig {
   const provider = normalizeProviderName(providerEnvValue);
-  const model = getModelId(modelEnvValue, defaultModel);
+  const model = getModelId(modelEnvValue, defaultModel, provider);
 
   return {
     id: `${getMastraProviderId(provider)}/${model}`,

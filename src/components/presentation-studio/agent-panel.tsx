@@ -1,25 +1,24 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { Send, Sparkles } from "lucide-react";
 
-type AgentMessage = {
+export type AgentMessage = {
   id: string;
   role: "assistant" | "user";
   content: string;
 };
 
 interface AgentPanelProps {
-  onSubmit: (message: string) => Promise<string | void> | string | void;
+  messages: AgentMessage[];
+  isSending: boolean;
+  onSend: (message: string) => void;
   title?: string;
   subtitle?: string;
-  initialMessage?: string;
   helperText?: string;
   quickPrompts?: string[];
   placeholder?: string;
 }
-
-const guidance = "告诉我你想做什么演示文稿：主题、受众、页数、风格或任何特殊要求都可以直接说。";
 
 const defaultQuickPrompts = [
   "帮我做一份融资路演",
@@ -27,59 +26,30 @@ const defaultQuickPrompts = [
   "优化现有演示结构",
 ];
 
-const makeMessageId = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-
 export default function AgentPanel({
-  onSubmit,
+  messages,
+  isSending,
+  onSend,
   title = "Tell the agent what to build",
   subtitle = "Use natural language to create your first outline.",
-  initialMessage = guidance,
-  helperText,
+  helperText = "直接描述需求即可，我会主动确认缺失的信息并自动开始生成。",
   quickPrompts = defaultQuickPrompts,
   placeholder = "例如：为 SaaS 产品发布会做 8 页演示，面向企业客户，风格简洁高级，需要包含痛点、产品能力和 CTA。",
 }: AgentPanelProps) {
-  const [messages, setMessages] = useState<AgentMessage[]>([
-    {
-      id: "initial-guidance",
-      role: "assistant",
-      content: initialMessage,
-    },
-  ]);
   const [input, setInput] = useState("");
-  const [isSending, setIsSending] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const canSend = input.trim().length > 0 && !isSending;
 
-  const computedHelperText = useMemo(() => {
-    if (helperText) return helperText;
-    if (messages.length <= 1) return "你可以先点一个快捷提示词，也可以直接输入完整需求。";
-    return "我会先把你的自然语言作为主题和需求生成大纲，后续可继续细化 brief 提取逻辑。";
-  }, [helperText, messages.length]);
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages.length, isSending]);
 
-  const sendPrompt = async (prompt: string) => {
+  const sendPrompt = (prompt: string) => {
     const trimmedPrompt = prompt.trim();
     if (!trimmedPrompt || isSending) return;
 
     setInput("");
-    setIsSending(true);
-    setMessages((current) => [
-      ...current,
-      { id: makeMessageId(), role: "user", content: trimmedPrompt },
-    ]);
-
-    try {
-      const assistantReply = await onSubmit(trimmedPrompt) ?? "收到，我会继续根据这段需求推进。";
-
-      setMessages((current) => [
-        ...current,
-        {
-          id: makeMessageId(),
-          role: "assistant",
-          content: assistantReply,
-        },
-      ]);
-    } finally {
-      setIsSending(false);
-    }
+    onSend(trimmedPrompt);
   };
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -101,14 +71,21 @@ export default function AgentPanel({
         </div>
       </div>
 
-      <div className="min-h-72 flex-1 space-y-3 overflow-y-auto p-4">
+      <div ref={scrollRef} className="min-h-72 flex-1 space-y-3 overflow-y-auto p-4">
         {messages.map((message) => (
           <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
-            <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-6 ${message.role === "user" ? "bg-[var(--accent-terracotta)] text-white" : "border border-[var(--border-light)] bg-[var(--bg-card)] text-[var(--text-secondary)]"}`}>
+            <div className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-6 ${message.role === "user" ? "bg-[var(--accent-terracotta)] text-white" : "border border-[var(--border-light)] bg-[var(--bg-card)] text-[var(--text-secondary)]"}`}>
               {message.content}
             </div>
           </div>
         ))}
+        {isSending ? (
+          <div className="flex justify-start">
+            <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-card)] px-4 py-3 text-sm text-[var(--text-muted)]">
+              <span className="animate-pulse">正在思考…</span>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <div className="space-y-4 border-t border-[var(--border-light)] p-4">
@@ -131,6 +108,12 @@ export default function AgentPanel({
             id="agent-prompt"
             value={input}
             onChange={(event) => setInput(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                event.preventDefault();
+                sendPrompt(input);
+              }
+            }}
             placeholder={placeholder}
             className="input min-h-24 flex-1 resize-none"
           />
@@ -143,7 +126,7 @@ export default function AgentPanel({
             <Send className={`h-5 w-5 ${isSending ? "animate-pulse" : ""}`} />
           </button>
         </form>
-        <p className="text-xs leading-5 text-[var(--text-muted)]">{computedHelperText}</p>
+        <p className="text-xs leading-5 text-[var(--text-muted)]">{helperText}</p>
       </div>
     </section>
   );
