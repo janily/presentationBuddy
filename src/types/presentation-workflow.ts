@@ -25,6 +25,11 @@ export type PresentationBriefData = {
   requirements?: string;
 };
 
+export type AgentRequestData = {
+  message: string;
+  context?: Partial<PresentationBriefData>;
+};
+
 export type OutlineStepData = {
   status: "loading" | "streaming" | "completed";
   outline?: Partial<PresentationOutlineData>;
@@ -44,6 +49,7 @@ export type MyUIMessage = UIMessage<
   unknown,
   {
     presentationBrief: PresentationBriefData;
+    agentRequest: AgentRequestData;
     approvedOutline?: PresentationOutlineData;
     workflowRunId?: string;
     workflow: WorkflowDataPart;

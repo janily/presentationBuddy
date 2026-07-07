@@ -9,6 +9,28 @@ export const resumeWorkflowRequestSchema = z.object({
   approvedOutline: presentationOutlineSchema,
 });
 
+const defaultAgentRequestPresentationInput = {
+  audience: "General business audience",
+  pageCount: 6,
+  style: "Polished modern presentation",
+};
+
+export const agentRequestSchema = z.object({
+  message: z.string().trim().min(1, "Message is required"),
+  context: presentationInputSchema.partial().optional(),
+});
+
+function normalizeAgentRequestToPresentationInput(request: z.infer<typeof agentRequestSchema>) {
+  const context = request.context ?? {};
+
+  return {
+    ...defaultAgentRequestPresentationInput,
+    ...context,
+    topic: context.topic?.trim() || request.message,
+    requirements: [context.requirements, request.message].filter(Boolean).join("\n\n"),
+  };
+}
+
 export type WorkflowRequestAction = "start" | "resume";
 
 function hasNonNullProperty(body: Record<string, unknown>, property: "workflowRunId" | "approvedOutline") {
@@ -33,6 +55,18 @@ export function getPresentationBriefSource(body: unknown) {
   return body;
 }
 
+export function getAgentRequestSource(body: unknown) {
+  if (typeof body === "object" && body !== null && "agentRequest" in body) {
+    return (body as { agentRequest?: unknown }).agentRequest;
+  }
+
+  if (typeof body === "object" && body !== null && "message" in body) {
+    return body;
+  }
+
+  return null;
+}
+
 export function validatePresentationWorkflowRequest(body: unknown) {
   if (isResumeWorkflowRequest(body)) {
     const result = resumeWorkflowRequestSchema.safeParse(body);
@@ -40,6 +74,21 @@ export function validatePresentationWorkflowRequest(body: unknown) {
     return result.success
       ? { success: true as const, action: "resume" as const, data: result.data }
       : { success: false as const, action: "resume" as const, error: result.error };
+  }
+
+  const agentRequestSource = getAgentRequestSource(body);
+  if (agentRequestSource) {
+    const agentRequestResult = agentRequestSchema.safeParse(agentRequestSource);
+
+    if (!agentRequestResult.success) {
+      return { success: false as const, action: "start" as const, error: agentRequestResult.error };
+    }
+
+    const normalizedResult = presentationInputSchema.safeParse(normalizeAgentRequestToPresentationInput(agentRequestResult.data));
+
+    return normalizedResult.success
+      ? { success: true as const, action: "start" as const, data: normalizedResult.data }
+      : { success: false as const, action: "start" as const, error: normalizedResult.error };
   }
 
   const result = presentationInputSchema.safeParse(getPresentationBriefSource(body));

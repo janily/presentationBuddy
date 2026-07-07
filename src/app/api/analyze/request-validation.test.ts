@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatValidationErrors, getPresentationBriefSource, isResumeWorkflowRequest, validatePresentationWorkflowRequest } from "./request-validation";
+import { formatValidationErrors, getAgentRequestSource, getPresentationBriefSource, isResumeWorkflowRequest, validatePresentationWorkflowRequest } from "./request-validation";
 
 const outline = {
   title: "Deck",
@@ -33,6 +33,48 @@ describe("analyze request validation", () => {
     const result = validatePresentationWorkflowRequest({ presentationBrief: { topic: "Nested", pageCount: 3 } });
 
     expect(result).toMatchObject({ success: true, action: "start" });
+  });
+
+
+  it("normalizes nested natural-language agent requests into presentation input", () => {
+    expect(getAgentRequestSource({ agentRequest: { message: "Build a launch deck" } })).toEqual({ message: "Build a launch deck" });
+
+    const result = validatePresentationWorkflowRequest({ agentRequest: { message: "Build a launch deck" } });
+
+    expect(result).toMatchObject({ success: true, action: "start" });
+    if (result.success && result.action === "start") {
+      expect(result.data).toMatchObject({
+        topic: "Build a launch deck",
+        audience: "General business audience",
+        pageCount: 6,
+        style: "Polished modern presentation",
+        requirements: "Build a launch deck",
+      });
+    }
+  });
+
+  it("preserves explicit context when normalizing top-level agent messages", () => {
+    const result = validatePresentationWorkflowRequest({
+      message: "Make it investor-ready",
+      context: {
+        topic: "Series A fundraising",
+        audience: "Investors",
+        pageCount: 8,
+        style: "Minimal",
+        requirements: "Include traction",
+      },
+    });
+
+    expect(result).toMatchObject({ success: true, action: "start" });
+    if (result.success && result.action === "start") {
+      expect(result.data).toMatchObject({
+        topic: "Series A fundraising",
+        audience: "Investors",
+        pageCount: 8,
+        style: "Minimal",
+        requirements: "Include traction\n\nMake it investor-ready",
+      });
+    }
   });
 
   it("returns field-level errors for invalid start requests", () => {

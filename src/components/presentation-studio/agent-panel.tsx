@@ -2,7 +2,6 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import { Send, Sparkles } from "lucide-react";
-import type { PresentationBrief } from "./brief-form";
 
 type AgentMessage = {
   id: string;
@@ -11,7 +10,7 @@ type AgentMessage = {
 };
 
 interface AgentPanelProps {
-  onSubmit: (brief: PresentationBrief) => void;
+  onSubmit: (message: string) => void;
 }
 
 const guidance = "告诉我你想做什么演示文稿：主题、受众、页数、风格或任何特殊要求都可以直接说。";
@@ -23,14 +22,6 @@ const quickPrompts = [
 ];
 
 const makeMessageId = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-
-const toBrief = (prompt: string): PresentationBrief => ({
-  topic: prompt,
-  audience: "General business audience",
-  slideCount: 6,
-  style: "Polished modern presentation",
-  requirements: prompt,
-});
 
 export default function AgentPanel({ onSubmit }: AgentPanelProps) {
   const [messages, setMessages] = useState<AgentMessage[]>([
@@ -62,7 +53,7 @@ export default function AgentPanel({ onSubmit }: AgentPanelProps) {
       },
     ]);
     setInput("");
-    onSubmit(toBrief(trimmedPrompt));
+    onSubmit(trimmedPrompt);
   };
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
