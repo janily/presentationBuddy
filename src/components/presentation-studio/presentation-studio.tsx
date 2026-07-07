@@ -8,6 +8,7 @@ import BriefForm, { type PresentationBrief } from "./brief-form";
 import HtmlPreview from "./html-preview";
 import OutlinePanel from "./outline-panel";
 import PresentationProcessingView from "./presentation-processing-view";
+import { emptyOutline, toApprovedOutline, toSlideItem } from "./presentation-outline-utils";
 import { type SlideOutlineItem } from "./slide-outline-card";
 
 type WorkflowStep = "brief" | "outlining" | "review" | "generating" | "preview";
@@ -28,55 +29,6 @@ const getErrorMessage = (error: Error | undefined, fallback: string) => {
 };
 
 const makeId = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-
-const emptyOutline = (brief: PresentationBrief): PresentationOutlineData => ({
-  title: brief.topic,
-  narrativeGoal: `Create a ${brief.style} presentation for ${brief.audience}.`,
-  sections: [],
-  slides: [],
-  designGuidance: [],
-});
-
-const formatSlideNotes = (slide: Pick<PresentationOutlineData["slides"][number], "purpose" | "keyPoints" | "designSuggestion">) =>
-  [slide.purpose, ...slide.keyPoints, slide.designSuggestion].filter(Boolean).join(" ");
-
-const toSlideItem = (slide: PresentationOutlineData["slides"][number]): SlideOutlineItem => {
-  const notes = formatSlideNotes(slide);
-
-  return {
-    id: `${slide.pageNumber}-${slide.title}`,
-    title: slide.title,
-    notes,
-    selected: true,
-    purpose: slide.purpose,
-    keyPoints: [...slide.keyPoints],
-    designSuggestion: slide.designSuggestion,
-    originalNotes: notes,
-  };
-};
-
-const toApprovedOutline = (
-  baseOutline: PresentationOutlineData,
-  items: SlideOutlineItem[],
-): PresentationOutlineData => ({
-  ...baseOutline,
-  slides: items
-    .filter((item) => item.selected)
-    .map((item, index) => {
-      const notesWereEdited = item.originalNotes !== undefined && item.notes !== item.originalNotes;
-      const baseKeyPoints = item.keyPoints?.length ? [...item.keyPoints] : [item.notes].filter(Boolean);
-      const keyPoints = notesWereEdited && item.notes ? [...baseKeyPoints, `User notes: ${item.notes}`] : baseKeyPoints;
-
-      return {
-        pageNumber: index + 1,
-        title: item.title,
-        purpose: item.purpose || item.notes,
-        keyPoints,
-        designSuggestion:
-          item.designSuggestion || baseOutline.designGuidance.join(" ") || "Use a polished, readable slide layout.",
-      };
-    }),
-});
 
 export default function PresentationStudio() {
   const {
