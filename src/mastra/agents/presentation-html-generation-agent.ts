@@ -1,4 +1,7 @@
 import { Agent } from "@mastra/core";
+import { getOpenRouterModelId, openrouter } from "../../utils/openrouter";
+
+const DEFAULT_PRESENTATION_HTML_MODEL = "google/gemini-3-flash-preview";
 
 export const presentationHtmlGenerationAgent = new Agent({
   id: "presentation-html-generation-agent",
@@ -12,5 +15,5 @@ Requirements:
 - Include speaker-friendly hierarchy, concise copy, and visual layout details that match the requested style.
 - Do not reference external assets unless the user explicitly requires them.
 - Make the result suitable to save as a standalone .html file.`,
-  model: "openrouter/google/gemini-3-flash-preview",
+  model: openrouter(getOpenRouterModelId(process.env.PRESENTATION_HTML_MODEL, DEFAULT_PRESENTATION_HTML_MODEL)),
 });
