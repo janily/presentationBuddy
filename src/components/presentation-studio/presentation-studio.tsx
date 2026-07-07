@@ -253,17 +253,6 @@ export default function PresentationStudio() {
         </section>
       )}
 
-      {brief ? (
-        <section className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-elevated)] p-4">
-          <p className="text-xs font-medium uppercase tracking-[0.2em] text-[var(--accent-brass)]">Current request</p>
-          <h3 className="mt-2 text-xl font-semibold text-[var(--text-primary)]" style={{ fontFamily: "var(--font-fraunces), Georgia, serif" }}>{brief.topic}</h3>
-          <dl className="mt-4 space-y-2 text-sm">
-            <div><dt className="font-medium text-[var(--text-muted)]">Audience</dt><dd className="text-[var(--text-primary)]">{brief.audience}</dd></div>
-            <div><dt className="font-medium text-[var(--text-muted)]">Style</dt><dd className="text-[var(--text-primary)]">{brief.style}</dd></div>
-            <div><dt className="font-medium text-[var(--text-muted)]">Narrative goal</dt><dd className="text-[var(--text-primary)]">{baseOutline?.narrativeGoal ?? suspenseData?.reason ?? "The agent will suggest a narrative after outline generation starts."}</dd></div>
-          </dl>
-        </section>
-      ) : null}
 
       {currentStep === "generating" ? (
         <section className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-elevated)] p-4 shadow-sm">
