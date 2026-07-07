@@ -1,16 +1,13 @@
 "use client";
 
-import { Download, FileText, MessageCircle, RotateCcw, Sparkles } from "lucide-react";
+import { FileText, MessageCircle, RotateCcw, Sparkles } from "lucide-react";
 import { type FormEvent, type ReactNode, useState } from "react";
-import type { HtmlGenerationStepData } from "@/src/types/presentation-workflow";
 import type { PresentationBrief } from "./brief-form";
 
 interface PresentationWorkspaceProps {
   brief: PresentationBrief | null;
-  generatedHtml: string;
-  previewOverlay?: ReactNode;
+  previewContent: ReactNode;
   agentContent?: ReactNode;
-  htmlGeneration?: HtmlGenerationStepData;
   onBriefSubmit: (brief: PresentationBrief) => void;
   onStartOver: () => void;
 }
@@ -80,22 +77,7 @@ function BriefComposer({ initialBrief, onSubmit }: { initialBrief: PresentationB
   );
 }
 
-export default function PresentationWorkspace({ brief, generatedHtml, previewOverlay, agentContent, htmlGeneration, onBriefSubmit, onStartOver }: PresentationWorkspaceProps) {
-  const progress = htmlGeneration?.progress;
-
-  const handleDownload = () => {
-    if (!generatedHtml) return;
-    const blob = new Blob([generatedHtml], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "presentation.html";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
-
+export default function PresentationWorkspace({ brief, previewContent, agentContent, onBriefSubmit, onStartOver }: PresentationWorkspaceProps) {
   return (
     <div className="min-h-screen paper-texture">
       <header className="sticky top-0 z-20 border-b border-[var(--border-light)] bg-[var(--bg-card)]/90 backdrop-blur">
@@ -105,7 +87,6 @@ export default function PresentationWorkspace({ brief, generatedHtml, previewOve
             <p className="text-sm text-[var(--text-muted)]">Preview and agent conversation in one workspace</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            {generatedHtml ? <button type="button" onClick={handleDownload} className="flex items-center gap-2 rounded-xl bg-[var(--accent-terracotta)] px-4 py-2 text-sm font-medium text-white"><Download className="h-4 w-4" />Download HTML</button> : null}
             <button type="button" onClick={onStartOver} className="flex items-center gap-2 rounded-xl border border-[var(--border-light)] bg-[var(--bg-card)] px-4 py-2 text-sm font-medium text-[var(--text-secondary)]"><RotateCcw className="h-4 w-4" />Start over</button>
           </div>
         </div>
@@ -113,22 +94,7 @@ export default function PresentationWorkspace({ brief, generatedHtml, previewOve
 
       <main className="mx-auto grid max-w-[1600px] gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_420px] xl:grid-cols-[minmax(0,1fr)_460px]">
         <section className="relative min-h-[calc(100vh-112px)] overflow-hidden rounded-3xl border border-[var(--border-light)] bg-white shadow-lg">
-          {generatedHtml ? (
-            <iframe title="Generated HTML presentation" sandbox="allow-same-origin" srcDoc={generatedHtml} className="h-[calc(100vh-112px)] min-h-[620px] w-full" />
-          ) : (
-            <div className="flex h-[calc(100vh-112px)] min-h-[620px] items-center justify-center bg-[linear-gradient(135deg,#faf7f1_0%,#fff_52%,#f7efe5_100%)] p-8 text-center">
-              <div className="max-w-xl rounded-3xl border border-dashed border-[var(--border-light)] bg-white/75 p-10 shadow-sm backdrop-blur">
-                <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--accent-terracotta)]/10 text-[var(--accent-terracotta)]">
-                  <Sparkles className="h-8 w-8" />
-                </div>
-                <p className="text-sm font-medium uppercase tracking-[0.2em] text-[var(--accent-brass)]">Live preview</p>
-                <h2 className="mt-3 text-3xl font-semibold text-[var(--text-primary)]" style={{ fontFamily: "var(--font-fraunces), Georgia, serif" }}>你的演示文稿将在这里实时预览</h2>
-                <p className="mt-4 text-[var(--text-secondary)]">Use the agent panel to create a brief, review the outline, and generate an HTML deck without leaving this workspace.</p>
-                {typeof progress === "number" ? <div className="mt-6 h-2 overflow-hidden rounded-full bg-[var(--bg-secondary)]"><div className="h-full rounded-full bg-[var(--accent-terracotta)] transition-all duration-500" style={{ width: `${progress}%` }} /></div> : null}
-              </div>
-            </div>
-          )}
-          {previewOverlay}
+          {previewContent}
         </section>
 
         <aside className="flex min-h-[calc(100vh-112px)] flex-col gap-4 rounded-3xl border border-[var(--border-light)] bg-[var(--bg-card)] p-4 shadow-lg">
@@ -139,7 +105,7 @@ export default function PresentationWorkspace({ brief, generatedHtml, previewOve
               <p className="text-sm text-[var(--text-muted)]">Brief, outline review, and generation controls</p>
             </div>
           </div>
-          <BriefComposer initialBrief={brief} onSubmit={onBriefSubmit} />
+          <BriefComposer key={brief ? "active-brief" : "empty-brief"} initialBrief={brief} onSubmit={onBriefSubmit} />
           {agentContent}
         </aside>
       </main>
