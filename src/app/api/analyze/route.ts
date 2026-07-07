@@ -1,35 +1,57 @@
 import { mastra } from "@/src/mastra";
+import {
+  presentationInputSchema,
+  presentationOutlineSchema,
+} from "@/src/mastra/workflows/presentation-generation-workflow";
 import { createUIMessageStream, createUIMessageStreamResponse } from "ai";
 import type { NextRequest } from "next/server";
 import { toAISdkFormat } from "@mastra/ai-sdk";
 import { NextResponse } from "next/server";
+import z from "zod";
+
+const resumeWorkflowRequestSchema = z.object({
+  workflowRunId: z.string().trim().min(1, "Workflow run ID is required"),
+  approvedOutline: presentationOutlineSchema,
+});
+
+function formatValidationErrors(error: z.ZodError) {
+  return error.issues.map((issue) => ({
+    field: issue.path.length > 0 ? issue.path.join(".") : "request",
+    message: issue.message,
+  }));
+}
+
+function validationErrorResponse(error: z.ZodError) {
+  return NextResponse.json(
+    {
+      error: "Invalid presentation generation request",
+      fields: formatValidationErrors(error),
+    },
+    { status: 400 },
+  );
+}
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const presentationBrief = body.presentationBrief ?? body;
-    const topic = presentationBrief.topic as string | undefined;
-    const audience = presentationBrief.audience as string | undefined;
-    const pageCount = presentationBrief.pageCount as number | undefined;
-    const style = presentationBrief.style as string | undefined;
-    const requirements = presentationBrief.requirements as string | undefined;
-    const workflowRunId = body.workflowRunId as string | undefined;
-    const approvedOutline = body.approvedOutline as unknown | undefined;
-
     const workflow = mastra.getWorkflow("presentationGenerationWorkflow");
+    const isResumeRequest =
+      "workflowRunId" in body || "approvedOutline" in body;
 
-    console.log("Received presentation generation request:", {
-      topic,
-      audience,
-      pageCount,
-      style,
-      requirements,
-      workflowRunId,
-      approvedOutline,
-    });
+    if (isResumeRequest) {
+      const resumeRequest = resumeWorkflowRequestSchema.safeParse(body);
 
-    // Resume an existing workflow run after outline approval/editing.
-    if (workflowRunId && approvedOutline) {
+      if (!resumeRequest.success) {
+        return validationErrorResponse(resumeRequest.error);
+      }
+
+      const { workflowRunId, approvedOutline } = resumeRequest.data;
+
+      console.log("Received presentation workflow resume request:", {
+        workflowRunId,
+        approvedOutline,
+      });
+
       const run = await workflow.createRunAsync({ runId: workflowRunId });
       const stream = run.resumeStreamVNext({
         step: "presentation-outline-suggestion-step",
@@ -45,13 +67,25 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Start a new workflow run.
-    if (!topic) {
-      return NextResponse.json(
-        { error: "No presentation topic provided" },
-        { status: 400 },
-      );
+    const presentationBriefSource = body.presentationBrief ?? body;
+    const presentationBrief = presentationInputSchema.safeParse(
+      presentationBriefSource,
+    );
+
+    if (!presentationBrief.success) {
+      return validationErrorResponse(presentationBrief.error);
     }
+
+    const { topic, audience, pageCount, style, requirements } =
+      presentationBrief.data;
+
+    console.log("Received presentation generation request:", {
+      topic,
+      audience,
+      pageCount,
+      style,
+      requirements,
+    });
 
     const run = await workflow.createRunAsync();
     const stream = run.streamVNext({

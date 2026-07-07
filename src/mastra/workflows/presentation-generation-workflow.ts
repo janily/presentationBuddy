@@ -2,15 +2,20 @@ import { createStep, createWorkflow } from "@mastra/core";
 import z from "zod";
 import { saveHtmlToFile } from "@/src/utils/save-html-to-file";
 
-const presentationInputSchema = z.object({
-  topic: z.string(),
+export const presentationInputSchema = z.object({
+  topic: z.string().trim().min(1, "Topic is required"),
   audience: z.string().optional(),
-  pageCount: z.number().optional(),
+  pageCount: z
+    .number()
+    .int("Page count must be a whole number")
+    .min(3, "Page count must be at least 3")
+    .max(12, "Page count must be at most 12")
+    .optional(),
   style: z.string().optional(),
   requirements: z.string().optional(),
 });
 
-const slideOutlineSchema = z.object({
+export const slideOutlineSchema = z.object({
   pageNumber: z.number(),
   title: z.string(),
   purpose: z.string(),
@@ -18,7 +23,7 @@ const slideOutlineSchema = z.object({
   designSuggestion: z.string(),
 });
 
-const presentationOutlineSchema = z.object({
+export const presentationOutlineSchema = z.object({
   title: z.string(),
   narrativeGoal: z.string(),
   sections: z.array(z.string()),
