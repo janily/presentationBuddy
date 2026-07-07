@@ -39,17 +39,14 @@ const toDefaultBriefFromAgentRequest = (message: string): PresentationBrief => (
   requirements: message,
 });
 
-const confirmationPattern = /^(确认|确定|可以|开始|生成|确认生成|开始生成|没问题|go|ok|yes)$/i;
-const generationIntentPattern = /(生成|开始|确认|做出来|出稿|预览|preview|generate)/i;
+const confirmationPattern = /^(确认|确认生成|确定|可以开始|开始生成|没问题|ok|yes|go)$/i;
 
 function isConfirmationMessage(message: string) {
-  const normalized = message.trim();
-
-  return confirmationPattern.test(normalized) || (generationIntentPattern.test(normalized) && normalized.length <= 24);
+  return confirmationPattern.test(message.trim());
 }
 
 function buildRequirementReply(requirements: string) {
-  return `我先和你确认需求：\n\n${requirements}\n\n如果方向没问题，请回复“确认生成”，我再开始生成大纲并在左侧预览；也可以继续补充受众、页数、风格、内容结构或参考案例。`;
+  return `我先基于你的输入做一个需求判断：\n\n- 核心目标：围绕“${requirements}”制作演示文稿。\n- 还需要确认：目标受众是谁、希望几页、整体风格偏商务/科技/教育/销售哪一种、是否有必须包含的章节。\n- 当前建议：先补充这些信息；如果你已经认可这个方向，请回复“确认生成”。\n\n在你确认之前，我不会在左侧生成 deck 预览。`;
 }
 
 const toStreamingSlideItem = (slide: Partial<PresentationOutlineData["slides"][number]>, index: number): SlideOutlineItem => {
@@ -203,19 +200,18 @@ export default function PresentationStudio() {
       return "好的，需求已确认。我现在开始生成演示文稿大纲，稍后会在左侧进入预览和确认流程。";
     }
 
-    if (!pendingAgentRequest && isConfirmationMessage(message)) {
-      startGenerationFromAgentRequest(message);
-      return "好的，我会按这条指令开始生成演示文稿大纲。";
+    if (brief) {
+      resetWorkflow();
+      setBrief(null);
+      setUserModifiedOutline(null);
+      setIsAdvancedOutlineOpen(false);
     }
 
     setPendingAgentRequest(combinedRequest);
     return buildRequirementReply(combinedRequest);
-  }, [pendingAgentRequest, startGenerationFromAgentRequest]);
+  }, [brief, pendingAgentRequest, resetWorkflow, startGenerationFromAgentRequest]);
 
-  const handleAgentRequestSubmit = useCallback((message: string) => {
-    startGenerationFromAgentRequest(message);
-    return "收到，我会根据你的新要求重新推进演示文稿生成。";
-  }, [startGenerationFromAgentRequest]);
+  const handleAgentRequestSubmit = handleBriefAgentSubmit;
 
   const handleToggle = useCallback((id: string) => {
     setUserModifiedOutline((current) => (current ?? outline).map((item) => (item.id === id ? { ...item, selected: !item.selected } : item)));
