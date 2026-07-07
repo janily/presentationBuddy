@@ -7,7 +7,7 @@ export type SuggestionStepData = {
 };
 
 export type ImprovementStepData = {
-  status: "in-progess" | "completed";
+  status: "in-progress" | "completed";
   url: string;
 };
 
