@@ -70,6 +70,8 @@ function classifyProcessingError(error: unknown) {
     lowerMessage.includes("model")
     || lowerMessage.includes("provider")
     || lowerMessage.includes("generate")
+    || lowerMessage.includes("generation")
+    || lowerMessage.includes("outline")
     || lowerMessage.includes("stream")
     || lowerMessage.includes("timed out")
     || lowerMessage.includes("idle")
