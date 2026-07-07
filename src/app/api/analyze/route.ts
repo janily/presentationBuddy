@@ -1,5 +1,5 @@
 import { mastra } from "@/src/mastra";
-import { createUIMessageStreamResponse } from "ai";
+import { createUIMessageStream, createUIMessageStreamResponse } from "ai";
 import type { NextRequest } from "next/server";
 import { toAISdkFormat } from "@mastra/ai-sdk";
 import { NextResponse } from "next/server";
@@ -65,8 +65,16 @@ export async function POST(request: NextRequest) {
     });
 
     return createUIMessageStreamResponse({
-      stream: toAISdkFormat(stream, {
-        from: "workflow",
+      stream: createUIMessageStream({
+        execute: ({ writer }) => {
+          writer.write({
+            type: "data-workflowRunId",
+            data: run.runId,
+          });
+          writer.merge(toAISdkFormat(stream, {
+            from: "workflow",
+          }));
+        },
       }),
     });
   } catch (error) {

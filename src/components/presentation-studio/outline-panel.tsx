@@ -12,11 +12,13 @@ interface OutlinePanelProps {
   onDelete: (id: string) => void;
   onAdd: (title: string) => void;
   onGenerate: () => void;
+  generateDisabledReason?: string | null;
 }
 
-export default function OutlinePanel({ items, isLoading = false, onToggle, onEdit, onDelete, onAdd, onGenerate }: OutlinePanelProps) {
+export default function OutlinePanel({ items, isLoading = false, onToggle, onEdit, onDelete, onAdd, onGenerate, generateDisabledReason }: OutlinePanelProps) {
   const [newTitle, setNewTitle] = useState("");
   const selectedCount = items.filter((item) => item.selected).length;
+  const isGenerateDisabled = selectedCount === 0 || isLoading || Boolean(generateDisabledReason);
 
   const addSlide = () => {
     if (!newTitle.trim()) return;
@@ -47,7 +49,8 @@ export default function OutlinePanel({ items, isLoading = false, onToggle, onEdi
           <input value={newTitle} onChange={(event) => setNewTitle(event.target.value)} onKeyDown={(event) => event.key === "Enter" && addSlide()} className="input flex-1" placeholder="Add another slide title..." />
           <button type="button" onClick={addSlide} className="rounded-xl bg-[var(--bg-card)] px-4 text-[var(--accent-terracotta)] shadow-sm"><Plus className="h-5 w-5" /></button>
         </div>
-        <button type="button" onClick={onGenerate} disabled={selectedCount === 0 || isLoading} className="mt-4 w-full rounded-xl bg-[var(--accent-terracotta)] px-6 py-3.5 font-medium text-white shadow-md disabled:cursor-not-allowed disabled:bg-[var(--border-medium)]">
+        {generateDisabledReason ? <p className="mt-3 text-sm text-[var(--accent-terracotta)]">{generateDisabledReason}</p> : null}
+        <button type="button" onClick={onGenerate} disabled={isGenerateDisabled} className="mt-4 w-full rounded-xl bg-[var(--accent-terracotta)] px-6 py-3.5 font-medium text-white shadow-md disabled:cursor-not-allowed disabled:bg-[var(--border-medium)]">
           Generate HTML presentation ({selectedCount} slides)
         </button>
       </div>
