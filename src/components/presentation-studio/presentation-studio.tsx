@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePresentationWorkflow } from "@/src/hooks/use-presentation-workflow";
 import type { PresentationOutlineData } from "@/src/types/presentation-workflow";
+import AgentPanel from "./agent-panel";
 import { type PresentationBrief } from "./brief-form";
 import OutlinePanel from "./outline-panel";
 import PresentationPreviewPane from "./presentation-preview-pane";
@@ -255,9 +256,7 @@ export default function PresentationStudio() {
       ) : null}
 
       {currentStep === "brief" ? (
-        <section className="rounded-2xl border border-dashed border-[var(--border-light)] bg-[var(--bg-elevated)] p-4 text-sm text-[var(--text-secondary)]">
-          Start by sending the structured brief above. The preview area will stay visible while the agent drafts, reviews, and generates your deck.
-        </section>
+        <AgentPanel onSubmit={handleBriefSubmit} />
       ) : (
         <div className="min-h-[520px] flex-1">
           <OutlinePanel items={outline} isLoading={currentStep === "outlining"} onToggle={handleToggle} onEdit={handleEdit} onDelete={handleDelete} onAdd={handleAdd} onGenerate={handleGenerate} generateDisabledReason={!activeRunId ? (approvalError ?? "Waiting for the workflow run ID before generating HTML.") : approvalError} />
@@ -268,10 +267,8 @@ export default function PresentationStudio() {
 
   return (
     <PresentationWorkspace
-      brief={brief}
       previewContent={<PresentationPreviewPane step={currentStep} html={generatedHtml} outline={outline} htmlGeneration={htmlGenerationStep?.data} />}
       agentContent={agentContent}
-      onBriefSubmit={handleBriefSubmit}
       onStartOver={handleStartOver}
     />
   );

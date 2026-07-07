@@ -1,83 +1,15 @@
 "use client";
 
-import { FileText, MessageCircle, RotateCcw, Sparkles } from "lucide-react";
-import { type FormEvent, type ReactNode, useState } from "react";
-import type { PresentationBrief } from "./brief-form";
+import { MessageCircle, RotateCcw } from "lucide-react";
+import { type ReactNode } from "react";
 
 interface PresentationWorkspaceProps {
-  brief: PresentationBrief | null;
   previewContent: ReactNode;
   agentContent?: ReactNode;
-  onBriefSubmit: (brief: PresentationBrief) => void;
   onStartOver: () => void;
 }
 
-const defaultBrief: PresentationBrief = {
-  topic: "AI adoption roadmap for sales teams",
-  audience: "Revenue leaders and sales managers",
-  slideCount: 6,
-  style: "Modern executive keynote",
-  requirements: "Include a clear problem statement, phased rollout, KPIs, and a closing call to action.",
-};
-
-function BriefComposer({ initialBrief, onSubmit }: { initialBrief: PresentationBrief | null; onSubmit: (brief: PresentationBrief) => void }) {
-  const [draft, setDraft] = useState<PresentationBrief>(initialBrief ?? defaultBrief);
-
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!draft.topic.trim()) return;
-    onSubmit({
-      ...draft,
-      topic: draft.topic.trim(),
-      audience: draft.audience.trim(),
-      style: draft.style.trim(),
-      requirements: draft.requirements.trim(),
-    });
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-elevated)] p-4">
-        <div className="mb-4 flex items-center gap-3">
-          <div className="rounded-xl bg-[var(--accent-terracotta)]/10 p-2 text-[var(--accent-terracotta)]">
-            <FileText className="h-5 w-5" />
-          </div>
-          <div>
-            <h2 className="font-semibold text-[var(--text-primary)]">Presentation brief</h2>
-            <p className="text-xs text-[var(--text-muted)]">Tell the agent what to create.</p>
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          <label className="block text-xs font-medium uppercase tracking-[0.14em] text-[var(--text-muted)]">Topic
-            <input className="input mt-2 w-full" value={draft.topic} onChange={(event) => setDraft({ ...draft, topic: event.target.value })} />
-          </label>
-          <label className="block text-xs font-medium uppercase tracking-[0.14em] text-[var(--text-muted)]">Audience
-            <input className="input mt-2 w-full" value={draft.audience} onChange={(event) => setDraft({ ...draft, audience: event.target.value })} />
-          </label>
-          <div className="grid gap-3 sm:grid-cols-[0.45fr_1fr] lg:grid-cols-1 xl:grid-cols-[0.45fr_1fr]">
-            <label className="block text-xs font-medium uppercase tracking-[0.14em] text-[var(--text-muted)]">Pages
-              <input className="input mt-2 w-full" type="number" min={3} max={12} value={draft.slideCount} onChange={(event) => setDraft({ ...draft, slideCount: Number(event.target.value) })} />
-            </label>
-            <label className="block text-xs font-medium uppercase tracking-[0.14em] text-[var(--text-muted)]">Style
-              <input className="input mt-2 w-full" value={draft.style} onChange={(event) => setDraft({ ...draft, style: event.target.value })} />
-            </label>
-          </div>
-          <label className="block text-xs font-medium uppercase tracking-[0.14em] text-[var(--text-muted)]">Additional requirements
-            <textarea className="input mt-2 min-h-24 w-full" value={draft.requirements} onChange={(event) => setDraft({ ...draft, requirements: event.target.value })} />
-          </label>
-        </div>
-
-        <button type="submit" className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--accent-terracotta)] px-4 py-3 font-medium text-white shadow-md transition hover:bg-[var(--accent-terracotta-light)]">
-          <Sparkles className="h-5 w-5" />
-          {initialBrief ? "Regenerate outline" : "Create outline"}
-        </button>
-      </div>
-    </form>
-  );
-}
-
-export default function PresentationWorkspace({ brief, previewContent, agentContent, onBriefSubmit, onStartOver }: PresentationWorkspaceProps) {
+export default function PresentationWorkspace({ previewContent, agentContent, onStartOver }: PresentationWorkspaceProps) {
   return (
     <div className="min-h-screen paper-texture">
       <header className="sticky top-0 z-20 border-b border-[var(--border-light)] bg-[var(--bg-card)]/90 backdrop-blur">
@@ -105,7 +37,6 @@ export default function PresentationWorkspace({ brief, previewContent, agentCont
               <p className="text-sm text-[var(--text-muted)]">Brief, outline review, and generation controls</p>
             </div>
           </div>
-          <BriefComposer key={brief ? "active-brief" : "empty-brief"} initialBrief={brief} onSubmit={onBriefSubmit} />
           {agentContent}
         </aside>
       </main>
