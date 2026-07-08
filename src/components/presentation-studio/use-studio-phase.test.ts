@@ -48,6 +48,16 @@ describe("deriveStudioPhase", () => {
     }).phase).toBe("reviewing");
   });
 
+  it("does not treat an empty outline as ready for review", () => {
+    expect(deriveStudioPhase({
+      hasWorkflowError: false,
+      hasGeneratedHtml: false,
+      hasSuspenseOutline: true,
+      hasOutlineSlides: false,
+      workflowStatus: "streaming",
+    }).phase).toBe("outlining");
+  });
+
   it("uses outlining while the workflow is submitted or streaming", () => {
     expect(deriveStudioPhase({
       hasWorkflowError: false,

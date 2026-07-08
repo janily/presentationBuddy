@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mastra Agent 开发框架入门教程</title>
+<style>
+  :root {
+    --primary: #4F46E5;
+    --primary-light: #EEF2FF;
+    --bg: #F8FAFC;
+    --text: #0F172A;
+    --text-light: #64748B;
+    --code-bg: #0F172A;
+    --code-text: #E2E8F0;
+    --border: #E2E8F0;
+  }
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+  }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  .slide {
+    width: 100vw;
+    height: 100vh;
+    padding: 3rem 5rem;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+    page-break-after: always;
+  }
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 1rem;
+    margin-bottom: 2rem;
+  }
+  .slide-title { font-size: 1.25rem; font-weight: 600; color: var(--text); }
+  .section-name { font-size: 0.875rem; color: var(--text-light); font-weight: 500; }
+  .content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  footer {
+    position: absolute;
+    bottom: 2rem;
+    left: 5rem;
+    right: 5rem;
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.875rem;
+    color: var(--text-light);
+    border-top: 1px solid var(--border);
+    padding-top: 1rem;
+  }
+  h1 { font-size: 3.5rem; font-weight: 800; line-height: 1.1; margin-bottom: 1rem; color: var(--text); letter-spacing: -0.02em; }
+  h2 { font-size: 2.5rem; font-weight: 700; margin-bottom: 1.5rem; letter-spacing: -0.01em; }
+  h3 { font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--text); }
+  p { margin-bottom: 1rem; font-size: 1.125rem; line-height: 1.6; }
+  ul { list-style: none; padding-left: 0; margin: 0; }
+  li { margin-bottom: 0.75rem; font-size: 1.125rem; position: relative; padding-left: 1.5rem; line-height: 1.5; }
+  li::before { content: "•"; color: var(--primary); position: absolute; left: 0; font-weight: bold; }
+  code {
+    font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+    background: var(--primary-light);
+    color: var(--primary);
+    padding: 0.2em 0.4em;
+    border-radius: 0.25rem;
+    font-size: 0.9em;
+  }
+  .tag {
+    display: inline-block;
+    padding: 0.35rem 1rem;
+    background: var(--primary-light);
+    color: var(--primary);
+    border-radius: 9999px;
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+  .code-block {
+    background: var(--code-bg);
+    color: var(--code-text);
+    padding: 1.5rem;
+    border-radius: 0.75rem;
+    font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+    font-size: 0.95rem;
+    overflow-x: auto;
+    line-height: 1.6;
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+  }
+  .terminal {
+    background: var(--code-bg);
+    border-radius: 0.75rem;
+    overflow: hidden;
+    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+  }
+  .terminal-header {
+    background: #1E293B;
+    padding: 0.75rem 1rem;
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+  .terminal-header .dot { width: 12px; height: 12px; border-radius: 50%; }
+  .dot.red { background: #EF4444; }
+  .dot.yellow { background: #F59E0B; }
+  .dot.green { background: #10B981; }
+  .terminal-body {
+    padding: 1.5rem;
+    color: #E2E8F0;
+    font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+    font-size: 0.95rem;
+    line-height: 1.6;
+  }
+  .highlight { color: #60A5FA; }
+  .keyword { color: #C678DD; }
+  .string { color: #98C379; }
+  .comment { color: #64748B; font-style: italic; }
+  .function { color: #61AFEF; }
+  .grid-2x2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+  }
+  .card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    transition: transform 0.2s;
+  }
+  .card:hover { transform: translateY(-2px); }
+  .split {
+    display: flex;
+    gap: 2.5rem;
+    align-items: stretch;
+  }
+  .split > div { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+</style>
+</head>
+<body>
+
+<section class="slide">
+  <header>
+    <div class="slide-title">Mastra Agent 开发框架入门教程</div>
+    <div class="section-name">第一部分：框架认知与基础概念</div>
+  </header>
+  <div class="content" style="flex-direction: row; align-items: center; gap: 4rem;">
+    <div style="flex: 1;">
+      <h1 style="color: var(--primary);">Mastra Agent<br>开发框架入门教程</h1>
+      <p style="font-size: 1.5rem; color: var(--text-light); margin-top: 1.5rem; font-weight: 500;">面向 TypeScript / Node.js 开发者的实战指南</p>
+      <div style="margin-top: 2.5rem; display: flex; gap: 0.75rem;">
+        <span class="tag">基础概念</span>
+        <span class="tag">环境搭建</span>
+        <span class="tag">代码实战</span>
+      </div>
+    </div>
+    <div style="flex: 1; display: flex; justify-content: center; align-items: center; background: var(--code-bg); border-radius: 1rem; padding: 2.5rem; color: #4F46E5; font-family: 'JetBrains Mono', monospace; font-size: 1.1rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);">
+      <pre style="margin:0;"><code><span class="keyword">import</span> { Agent } <span class="keyword">from</span> <span class="string">'@mastra/core'</span>;
+
+<span class="keyword">const</span> agent = <span class="keyword">new</span> <span class="function">Agent</span>({
+  name: <span class="string">'Mastra'</span>,
+  <span class="comment">// 开启你的 AI 之旅</span>
+});</code></pre>
+    </div>
+  </div>
+  <footer>
+    <span>演讲者：Your Name</span>
+    <span>2023.10.24</span>
+  </footer>
+</section>
+
+<section class="slide">
+  <header>
+    <div class="slide-title">什么是 Mastra？</div>
+    <div class="section-name">第一部分：框架认知与基础概念</div>
+  </header>
+  <div class="content">
+    <p style="font-size: 1.5rem; font-weight: 600; text-align: center; margin-bottom: 3rem; color: var(--text);">Mastra 是开源的 TypeScript AI 应用开发框架，原生支持 Node.js 运行时。</p>
+    <div style="display: flex; justify-content: space-around; align-items: center; margin-bottom: 3rem;">
+      <div class="card" style="text-align: center; width: 220px;">
+        <div style="font-size: 2.5rem; margin-bottom: 1rem;">🔌</div>
+        <h3>LLM API</h3>
+        <p style="font-size: 0.95rem; color: var(--text-light);">裸调接口，缺乏结构</p>
+      </div>
+      <div style="font-size: 2.5rem; color: var(--primary);">➔</div>
+      <div class="card" style="text-align: center; width: 220px; border: 2px solid var(--primary); box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2);">
+        <div style="font-size: 2.5rem; margin-bottom: 1rem;">🛠️</div>
+        <h3 style="color: var(--primary);">Mastra 框架</h3>
+        <p style="font-size: 0.95rem; color: var(--text-light);">结构化、组件化、类型安全</p>
+      </div>
+      <div style="font-size: 2.5rem; color: var(--primary);">➔</div>
+      <div class="card" style="text-align: center; width: 220px;">
+        <div style="font-size: 2.5rem; margin-bottom: 1rem;">💻</div>
+        <h3>TS 应用</h3>
+        <p style="font-size: 0.95rem; color: var(--text-light);">可维护的 Agent 与工作流</p>
+      </div>
+    </div>
+    <ul style="max-width: 800px; margin: 0 auto; background: white; padding: 1.5rem 2rem; border-radius: 0.75rem; border: 1px solid var(--border);">
+      <li><strong>核心价值：</strong>将 LLM 调用结构化、组件化，便于构建可维护的 Agent 与多智能体工作流。</li>
+      <li><strong>对比裸调 API：</strong>提供工具编排、状态管理、类型安全（TS 原生支持）。</li>
+    </ul>
+  </div>
+  <footer>
+    <span>2 / 8</span>
+    <span>Mastra Framework</span>
+  </footer>
+</section>
+
+<section class="slide">
+  <header>
+    <div class="slide-title">核心概念速览</div>
+    <div class="section-name">第一部分：框架认知与基础概念</div>
+  </header>
+  <div class="content">
+    <div class="grid-2x2">
+      <div class="card">
+        <div style="font-size: 2.5rem; margin-bottom: 1rem; color: var(--primary);">🤖</div>
+        <h3>Agent（智能体）</h3>
+        <p style="font-size: 1rem; color: var(--text-light);">由模型、系统指令（instructions）和可选工具组成的核心执行单元。</p>
+      </div>
+      <div class="card">
+        <div style="font-size: 2.5rem; margin-bottom: 1rem; color: var(--primary);">🔧</div>
+        <h3>Tools（工具）</h3>
+        <p style="font-size: 1rem; color: var(--text-light);">基于函数与 Zod Schema 定义的能力扩展，让 Agent 能调用外部 API 或计算。</p>
+      </div>
+      <div class="card">
+        <div style="font-size: 2.5rem; margin-bottom: 1rem; color: var(--primary);">📊</div>
+        <h3>Workflows（工作流）</h3>
+        <p style="font-size: 1rem; color: var(--text-light);">用于编排多步骤、有状态任务的图结构。</p>
+      </div>
+      <div class="card">
+        <div style="font-size: 2.5rem; margin-bottom: 1rem; color: var(--primary);">🧠</div>
+        <h3>Memory（记忆）</h3>
+        <p style="font-size: 1rem; color: var(--text-light);">管理对话上下文与长期记忆，提升交互连贯性。</p>
+      </div>
+    </div>
+  </div>
+  <footer>
+    <span>3 / 8</span>
+    <span>Mastra Framework</span>
+  </footer>
+</section>
+
+<section class="slide">
+  <header>
+    <div class="slide-title">环境搭建与项目初始化</div>
+    <div class="section-name">第二部分：环境搭建与代码实战</div>
+  </header>
+  <div class="content" style="justify-content: center; align-items: center;">
+    <div class="terminal" style="width: 100%; max-width: 850px;">
+      <div class="terminal-header">
+        <div class="dot red"></div>
+        <div class="dot yellow"></div>
+        <div class="dot green"></div>
+        <div style="color: #94A3B8; margin-left: auto; font-size: 0.85rem; font-family: sans-serif;">bash</div>
+      </div>
+      <div class="terminal-body">
+        <span class="comment"># 1. 环境要求：Node.js >= 18</span><br>
+        $ node -v<br>
+        <span class="highlight">v18.18.0</span><br><br>
+        
+        <span class="comment"># 2. 初始化项目并配置 TypeScript</span><br>
+        $ npm init -y<br>
+        $ npm install typescript -D<br>
+        $ npx tsc --init --strict<br><br>
+        
+        <span class="comment"># 3. 安装 Mastra 核心依赖</span><br>
+        $ npm install <span class="highlight">@mastra/core zod</span>
+      </div>
+    </div>
+  </div>
+  <footer>
+    <span>4 / 8</span>
+    <span>Mastra Framework</span>
+  </footer>
+</section>
+
+<section class="slide">
+  <header>
+    <div class="slide-title">编写你的第一个 Agent</div>
+    <div class="section-name">第二部分：环境搭建与代码实战</div>
+  </header>
+  <div class="content split">
+    <div class="code-block" style="flex: 1.2;">
+      <span class="comment">// src/index.ts</span><br>
+      <span class="keyword">import</span> { Agent } <span class="keyword">from</span> <span class="string">'@mastra/core'</span>;<br><br>
+      <span class="keyword">export const</span> myAgent = <span class="keyword">new</span> <span class="function">Agent</span>({<br>
+      &nbsp;&nbsp;name: <span class="string">'Helper'</span>,<br>
+      &nbsp;&nbsp;instructions: <span class="string">'你是一个乐于助人的 AI 助手。'</span>,<br>
+      &nbsp;&nbsp;model: <span class="string">'openai/gpt-4o'</span><br>
+      });
+    </div>
+    <div style="flex: 1;">
+      <h3 style="margin-bottom: 1.5rem; color: var(--primary); font-size: 1.5rem;">代码解析</h3>
+      <ul>
+        <li><strong>引入 Agent：</strong>从 <code>@mastra/core</code> 导入核心类。</li>
+        <li><strong>name：</strong>定义 Agent 的唯一标识与基础角色名。</li>
+        <li><strong>instructions：</strong>设定系统指令，约束 Agent 的行为与语气。</li>
+        <li><strong>model：</strong>指定底层 LLM 模型（如 openai/gpt-4o）。</li>
+      </ul>
+    </div>
+  </div>
+  <footer>
+    <span>5 / 8</span>
+    <span>Mastra Framework</span>
+  </footer>
+</section>
+
+<section class="slide">
+  <header>
+    <div class="slide-title">为 Agent 添加工具（Tools）</div>
+    <div class="section-name">第二部分：环境搭建与代码实战</div>
+  </header>
+  <div class="content" style="gap: 1.5rem;">
+    <div class="code-block" style="font-size: 0.95rem;">
+      <span class="keyword">import</span> { createTool } <span class="keyword">from</span> <span class="string">'@mastra/core'</span>;<br>
+      <span class="keyword">import</span> { z } <span class="keyword">from</span> <span class="string">'zod'</span>;<br><br>
+      <span class="keyword">const</span> weatherTool = <span class="function">createTool</span>({<br>
+      &nbsp;&nbsp;id: <span class="string">'get-weather'</span>,<br>
+      &nbsp;&nbsp;description: <span class="string">'获取指定城市的天气'</span>,<br>
+      &nbsp;&nbsp;<span class="highlight">inputSchema: z.object({ city: z.string() })</span>,<br>
+      &nbsp;&nbsp;execute: <span class="keyword">async</span> ({ context }) => {<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">return</span> `天气晴朗，位于 ${context.city}`;<br>
+      &nbsp;&nbsp;}<br>
+      });
+    </div>
+    <div style="text-align: center; color: var(--primary); font-size: 1.5rem; margin: 0.5rem 0; font-weight: bold;">⬇️ 挂载到 Agent</div>
+    <div class="code-block" style="font-size: 0.95rem;">
+      <span class="keyword">export const</span> myAgent = <span class="keyword">new</span> <span class="function">Agent</span>({<br>
+      &nbsp;&nbsp;name: <span class="string">'Helper'</span>,<br>
+      &nbsp;&nbsp;instructions: <span class="string">'你是一个天气助手。'</span>,<br>
+      &nbsp;&nbsp;model: <span class="string">'openai/gpt-4o'</span>,<br>
+      &nbsp;&nbsp;<span class="highlight">tools: [weatherTool]</span> <span class="comment">// 绑定工具数组</span><br>
+      });
+    </div>
+  </div>
+  <footer>
+    <span>6 / 8</span>
+    <span>Mastra Framework</span>
+  </footer>
+</section>
+
+<section class="slide">
+  <header>
+    <div class="slide-title">运行与交互调试</div>
+    <div class="section-name">第二部分：环境搭建与代码实战</div>
+  </header>
+  <div class="content split">
+    <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+      <div class="terminal" style="box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+        <div class="terminal-header"><div class="dot red"></div><div class="dot yellow"></div><div class="dot green"></div><div style="color: #94A3B8; margin-left: auto; font-size: 0.85rem; font-family: sans-serif;">bash</div></div>
+        <div class="terminal-body">
+          $ <span class="highlight">npx mastra dev</span>
+        </div>
+      </div>
+      <div class="code-block" style="font-size: 0.95rem;">
+        <span class="keyword">const</span> response = <span class="keyword">await</span> myAgent.<span class="function">generate</span>({<br>
+        &nbsp;&nbsp;messages: [{ role: <span class="string">'user'</span>, content: <span class="string">'北京天气如何？'</span> }]<br>
+        });<br>
+        console.<span class="function">log</span>(response.text);
+      </div>
+    </div>
+    <div class="terminal" style="flex: 1;">
+      <div class="terminal-header"><div class="dot red"></div><div class="dot yellow"></div><div class="dot green"></div><div style="color: #94A3B8; margin-left: auto; font-size: 0.85rem; font-family: sans-serif;">Output</div></div>
+      <div class="terminal-body">
+        <span class="comment">> 启动开发服务器...</span><br>
+        <span class="comment">> 监听端口 4111</span><br><br>
+        <span class="comment">[Tool Call] get-weather(city: "北京")</span><br>
+        <span class="comment">[Tool Result] 天气晴朗，位于 北京</span><br><br>
+        <span class="highlight" style="font-size: 1.1rem;">Agent: 北京当前天气晴朗，适合外出。</span>
+      </div>
+    </div>
+  </div>
+  <footer>
+    <span>7 / 8</span>
+    <span>Mastra Framework</span>
+  </footer>
+</section>
+
+<section class="slide">
+  <header>
+    <div class="slide-title">总结与进阶路线</div>
+    <div class="section-name">第三部分：总结与进阶指引</div>
+  </header>
+  <div class="content split">
+    <div>
+      <h3 style="margin-bottom: 1.5rem; color: var(--primary); font-size: 1.5rem;">🎯 知识回顾</h3>
+      <ul>
+        <li>✅ 理解 Mastra 框架定位与核心概念</li>
+        <li>✅ 完成 Node.js 环境搭建与依赖安装</li>
+        <li>✅ 编写并运行首个 Agent 代码</li>
+        <li>✅ 掌握 Tools 挂载与调试方法</li>
+      </ul>
+      <h3 style="margin: 2.5rem 0 1.5rem; color: var(--primary); font-size: 1.5rem;">🚀 进阶路线</h3>
+      <ul>
+        <li>学习 Workflows 多步骤编排</li>
+        <li>接入 RAG 知识库增强检索</li>
+        <li>部署至 Serverless (Vercel/Cloudflare)</li>
+      </ul>
+    </div>
+    <div style="display: flex; flex-direction: column; align-items: center; justify-content: flex-end; border-left: 1px solid var(--border); padding-left: 3rem; height: 100%;">
+      <div style="margin-top: auto; text-align: center;">
+        <div style="width: 140px; height: 140px; background: #E2E8F0; border-radius: 0.75rem; display: flex; align-items: center; justify-content: center; color: var(--text-light); font-size: 0.9rem; margin-bottom: 1.5rem; border: 1px dashed #94A3B8;">QR Code</div>
+        <p style="font-size: 1.125rem; font-weight: 600; margin-bottom: 0.5rem;">📚 官方文档</p>
+        <a href="https://mastra.ai" style="color: var(--primary); text-decoration: none; font-weight: 500; font-size: 1.125rem;">mastra.ai/docs</a>
+      </div>
+    </div>
+  </div>
+  <footer>
+    <span>8 / 8</span>
+    <span>Mastra Framework</span>
+  </footer>
+</section>
+
+</body>
+</html>

@@ -1,0 +1,567 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mastra 入门：构建你的第一个 TypeScript Agent</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --surface: #1e293b;
+    --border: #334155;
+    --text: #e2e8f0;
+    --text-muted: #94a3b8;
+    --primary: #3178c6;
+    --primary-hover: #2563eb;
+    --kw: #c678dd;
+    --str: #e5c07b;
+    --fn: #98c379;
+    --com: #5c6370;
+    --var: #61afef;
+    --cls: #e5c07b;
+  }
+  body {
+    margin: 0;
+    padding: 0;
+    background-color: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    overflow: hidden;
+  }
+  .slide {
+    width: 100vw;
+    height: 100vh;
+    box-sizing: border-box;
+    padding: 4rem 6rem;
+    display: flex;
+    flex-direction: column;
+  }
+  .slide-title {
+    font-size: 2.5rem;
+    color: #fff;
+    margin: 0 0 2rem 0;
+    border-bottom: 2px solid var(--primary);
+    padding-bottom: 0.5rem;
+    display: inline-block;
+    align-self: flex-start;
+  }
+  .content {
+    flex: 1;
+    display: flex;
+    gap: 3rem;
+    overflow: hidden;
+  }
+  .split { flex-direction: row; }
+  .col-layout { flex-direction: column; }
+  .text-col, .code-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .points {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  .points li {
+    position: relative;
+    padding-left: 1.5rem;
+    margin-bottom: 1.5rem;
+    font-size: 1.25rem;
+    line-height: 1.6;
+    color: var(--text);
+  }
+  .points li::before {
+    content: "▹";
+    position: absolute;
+    left: 0;
+    color: var(--primary);
+  }
+  .points li strong { color: #fff; }
+  .points code {
+    background: var(--surface);
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.9em;
+    color: #60a5fa;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  code {
+    font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  }
+  .code-block {
+    background: #1e1e1e;
+    border-radius: 8px;
+    padding: 1.5rem;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    overflow: auto;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    border: 1px solid var(--border);
+    color: #d4d4d4;
+  }
+  .code-block pre { margin: 0; }
+  .kw { color: var(--kw); }
+  .str { color: var(--str); }
+  .fn { color: var(--fn); }
+  .com { color: var(--com); font-style: italic; }
+  .var { color: var(--var); }
+  .cls { color: var(--cls); }
+
+  /* Slide 1 */
+  .slide-center {
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    position: relative;
+  }
+  .bg-code {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    opacity: 0.04;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.2rem;
+    line-height: 1.5;
+    overflow: hidden;
+    pointer-events: none;
+    text-align: left;
+    padding: 2rem;
+    z-index: 0;
+  }
+  .bg-code pre { margin: 0; white-space: pre-wrap; word-break: break-all; }
+  .center-content { position: relative; z-index: 1; }
+  .main-title {
+    font-size: 3.5rem;
+    color: #fff;
+    margin: 0 0 1rem 0;
+  }
+  .sub-title {
+    font-size: 1.5rem;
+    color: var(--text-muted);
+    margin: 0 0 2rem 0;
+  }
+  .tag {
+    display: inline-block;
+    padding: 0.5rem 1.5rem;
+    background: var(--primary);
+    color: #fff;
+    border-radius: 999px;
+    font-weight: bold;
+    font-size: 1.1rem;
+  }
+  .footer-note {
+    position: absolute;
+    bottom: 2rem;
+    color: var(--text-muted);
+    font-size: 1rem;
+    z-index: 1;
+  }
+
+  /* Slide 2 */
+  .diagram-col {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .arch-box {
+    display: grid;
+    grid-template-areas: ". top ." "left center right" ". bottom .";
+    gap: 1.5rem;
+    width: 100%;
+    max-width: 400px;
+    height: 300px;
+    align-items: center;
+    justify-items: center;
+  }
+  .arch-item {
+    padding: 1rem 2rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-weight: 600;
+    font-size: 1.1rem;
+  }
+  .arch-item.center {
+    grid-area: center;
+    background: var(--primary);
+    border-color: #60a5fa;
+    color: white;
+    box-shadow: 0 0 20px rgba(49,120,198,0.4);
+    font-size: 1.3rem;
+  }
+  .arch-item.top { grid-area: top; }
+  .arch-item.left { grid-area: left; }
+  .arch-item.right { grid-area: right; }
+  .arch-item.bottom { grid-area: bottom; }
+
+  /* Slide 3 */
+  .req-box, .dir-box {
+    background: var(--surface);
+    padding: 1.5rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    margin-bottom: 1.5rem;
+  }
+  .req-box h3, .dir-box h3 {
+    margin: 0 0 1rem 0;
+    color: #fff;
+    font-size: 1.2rem;
+  }
+  .req-box ul { margin: 0; padding-left: 1.5rem; color: var(--text-muted); }
+  .dir-tree {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--fn);
+    margin: 0;
+    line-height: 1.5;
+  }
+  .terminal {
+    background: #1e1e1e;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.5);
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+  .terminal-header {
+    background: #2d2d2d;
+    padding: 0.75rem 1rem;
+    display: flex;
+    gap: 0.5rem;
+  }
+  .dot { width: 12px; height: 12px; border-radius: 50%; }
+  .dot.red { background: #ff5f56; }
+  .dot.yellow { background: #ffbd2e; }
+  .dot.green { background: #27c93f; }
+  .terminal-body {
+    padding: 1.5rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.95rem;
+    color: #d4d4d4;
+    line-height: 1.6;
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  /* Slide 4 */
+  .cards-row {
+    display: flex;
+    gap: 2rem;
+    align-items: stretch;
+    width: 100%;
+  }
+  .card {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 2.5rem 2rem;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+  }
+  .card .icon { font-size: 3.5rem; margin-bottom: 1.5rem; }
+  .card h3 { color: #60a5fa; margin: 0 0 1rem 0; font-size: 1.5rem; }
+  .card p { color: var(--text-muted); line-height: 1.6; font-size: 1.1rem; margin: 0; }
+
+  /* Slide 6 */
+  .tool-layout { align-items: center; }
+  .tool-layout .arrow {
+    font-size: 2.5rem;
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+  }
+  .tool-layout h4 {
+    color: var(--text-muted);
+    margin: 0 0 1rem 0;
+    font-size: 1.1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* Slide 8 */
+  .cta-col { display: flex; align-items: center; justify-content: center; }
+  .cta-box {
+    background: var(--surface);
+    padding: 3rem;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    text-align: center;
+    width: 100%;
+    max-width: 400px;
+  }
+  .cta-box h3 { margin: 0 0 1.5rem 0; color: #fff; font-size: 1.5rem; }
+  .btn {
+    display: block;
+    width: 100%;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    background: var(--primary);
+    color: #fff;
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: bold;
+    font-size: 1.1rem;
+    transition: 0.2s;
+    box-sizing: border-box;
+  }
+  .btn:hover { background: var(--primary-hover); }
+  .btn.outline { background: transparent; border: 1px solid var(--primary); color: #60a5fa; }
+  .btn.outline:hover { background: rgba(49,120,198,0.1); }
+</style>
+</head>
+<body>
+
+<section class="slide slide-center">
+  <div class="bg-code">
+    <pre>import { Agent } from '@mastra/core';
+import { openai } from '@ai-sdk/openai';
+
+const agent = new Agent({
+  name: 'Assistant',
+  instructions: 'You are a helpful assistant.',
+  model: openai('gpt-4o')
+});
+
+const response = await agent.generate('Hello!');
+console.log(response.text);
+
+// Tool calling example
+import { createTool } from '@mastra/core';
+import { z } from 'zod';
+
+const getTime = createTool({
+  id: 'get-time',
+  description: 'Get current time',
+  inputSchema: z.object({}),
+  execute: async () => new Date().toISOString()
+});</pre>
+  </div>
+  <div class="center-content">
+    <h1 class="main-title">Mastra 入门：构建你的第一个 TypeScript Agent</h1>
+    <p class="sub-title">从零开始掌握类型安全的 AI 应用开发框架</p>
+    <div class="tag">TypeScript / Node.js Developers</div>
+  </div>
+  <div class="footer-note">面向 TS 开发者的 Agent 框架教程</div>
+</section>
+
+<section class="slide">
+  <h2 class="slide-title">什么是 Mastra？</h2>
+  <div class="content split">
+    <div class="text-col">
+      <ul class="points">
+        <li><strong>定义：</strong>Mastra 是一个原生面向 TypeScript/Node.js 的 Agent 开发框架。</li>
+        <li><strong>核心优势：</strong>类型安全（Zod 集成）、与 JS 生态（Next.js/Vite）无缝衔接、声明式工作流。</li>
+        <li><strong>适用场景：</strong>构建具备推理能力和外部工具调用能力的 AI 应用。</li>
+      </ul>
+    </div>
+    <div class="diagram-col">
+      <div class="arch-box">
+        <div class="arch-item top">LLM</div>
+        <div class="arch-item left">Runtime</div>
+        <div class="arch-item center">Agent</div>
+        <div class="arch-item right">Tools</div>
+        <div class="arch-item bottom">Workflows</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="slide">
+  <h2 class="slide-title">环境准备与项目初始化</h2>
+  <div class="content split">
+    <div class="text-col">
+      <div class="req-box">
+        <h3>环境要求</h3>
+        <ul>
+          <li>Node.js >= 18</li>
+          <li>npm / pnpm 包管理器</li>
+        </ul>
+      </div>
+      <div class="dir-box">
+        <h3>目录约定</h3>
+        <pre class="dir-tree">src/
+ ├── agents/
+ └── tools/</pre>
+      </div>
+    </div>
+    <div class="code-col">
+      <div class="terminal">
+        <div class="terminal-header">
+          <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+        </div>
+        <div class="terminal-body">
+          <code><span class="com"># 初始化项目并安装依赖</span>
+<span class="fn">mkdir</span> my-mastra-app && <span class="fn">cd</span> my-mastra-app
+<span class="fn">npm</span> init -y
+<span class="fn">npm</span> install @mastra/core zod openai</code>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="slide">
+  <h2 class="slide-title">核心概念解析</h2>
+  <div class="content cards-row">
+    <div class="card">
+      <div class="icon">🤖</div>
+      <h3>Agent</h3>
+      <p>具备特定指令（instructions）和模型（model）的推理实体。</p>
+    </div>
+    <div class="card">
+      <div class="icon">🔧</div>
+      <h3>Tools</h3>
+      <p>供 Agent 调用的函数，必须使用 Zod 定义 inputSchema 以保证类型安全。</p>
+    </div>
+    <div class="card">
+      <div class="icon">🔄</div>
+      <h3>Workflows</h3>
+      <p>用于编排多步骤或多 Agent 的复杂逻辑。</p>
+    </div>
+  </div>
+</section>
+
+<section class="slide">
+  <h2 class="slide-title">第一个 Agent 示例</h2>
+  <div class="content col-layout">
+    <div class="text-col" style="flex: 0.4; padding-bottom: 1rem;">
+      <ul class="points">
+        <li>引入模块：从 <code>@mastra/core</code> 导入 Agent，配置 LLM。</li>
+        <li>实例化：定义 <code>name</code>, <code>instructions</code> 和 <code>model</code> 参数。</li>
+        <li>执行推理：调用 <code>agent.generate()</code> 获取响应。</li>
+      </ul>
+    </div>
+    <div class="code-col" style="flex: 0.6;">
+      <div class="code-block" style="height: 100%;">
+        <pre><code><span class="kw">import</span> { Agent } from <span class="str">'@mastra/core'</span>;
+<span class="kw">import</span> { openai } from <span class="str">'@ai-sdk/openai'</span>;
+
+<span class="kw">const</span> <span class="var">agent</span> = <span class="kw">new</span> <span class="cls">Agent</span>({
+  <span class="var">name</span>: <span class="str">'助手'</span>,
+  <span class="var">instructions</span>: <span class="str">'你是一个乐于助人的 AI 助手。'</span>,
+  <span class="var">model</span>: openai(<span class="str">'gpt-4o'</span>),
+});
+
+<span class="com">// 执行推理</span>
+<span class="kw">const</span> <span class="var">response</span> = <span class="kw">await</span> agent.<span class="fn">generate</span>(<span class="str">'你好，介绍一下 TypeScript。'</span>);
+console.<span class="fn">log</span>(response.text);</code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="slide">
+  <h2 class="slide-title">简单工具调用 (Tool Calling)</h2>
+  <div class="content split tool-layout">
+    <div class="code-col">
+      <h4>1. 定义工具 (createTool)</h4>
+      <div class="code-block">
+        <pre><code><span class="kw">import</span> { createTool } from <span class="str">'@mastra/core'</span>;
+<span class="kw">import</span> { z } from <span class="str">'zod'</span>;
+
+<span class="kw">const</span> <span class="var">getWeather</span> = <span class="fn">createTool</span>({
+  <span class="var">id</span>: <span class="str">'getWeather'</span>,
+  <span class="var">description</span>: <span class="str">'获取指定城市的天气'</span>,
+  <span class="var">inputSchema</span>: z.<span class="fn">object</span>({
+    city: z.<span class="fn">string</span>()
+  }),
+  <span class="var">execute</span>: <span class="kw">async</span> ({ city }) => {
+    <span class="kw">return</span> <span class="str">`${city} 今天是晴天，25°C。`</span>;
+  }
+});</code></pre>
+      </div>
+    </div>
+    <div class="arrow">➔</div>
+    <div class="code-col">
+      <h4>2. 挂载工具到 Agent</h4>
+      <div class="code-block">
+        <pre><code><span class="kw">const</span> <span class="var">agent</span> = <span class="kw">new</span> <span class="cls">Agent</span>({
+  <span class="var">name</span>: <span class="str">'天气助手'</span>,
+  <span class="var">instructions</span>: <span class="str">'使用工具回答天气问题。'</span>,
+  <span class="var">model</span>: openai(<span class="str">'gpt-4o'</span>),
+  <span class="var">tools</span>: { getWeather } <span class="com">// 注入工具</span>
+});</code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="slide">
+  <h2 class="slide-title">实战：Agent 与工具协同</h2>
+  <div class="content col-layout" style="gap: 1.5rem;">
+    <div class="code-block" style="flex: 1.2; overflow-y: auto;">
+      <pre><code><span class="kw">import</span> { Agent, createTool } from <span class="str">'@mastra/core'</span>;
+<span class="kw">import</span> { openai } from <span class="str">'@ai-sdk/openai'</span>;
+<span class="kw">import</span> { z } from <span class="str">'zod'</span>;
+
+<span class="kw">const</span> <span class="var">getWeather</span> = <span class="fn">createTool</span>({
+  <span class="var">id</span>: <span class="str">'getWeather'</span>,
+  <span class="var">description</span>: <span class="str">'获取天气'</span>,
+  <span class="var">inputSchema</span>: z.<span class="fn">object</span>({ city: z.<span class="fn">string</span>() }),
+  <span class="var">execute</span>: <span class="kw">async</span> ({ city }) => <span class="str">`${city} 晴天`</span>
+});
+
+<span class="kw">const</span> <span class="var">agent</span> = <span class="kw">new</span> <span class="cls">Agent</span>({
+  <span class="var">name</span>: <span class="str">'WeatherAgent'</span>,
+  <span class="var">instructions</span>: <span class="str">'回答天气问题'</span>,
+  <span class="var">model</span>: openai(<span class="str">'gpt-4o'</span>),
+  <span class="var">tools</span>: { getWeather }
+});
+
+<span class="kw">const</span> <span class="var">res</span> = <span class="kw">await</span> agent.<span class="fn">generate</span>(<span class="str">'北京天气如何？'</span>);
+console.<span class="fn">log</span>(res.text);</code></pre>
+    </div>
+    <div class="terminal" style="flex: 0.8;">
+      <div class="terminal-header">
+        <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+      </div>
+      <div class="terminal-body">
+        <code><span class="com">> 运行脚本...</span>
+<span class="com">[Agent] 识别意图：需要查询北京天气</span>
+<span class="com">[Tool] 调用 getWeather({ city: '北京' })</span>
+<span class="com">[Tool] 返回：北京 晴天</span>
+<span class="str">北京今天是晴天，适合外出。</span></code>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="slide">
+  <h2 class="slide-title">总结与下一步</h2>
+  <div class="content split">
+    <div class="text-col">
+      <h3 style="color: #fff; margin-top: 0;">知识回顾</h3>
+      <ul class="points">
+        <li>环境准备 → 核心概念</li>
+        <li>Agent 基础 → Tool 集成</li>
+      </ul>
+      <h3 style="color: #fff; margin-top: 2rem;">进阶方向</h3>
+      <ul class="points">
+        <li>引入 Memory 实现记忆</li>
+        <li>使用 Workflow 编排复杂任务</li>
+        <li>接入 RAG 检索增强</li>
+      </ul>
+    </div>
+    <div class="cta-col">
+      <div class="cta-box">
+        <h3>资源指引</h3>
+        <a href="#" class="btn">📚 阅读官方文档</a>
+        <a href="#" class="btn outline">⭐ GitHub 仓库</a>
+        <a href="#" class="btn outline">💬 加入 Discord</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>

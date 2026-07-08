@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mastra 入门实战：TypeScript 开发者的 Agent 框架指南</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+* { margin:0; padding:0; box-sizing:border-box; }
+html,body { background:#05070d; }
+body {
+  font-family:'Inter','PingFang SC',sans-serif;
+  color:#e6edf3;
+}
+.deck {
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:40px;
+  padding:40px 0;
+}
+.slide {
+  width:1920px;
+  height:1080px;
+  flex-shrink:0;
+  position:relative;
+  background:#0D1117;
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+}
+code, .mono, .term, .code-block, .badge, .kbd { font-family:'JetBrains Mono',monospace; font-feature-settings:"liga" 1; }
+
+/* ---------- shared bits ---------- */
+.accent { color:#6366F1; }
+.grad-text {
+  background:linear-gradient(90deg,#818CF8,#6366F1 45%,#A78BFA);
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+.page-num {
+  position:absolute; bottom:36px; right:56px;
+  font-family:'JetBrains Mono',monospace; font-size:16px; color:#4b5566;
+  letter-spacing:1px;
+}
+.tag {
+  position:absolute; top:56px; left:64px;
+  font-family:'JetBrains Mono',monospace; font-size:15px; color:#6366F1;
+  letter-spacing:2px; text-transform:uppercase; font-weight:600;
+  display:flex; align-items:center; gap:10px;
+}
+.tag::before { content:''; width:8px; height:8px; border-radius:50%; background:#6366F1; box-shadow:0 0 12px #6366F1; }
+
+.win {
+  background:#161B22;
+  border:1px solid #262c36;
+  border-radius:12px;
+  box-shadow:0 20px 60px rgba(0,0,0,.45);
+  overflow:hidden;
+}
+.win-bar {
+  height:40px;
+  background:#1c2129;
+  display:flex; align-items:center; gap:8px;
+  padding:0 16px;
+  border-bottom:1px solid #262c36;
+}
+.dot { width:12px; height:12px; border-radius:50%; }
+.dot.r{background:#FF5F56;} .dot.y{background:#FFBD2E;} .dot.g{background:#27C93F;}
+.win-title { margin-left:10px; font-family:'JetBrains Mono',monospace; font-size:13px; color:#8b949e; }
+.win-body { padding:26px 30px; font-family:'JetBrains Mono',monospace; font-size:20px; line-height:1.72; }
+
+.kw{color:#c792ea;} .fn{color:#82AAFF;} .str{color:#A5E844;} .cm{color:#5c6370;font-style:italic;} .num{color:#F78C6C;} .pu{color:#89DDFF;} .prop{color:#6366F1;}
+
+.pill {
+  display:inline-flex; align-items:center; gap:8px;
+  background:rgba(99,102,241,.12); border:1px solid rgba(99,102,241,.35);
+  color:#a5b4fc; font-size:15px; padding:6px 14px; border-radius:20px; font-weight:600;
+}
+.dollar { color:#6366F1; font-weight:700; margin-right:10px; }
+.grid-bg {
+  position:absolute; inset:0;
+  background-image:
+    linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
+  background-size:48px 48px;
+  mask-image:radial-gradient(ellipse 70% 60% at 50% 40%, black, transparent);
+}
+</style>
+</head>
+<body>
+<div class="deck">
+
+<!-- SLIDE 1 : TITLE -->
+<section class="slide">
+  <div class="grid-bg"></div>
+  <div style="position:absolute; top:-220px; right:-160px; width:760px; height:760px; border-radius:50%; background:radial-gradient(circle,#6366F1 0%,transparent 70%); opacity:.28; filter:blur(10px);"></div>
+  <div style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:0 120px;">
+    <div class="pill" style="margin-bottom:36px;">
+      <span style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span>
+      TYPESCRIPT · AGENT FRAMEWORK · LOCAL-FIRST
+    </div>
+    <h1 style="font-size:88px; font-weight:800; line-height:1.12; letter-spacing:-2px;">
+      Mastra 入门实战<br><span class="grad-text">TypeScript 开发者的 Agent 框架指南</span>
+    </h1>
+    <p style="margin-top:36px; font-size:30px; color:#9aa5b1; font-weight:500;">
+      8 页搞定环境搭建与第一个 Agent 运行
+    </p>
+    <div style="margin-top:56px; display:flex; gap:16px; align-items:center;">
+      <span class="mono" style="font-size:18px; color:#6366F1; border:1px solid #30363d; padding:10px 20px; border-radius:8px; background:#0d1117;">for TS/Node.js Developers</span>
+      <span class="mono" style="font-size:18px; color:#8b949e; border:1px solid #30363d; padding:10px 20px; border-radius:8px; background:#0d1117;">Frontend · Full-stack</span>
+    </div>
+  </div>
+  <div style="position:absolute; bottom:60px; left:64px; font-family:'JetBrains Mono',monospace; font-size:16px; color:#4b5566;">mastra.ai · quickstart</div>
+  <div class="page-num">01 / 08</div>
+</section>
+
+<!-- SLIDE 2 : WHY MASTRA -->
+<section class="slide">
+  <div class="tag">WHY MASTRA</div>
+  <div style="padding:170px 64px 0 64px;">
+    <h2 style="font-size:56px; font-weight:800; letter-spacing:-1px;">为什么是 <span class="grad-text">Mastra</span>？</h2>
+    <p style="margin-top:18px; font-size:22px; color:#8b949e; max-width:1100px;">用开发者真正在意的技术特性，建立对框架的信任。</p>
+  </div>
+  <div style="flex:1; display:grid; grid-template-columns:repeat(4,1fr); gap:28px; padding:56px 64px 90px 64px;">
+    <div class="win" style="display:flex; flex-direction:column; padding:34px 28px;">
+      <div style="width:52px;height:52px;border-radius:12px;background:rgba(99,102,241,.14);display:flex;align-items:center;justify-content:center;margin-bottom:24px;">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#6366F1" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4z"/></svg>
+      </div>
+      <div style="font-size:22px; font-weight:700;">TypeScript-First</div>
+      <div style="margin-top:12px; font-size:17px; color:#9aa5b1; line-height:1.6;">原生类型安全，端到端推导，无需胶水代码。</div>
+    </div>
+    <div class="win" style="display:flex; flex-direction:column; padding:34px 28px;">
+      <div style="width:52px;height:52px;border-radius:12px;background:rgba(99,102,241,.14);display:flex;align-items:center;justify-content:center;margin-bottom:24px;">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#6366F1" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l4 3-4 3M13 15h4"/></svg>
+      </div>
+      <div style="font-size:22px; font-weight:700;">Local-First</div>
+      <div style="margin-top:12px; font-size:17px; color:#9aa5b1; line-height:1.6;">内置 Playground，本地优先开发与实时调试。</div>
+    </div>
+    <div class="win" style="display:flex; flex-direction:column; padding:34px 28px;">
+      <div style="width:52px;height:52px;border-radius:12px;background:rgba(99,102,241,.14);display:flex;align-items:center;justify-content:center;margin-bottom:24px;">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#6366F1" stroke-width="2"><circle cx="7" cy="7" r="3"/><circle cx="17" cy="17" r="3"/><path d="M9.5 9.5l5 5"/></svg>
+      </div>
+      <div style="font-size:22px; font-weight:700;">生态融合</div>
+      <div style="margin-top:12px; font-size:17px; color:#9aa5b1; line-height:1.6;">无缝对接 Vercel AI SDK、Zod 等现代 TS 库。</div>
+    </div>
+    <div class="win" style="display:flex; flex-direction:column; padding:34px 28px;">
+      <div style="width:52px;height:52px;border-radius:12px;background:rgba(99,102,241,.14);display:flex;align-items:center;justify-content:center;margin-bottom:24px;">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#6366F1" stroke-width="2"><path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z"/></svg>
+      </div>
+      <div style="font-size:22px; font-weight:700;">更轻量</div>
+      <div style="margin-top:12px; font-size:17px; color:#9aa5b1; line-height:1.6;">比 LangChain 更贴合 JS/TS 开发者的心智模型。</div>
+    </div>
+  </div>
+  <div class="page-num">02 / 08</div>
+</section>
+
+<!-- SLIDE 3 : ENV & INIT -->
+<section class="slide">
+  <div class="tag">SETUP</div>
+  <div style="padding:170px 64px 0 64px;">
+    <h2 style="font-size:56px; font-weight:800; letter-spacing:-1px;">环境准备与项目初始化</h2>
+    <p style="margin-top:18px; font-size:22px; color:#8b949e;">可立即执行的起步指令，完成项目脚手架。</p>
+  </div>
+  <div style="flex:1; display:grid; grid-template-columns:0.85fr 1.15fr; gap:48px; padding:52px 64px 90px 64px;">
+    <div style="display:flex; flex-direction:column; gap:22px;">
+      <div style="font-size:16px; letter-spacing:2px; color:#6366F1; font-weight:700;">环境要求</div>
+      <div style="display:flex; gap:14px; align-items:flex-start;">
+        <span class="pill">Node ≥ 18</span>
+      </div>
+      <div style="font-size:19px; color:#c9d1d9; line-height:1.7;">✔ 已安装 Node.js 18 及以上版本</div>
+      <div style="font-size:19px; color:#c9d1d9; line-height:1.7;">✔ 已获取模型 API Key（如 OpenAI）</div>
+      <div style="font-size:19px; color:#c9d1d9; line-height:1.7;">✔ 熟悉基础 npm / pnpm 工作流</div>
+      <div style="margin-top:12px; font-size:16px; letter-spacing:2px; color:#6366F1; font-weight:700;">项目结构预览</div>
+      <div class="win">
+        <div class="win-bar"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div><div class="win-title">project tree</div></div>
+        <div class="win-body" style="font-size:17px;">
+src/mastra/<br>
+├─ <span class="fn">agents</span>/<br>
+│  └─ index.ts<br>
+├─ <span class="fn">tools</span>/<br>
+│  └─ weather.ts<br>
+└─ index.ts
+        </div>
+      </div>
+    </div>
+    <div class="win" style="align-self:flex-start; width:100%;">
+      <div class="win-bar"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div><div class="win-title">terminal — zsh</div></div>
+      <div class="win-body">
+        <div><span class="dollar">$</span><span class="str">npm create mastra@latest</span></div>
+        <div class="cm">// 或者手动安装依赖：</div>
+        <div><span class="dollar">$</span><span class="str">npm install @mastra/core @ai-sdk/openai</span></div>
+        <div><span class="dollar">$</span><span class="str">npm install zod</span></div>
+        <br>
+        <div class="cm">✔ Project scaffolded</div>
+        <div class="cm">✔ Dependencies installed</div>
+        <div style="color:#27C93F;">✔ Ready — cd my-mastra-app</div>
+      </div>
+    </div>
+  </div>
+  <div class="page-num">03 / 08</div>
+</section>
+
+<!-- SLIDE 4 : DEFINE AGENT -->
+<section class="slide">
+  <div class="tag">STEP 01</div>
+  <div style="padding:170px 64px 0 64px;">
+    <h2 style="font-size:56px; font-weight:800; letter-spacing:-1px;">定义你的基础 Agent</h2>
+    <p style="margin-top:18px; font-size:22px; color:#8b949e;">用最少的 TypeScript 代码定义一个基础 Agent。</p>
+  </div>
+  <div style="flex:1; display:grid; grid-template-columns:0.8fr 1.2fr; gap:48px; padding:52px 64px 90px 64px;">
+    <div style="display:flex; flex-direction:column; gap:24px;">
+      <div style="display:flex; gap:16px; align-items:flex-start;">
+        <div style="width:34px;height:34px;border-radius:8px;background:rgba(99,102,241,.16);color:#a5b4fc;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;">1</div>
+        <div><div style="font-weight:700; font-size:19px;">引入核心包</div><div style="color:#9aa5b1; font-size:16px; margin-top:4px;">从 <code class="mono" style="color:#82AAFF;">@mastra/core</code> 导入 Agent 类。</div></div>
+      </div>
+      <div style="display:flex; gap:16px; align-items:flex-start;">
+        <div style="width:34px;height:34px;border-radius:8px;background:rgba(99,102,241,.16);color:#a5b4fc;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;">2</div>
+        <div><div style="font-weight:700; font-size:19px;">配置模型</div><div style="color:#9aa5b1; font-size:16px; margin-top:4px;">通过 <code class="mono" style="color:#82AAFF;">@ai-sdk/openai</code> 接入 LLM。</div></div>
+      </div>
+      <div style="display:flex; gap:16px; align-items:flex-start;">
+        <div style="width:34px;height:34px;border-radius:8px;background:rgba(99,102,241,.16);color:#a5b4fc;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;">3</div>
+        <div><div style="font-weight:700; font-size:19px;">定义 Instructions</div><div style="color:#9aa5b1; font-size:16px; margin-top:4px;">用自然语言设定 Agent 的角色与边界。</div></div>
+      </div>
+      <div style="display:flex; gap:16px; align-items:flex-start;">
+        <div style="width:34px;height:34px;border-radius:8px;background:rgba(99,102,241,.16);color:#a5b4fc;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;">4</div>
+        <div><div style="font-weight:700; font-size:19px;">导出实例</div><div style="color:#9aa5b1; font-size:16px; margin-top:4px;">保存至 <code class="mono" style="color:#82AAFF;">src/mastra/agents/index.ts</code>。</div></div>
+      </div>
+    </div>
+    <div class="win">
+      <div class="win-bar"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div><div class="win-title">src/mastra/agents/index.ts</div></div>
+      <div class="win-body">
+<span class="kw">import</span> { Agent } <span class="kw">from</span> <span class="str">'@mastra/core'</span>;<br>
+<span class="kw">import</span> { openai } <span class="kw">from</span> <span class="str">'@ai-sdk/openai'</span>;<br>
+<br>
+<span class="kw">export</span> <span class="kw">const</span> <span class="prop">weatherAgent</span> = <span class="kw">new</span> <span class="fn">Agent</span>({<br>
+&nbsp;&nbsp;<span class="prop">name</span>: <span class="str">'weather-agent'</span>,<br>
+&nbsp;&nbsp;<span class="prop">instructions</span>: <span class="str">`你是一个天气助手，
+  只使用工具返回的真实数据回答。`</span>,<br>
+&nbsp;&nbsp;<span class="prop">model</span>: <span class="fn">openai</span>(<span class="str">'gpt-4o-mini'</span>),<br>
+});
+      </div>
+    </div>
+  </div>
+  <div class="page-num">04 / 08</div>
+</section>
+
+<!-- SLIDE 5 : TOOLS -->
+<section class="slide">
+  <div class="tag">STEP 02</div>
+  <div style="padding:170px 64px 0 64px;">
+    <h2 style="font-size:56px; font-weight:800; letter-spacing:-1px;">为 Agent 添加 Tools</h2>
+    <p style="margin-top:18px; font-size:22px; color:#8b949e;">赋予 Agent 外部调用能力，体验 TS 类型安全的优势。</p>
+  </div>
+  <div style="flex:1; display:grid; grid-template-columns:1fr 1fr; gap:36px; padding:48px 64px 90px 64px;">
+    <div class="win">
+      <div class="win-bar"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div><div class="win-title">src/mastra/tools/weather.ts</div></div>
+      <div class="win-body" style="font-size:18px;">
+<span class="kw">import</span> { createTool } <span class="kw">from</span> <span class="str">'@mastra/core/tools'</span>;<br>
+<span class="kw">import</span> { z } <span class="kw">from</span> <span class="str">'zod'</span>;<br>
+<br>
+<span class="kw">export</span> <span class="kw">const</span> <span class="prop">weatherTool</span> = <span class="fn">createTool</span>({<br>
+&nbsp;&nbsp;<span class="prop">id</span>: <span class="str">'get-weather'</span>,<br>
+&nbsp;&nbsp;<span class="prop">description</span>: <span class="str">'获取指定城市天气'</span>,<br>
+&nbsp;&nbsp;<span class="prop">inputSchema</span>: z.<span class="fn">object</span>({<br>
+&nbsp;&nbsp;&nbsp;&nbsp;city: z.<span class="fn">string</span>(), <span class="cm">// 类型自动推导</span><br>
+&nbsp;&nbsp;}),<br>
+&nbsp;&nbsp;<span class="kw">execute</span>: <span class="kw">async</span> ({ context }) =&gt; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">return</span> <span class="kw">await</span> <span class="fn">fetchWeather</span>(context.city);<br>
+&nbsp;&nbsp;},<br>
+});
+      </div>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:22px;">
+      <div class="win">
+        <div class="win-bar"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div><div class="win-title">src/mastra/agents/index.ts</div></div>
+        <div class="win-body" style="font-size:18px;">
+<span class="kw">new</span> <span class="fn">Agent</span>({<br>
+&nbsp;&nbsp;...,<br>
+&nbsp;&nbsp;<span class="prop">tools</span>: { weatherTool },<br>
+});
+        </div>
+      </div>
+      <div style="border-left:3px solid #6366F1; background:rgba(99,102,241,.08); padding:20px 24px; border-radius:0 10px 10px 0;">
+        <div style="font-weight:700; font-size:18px; color:#a5b4fc; margin-bottom:8px;">💡 类型安全的关键</div>
+        <div style="font-size:17px; color:#c9d1d9; line-height:1.7;">Zod Schema 不仅做运行时校验，还会自动生成给 LLM 的 Function Calling 参数描述 —— <span class="mono" style="color:#82AAFF;">context</span> 参数的类型由 <span class="mono" style="color:#82AAFF;">inputSchema</span> 完全推导，写错字段名 TS 直接报错。</div>
+      </div>
+    </div>
+  </div>
+  <div class="page-num">05 / 08</div>
+</section>
+
+<!-- SLIDE 6 : RUN & PLAYGROUND -->
+<section class="slide">
+  <div class="tag">STEP 03</div>
+  <div style="padding:170px 64px 0 64px;">
+    <h2 style="font-size:56px; font-weight:800; letter-spacing:-1px;">运行与本地 Playground</h2>
+    <p style="margin-top:18px; font-size:22px; color:#8b949e;">运行 Agent 并验证端到端链路。</p>
+  </div>
+  <div style="flex:1; display:grid; grid-template-columns:1fr 1fr; gap:36px; padding:48px 64px 90px 64px;">
+    <div class="win">
+      <div class="win-bar"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div><div class="win-title">run.ts</div></div>
+      <div class="win-body">
+<span class="kw">import</span> { weatherAgent } <span class="kw">from</span> <span class="str">'./agents'</span>;<br>
+<br>
+<span class="kw">const</span> <span class="prop">res</span> = <span class="kw">await</span> weatherAgent.<span class="fn">generate</span>(<br>
+&nbsp;&nbsp;<span class="str">'北京天气如何？'</span><br>
+);<br>
+<br>
+console.<span class="fn">log</span>(res.text);
+      </div>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:24px;">
+      <div class="win">
+        <div class="win-bar"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div><div class="win-title">terminal — output</div></div>
+        <div class="win-body" style="font-size:18px;">
+          <div><span class="dollar">$</span><span class="str">npx mastra dev</span></div>
+          <div class="cm">Playground running at http://localhost:4111</div>
+          <br>
+          <div class="cm">→ tool call: get-weather({ city: "北京" })</div>
+          <div style="color:#27C93F;">北京当前天气：晴，26°C，微风。</div>
+        </div>
+      </div>
+      <div class="win" style="flex:1; display:flex; align-items:center; justify-content:center; min-height:170px;">
+        <div style="text-align:center; color:#586069;">
+          <div style="font-size:14px; letter-spacing:2px; margin-bottom:10px;">MASTRA PLAYGROUND</div>
+          <div style="font-size:15px;">http://localhost:4111 · 可视化对话与 Trace 调试</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="page-num">06 / 08</div>
+</section>
+
+<!-- SLIDE 7 : PITFALLS -->
+<section class="slide">
+  <div class="tag">TROUBLESHOOTING</div>
+  <div style="padding:170px 64px 0 64px;">
+    <h2 style="font-size:56px; font-weight:800; letter-spacing:-1px;">常见入门陷阱与排查</h2>
+    <p style="margin-top:18px; font-size:22px; color:#8b949e;">提前规避 TS 开发者常遇到的运行时错误。</p>
+  </div>
+  <div style="flex:1; display:flex; flex-direction:column; gap:24px; padding:48px 64px 90px 64px;">
+    <div style="display:flex; gap:24px; border-left:4px solid #FFBD2E; background:rgba(255,189,46,.07); border-radius:0 10px 10px 0; padding:22px 28px;">
+      <div style="font-weight:800; color:#FFBD2E; font-size:19px; flex-shrink:0; width:150px;">陷阱 1</div>
+      <div style="flex:1;">
+        <div style="font-size:19px; font-weight:700; margin-bottom:6px;">API Key 未设置</div>
+        <div style="font-size:16px; color:#9aa5b1; margin-bottom:10px;">未在 <code class="mono" style="color:#82AAFF;">.env</code> 中配置模型密钥导致请求失败。</div>
+        <div class="mono" style="font-size:15px; background:#0d1117; padding:10px 14px; border-radius:6px; border:1px solid #262c36;">OPENAI_API_KEY=<span class="str">sk-***</span>&nbsp;&nbsp;<span class="cm">// process.env.OPENAI_API_KEY</span></div>
+      </div>
+    </div>
+    <div style="display:flex; gap:24px; border-left:4px solid #FFBD2E; background:rgba(255,189,46,.07); border-radius:0 10px 10px 0; padding:22px 28px;">
+      <div style="font-weight:800; color:#FFBD2E; font-size:19px; flex-shrink:0; width:150px;">陷阱 2</div>
+      <div style="flex:1;">
+        <div style="font-size:19px; font-weight:700; margin-bottom:6px;">Schema 与 execute 参数类型不匹配</div>
+        <div style="font-size:16px; color:#9aa5b1;">修改 <code class="mono" style="color:#82AAFF;">inputSchema</code> 后忘记同步 <code class="mono" style="color:#82AAFF;">execute</code> 逻辑，TS 会在编译期直接报错拦截。</div>
+      </div>
+    </div>
+    <div style="display:flex; gap:24px; border-left:4px solid #6366F1; background:rgba(99,102,241,.07); border-radius:0 10px 10px 0; padding:22px 28px;">
+      <div style="font-weight:800; color:#a5b4fc; font-size:19px; flex-shrink:0; width:150px;">调试技巧</div>
+      <div style="flex:1;">
+        <div style="font-size:16px; color:#c9d1d9;">开启 Mastra 内置日志，查看 LLM 原始请求 / 响应与 tool-call 全过程，快速定位问题根因。</div>
+      </div>
+    </div>
+  </div>
+  <div class="page-num">07 / 08</div>
+</section>
+
+<!-- SLIDE 8 : SUMMARY / QUOTE -->
+<section class="slide">
+  <div class="grid-bg"></div>
+  <div class="tag">SUMMARY</div>
+  <div style="flex:1; display:flex; flex-direction:column; justify-content:center; padding:0 64px;">
+    <div style="display:flex; justify-content:space-between; max-width:1600px; margin:0 auto 64px auto; width:100%; position:relative;">
+      <div style="position:absolute; top:19px; left:60px; right:60px; height:2px; background:#262c36;"></div>
+      <div style="text-align:center; flex:1; position:relative;">
+        <div style="width:40px;height:40px;border-radius:50%;background:#6366F1;color:#fff;display:flex;align-items:center;justify-content:center;margin:0 auto 14px auto; font-weight:700;">1</div>
+        <div style="font-weight:700; font-size:18px;">Init</div>
+      </div>
+      <div style="text-align:center; flex:1; position:relative;">
+        <div style="width:40px;height:40px;border-radius:50%;background:#6366F1;color:#fff;display:flex;align-items:center;justify-content:center;margin:0 auto 14px auto; font-weight:700;">2</div>
+        <div style="font-weight:700; font-size:18px;">Define Agent</div>
+      </div>
+      <div style="text-align:center; flex:1; position:relative;">
+        <div style="width:40px;height:40px;border-radius:50%;background:#6366F1;color:#fff;display:flex;align-items:center;justify-content:center;margin:0 auto 14px auto; font-weight:700;">3</div>
+        <div style="font-weight:700; font-size:18px;">Add Tools</div>
+      </div>
+      <div style="text-align:center; flex:1; position:relative;">
+        <div style="width:40px;height:40px;border-radius:50%;background:#6366F1;color:#fff;display:flex;align-items:center;justify-content:center;margin:0 auto 14px auto; font-weight:700;">4</div>
+        <div style="font-weight:700; font-size:18px;">Run</div>
+      </div>
+    </div>
+
+    <blockquote style="text-align:center; max-width:1300px; margin:0 auto; font-size:42px; font-weight:700; line-height:1.4; letter-spacing:-0.5px;">
+      "从 <span class="grad-text">Init</span> 到可运行的 Agent，
+      只需要你熟悉的 TypeScript。"
+    </blockquote>
+
+    <div style="display:flex; justify-content:center; gap:56px; margin-top:64px;">
+      <div style="text-align:center;">
+        <div style="font-size:16px; letter-spacing:2px; color:#6366F1; font-weight:700; margin-bottom:10px;">进阶方向</div>
+        <div style="font-size:18px; color:#c9d1d9;">Workflow（工作流编排）</div>
+        <div style="font-size:18px; color:#c9d1d9;">RAG（知识库检索）</div>
+      </div>
+      <div style="width:1px; background:#262c36;"></div>
+      <div style="text-align:center;">
+        <div style="font-size:16px; letter-spacing:2px; color:#6366F1; font-weight:700; margin-bottom:10px;">资源</div>
+        <div class="mono" style="font-size:17px; color:#82AAFF;">mastra.ai/docs</div>
+        <div class="mono" style="font-size:17px; color:#82AAFF;">github.com/mastra-ai/mastra</div>
+      </div>
+    </div>
+  </div>
+  <div class="page-num">08 / 08</div>
+</section>
+
+</div>
+</body>
+</html>

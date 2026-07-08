@@ -1,5 +1,10 @@
 import type { FrontendSlidesInput } from "./outline-to-slides-mapper";
 
+/**
+ * @deprecated Use frontend-slides-agent-runner.ts. This file keeps the old
+ * Anthropic Messages API fallback path available while the Agent SDK path is
+ * validated in production-like environments.
+ */
 type AnthropicTextBlock = {
   type: "text";
   text: string;

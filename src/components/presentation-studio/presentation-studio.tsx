@@ -180,16 +180,16 @@ export default function PresentationStudio() {
   useEffect(() => {
     if (htmlGenerationStep?.data?.status !== "in-progress") return;
 
-    const generatedCharacters = htmlGenerationStep.data.generatedCharacters ?? 0;
+    const lastUpdatedAt = htmlGenerationStep.data.lastUpdatedAt ?? Date.now();
     const timeout = window.setTimeout(() => {
-      if (generatedCharacters === 0) {
+      if (Date.now() - lastUpdatedAt >= 240_000) {
         stop();
-        setHtmlWatchdogError("HTML generation is taking longer than expected and has not streamed visible output yet. Please retry, reduce selected slides, or switch to a faster HTML model.");
+        setHtmlWatchdogError("Generation has not reported progress for several minutes. Please retry, reduce selected slides, or switch to a faster HTML model.");
       }
     }, 240_000);
 
     return () => window.clearTimeout(timeout);
-  }, [htmlGenerationStep?.data?.generatedCharacters, htmlGenerationStep?.data?.status, stop]);
+  }, [htmlGenerationStep?.data?.lastUpdatedAt, htmlGenerationStep?.data?.status, stop]);
 
   const startGenerationFromBrief = useCallback((agentBrief: AgentBriefData) => {
     const nextBrief: PresentationBrief = {
@@ -330,6 +330,19 @@ export default function PresentationStudio() {
     setBrief(null);
   }, [clearError, handleGenerate]);
 
+  useEffect(() => {
+    if (!isOutlineDrawerOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsOutlineDrawerOpen(false);
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isOutlineDrawerOpen]);
+
   const markGenerationRequestQueued = useCallback((messageId: string) => {
     setChatMessages((current) => current.map((message) => (
       message.id === messageId && message.kind === "generation-request"
@@ -387,6 +400,17 @@ export default function PresentationStudio() {
       });
     }
 
+    if (phase === "outlining") {
+      messages.push({
+        id: "outline-progress-card",
+        role: "system",
+        kind: "progress",
+        message: outlineStep?.data?.message ?? "Drafting the presentation outline...",
+        progress: outlineStep?.data?.progress,
+        steps: outlineStep?.data?.steps,
+      });
+    }
+
     if (phase === "generating") {
       messages.push({
         id: "generation-progress-card",
@@ -394,6 +418,7 @@ export default function PresentationStudio() {
         kind: "progress",
         message: htmlGenerationStep?.data?.message ?? "Generating the HTML presentation...",
         progress: htmlGenerationStep?.data?.progress,
+        steps: htmlGenerationStep?.data?.steps,
       });
     }
 
@@ -408,7 +433,7 @@ export default function PresentationStudio() {
     }
 
     return messages;
-  }, [canApproveOutline, generateDisabledReason, generatedHtmlUrl, htmlGenerationStep?.data?.message, htmlGenerationStep?.data?.progress, outline.length, phase, selectedSlides.length, workflowError]);
+  }, [canApproveOutline, generateDisabledReason, generatedHtmlUrl, htmlGenerationStep?.data?.message, htmlGenerationStep?.data?.progress, htmlGenerationStep?.data?.steps, outline.length, outlineStep?.data?.message, outlineStep?.data?.progress, outlineStep?.data?.steps, phase, selectedSlides.length, workflowError]);
 
   const agentMessages = useMemo(() => [...chatMessages, ...systemMessages], [chatMessages, systemMessages]);
 
@@ -428,9 +453,18 @@ export default function PresentationStudio() {
       />
 
       {isOutlineDrawerOpen && outline.length > 0 ? (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/25 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Edit presentation outline">
-          <div className="flex h-full w-full max-w-2xl flex-col rounded-3xl border border-[var(--border-light)] bg-[var(--bg-card)] shadow-2xl">
-            <div className="flex items-center justify-between border-b border-[var(--border-light)] px-5 py-4">
+        <div
+          className="fixed inset-0 z-50 flex justify-end bg-black/25 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Edit presentation outline"
+          onClick={() => setIsOutlineDrawerOpen(false)}
+        >
+          <div
+            className="flex h-full w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-[var(--border-light)] bg-[var(--bg-card)] shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex shrink-0 items-center justify-between gap-4 border-b border-[var(--border-light)] bg-[var(--bg-secondary)] px-5 py-4">
               <div>
                 <h3 className="font-semibold text-[var(--text-primary)]">Edit outline</h3>
                 <p className="text-sm text-[var(--text-muted)]">Make slide-level changes, then return to the conversation.</p>
@@ -438,7 +472,7 @@ export default function PresentationStudio() {
               <button
                 type="button"
                 onClick={() => setIsOutlineDrawerOpen(false)}
-                className="rounded-xl border border-[var(--border-light)] bg-white p-2 text-[var(--text-muted)] transition hover:text-[var(--text-primary)]"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--border-light)] bg-white text-[var(--text-muted)] transition hover:text-[var(--text-primary)]"
                 aria-label="Close outline editor"
               >
                 <X className="h-5 w-5" />
@@ -464,7 +498,7 @@ export default function PresentationStudio() {
 
   return (
     <PresentationWorkspace
-      previewContent={<PresentationPreviewPane currentStep={previewStep} generatedHtml={generatedHtml} outline={outline} htmlGeneration={htmlGenerationStep?.data} />}
+      previewContent={<PresentationPreviewPane currentStep={previewStep} generatedHtml={generatedHtml} outline={outline} outlineGeneration={outlineStep?.data} htmlGeneration={htmlGenerationStep?.data} />}
       agentContent={agentContent}
       onStartOver={handleStartOver}
     />

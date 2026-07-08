@@ -44,7 +44,7 @@ export function deriveStudioPhase(input: StudioPhaseInput): StudioPhaseState {
     return { phase: "generating" };
   }
 
-  if (input.hasSuspenseOutline || (input.hasOutlineSlides && input.workflowStatus !== "submitted" && input.workflowStatus !== "streaming")) {
+  if ((input.hasSuspenseOutline && input.hasOutlineSlides) || (input.hasOutlineSlides && input.workflowStatus !== "submitted" && input.workflowStatus !== "streaming")) {
     return { phase: "reviewing" };
   }
 

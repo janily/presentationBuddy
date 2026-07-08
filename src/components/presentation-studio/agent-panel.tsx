@@ -7,7 +7,7 @@ import { getPhaseLabel, type StudioErrorSource, type StudioPhase } from "./use-s
 export type AgentMessage =
   | { id: string; role: "assistant" | "user"; kind?: "text"; content: string }
   | { id: string; role: "system"; kind: "outline-review"; slideCount: number; canGenerate: boolean; disabledReason?: string | null }
-  | { id: string; role: "system"; kind: "progress"; message: string; progress?: number }
+  | { id: string; role: "system"; kind: "progress"; message: string; progress?: number; steps?: Array<{ id: string; label: string; status: "pending" | "active" | "completed"; detail?: string }> }
   | { id: string; role: "system"; kind: "complete"; slideCount: number; htmlUrl?: string }
   | { id: string; role: "system"; kind: "error"; message: string; retryKind: StudioErrorSource }
   | { id: string; role: "system"; kind: "generation-request"; message: string; queued?: boolean };
@@ -119,6 +119,8 @@ function OutlineReviewCard({
 }
 
 function ProgressCard({ message }: { message: Extract<AgentMessage, { kind: "progress" }> }) {
+  const visibleSteps = message.steps ?? [];
+
   return (
     <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-card)] p-4">
       <div className="flex items-center gap-3">
@@ -132,6 +134,29 @@ function ProgressCard({ message }: { message: Extract<AgentMessage, { kind: "pro
           </div>
         </div>
       </div>
+      {visibleSteps.length > 0 ? (
+        <div className="mt-4 space-y-2">
+          {visibleSteps.map((step) => (
+            <div key={step.id} className="flex items-start gap-2 text-xs leading-5">
+              <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${
+                step.status === "completed"
+                  ? "bg-emerald-500"
+                  : step.status === "active"
+                    ? "animate-pulse bg-[var(--accent-terracotta)]"
+                    : "bg-[var(--border-medium)]"
+              }`} />
+              <div className="min-w-0">
+                <p className={step.status === "pending" ? "text-[var(--text-muted)]" : "font-medium text-[var(--text-secondary)]"}>
+                  {step.label}
+                </p>
+                {step.detail && step.status === "active" ? (
+                  <p className="truncate text-[var(--text-muted)]">{step.detail}</p>
+                ) : null}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
