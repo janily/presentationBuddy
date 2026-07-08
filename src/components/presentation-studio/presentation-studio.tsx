@@ -148,9 +148,9 @@ export default function PresentationStudio() {
     const timeout = window.setTimeout(() => {
       if (generatedCharacters === 0) {
         stop();
-        setHtmlWatchdogError("HTML generation did not receive any model output for 150 seconds. Please retry HTML generation or reduce the number of selected slides.");
+        setHtmlWatchdogError("HTML generation is taking longer than expected and has not streamed visible output yet. Please retry, reduce selected slides, or switch to a faster HTML model.");
       }
-    }, 150_000);
+    }, 240_000);
 
     return () => window.clearTimeout(timeout);
   }, [htmlGenerationStep?.data?.generatedCharacters, htmlGenerationStep?.data?.status, stop]);
@@ -315,7 +315,7 @@ export default function PresentationStudio() {
   }, [currentStep]);
 
   const agentContent = (
-    <div className="flex min-h-0 flex-1 flex-col gap-4">
+    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
       {workflowError && (
         <section className="rounded-2xl border border-red-200 bg-red-50 p-4 text-red-900 shadow-sm">
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-red-700">Generation issue</p>

@@ -71,7 +71,7 @@ export default function AgentPanel({
         </div>
       </div>
 
-      <div ref={scrollRef} className="min-h-72 flex-1 space-y-3 overflow-y-auto p-4">
+      <div ref={scrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
         {messages.map((message) => (
           <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
             <div className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-6 ${message.role === "user" ? "bg-[var(--accent-terracotta)] text-white" : "border border-[var(--border-light)] bg-[var(--bg-card)] text-[var(--text-secondary)]"}`}>
@@ -88,7 +88,7 @@ export default function AgentPanel({
         ) : null}
       </div>
 
-      <div className="space-y-4 border-t border-[var(--border-light)] p-4">
+      <div className="shrink-0 space-y-4 border-t border-[var(--border-light)] p-4">
         <div className="flex flex-wrap gap-2">
           {quickPrompts.map((prompt) => (
             <button
