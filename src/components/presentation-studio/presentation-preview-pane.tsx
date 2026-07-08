@@ -40,8 +40,8 @@ function EmptyPreview() {
 
 function OutlinePreview({ outline, isLoading }: { outline: SlideOutlineItem[]; isLoading: boolean }) {
   return (
-    <div className="h-full min-h-[620px] overflow-auto bg-[linear-gradient(135deg,#faf7f1_0%,#fff_60%,#f7efe5_100%)] p-6">
-      <div className="mx-auto max-w-5xl space-y-4">
+    <div className="h-full min-h-[calc(100vh-112px)] overflow-auto bg-[linear-gradient(135deg,#faf7f1_0%,#fff_60%,#f7efe5_100%)] p-6">
+      <div className="mx-auto max-w-5xl space-y-4 pb-8">
         <div className="rounded-3xl border border-[var(--border-light)] bg-white/85 p-6 shadow-sm backdrop-blur">
           <p className="text-sm font-medium uppercase tracking-[0.2em] text-[var(--accent-brass)]">Outline preview</p>
           <h2 className="mt-2 text-3xl font-semibold text-[var(--text-primary)]" style={{ fontFamily: "var(--font-fraunces), Georgia, serif" }}>
@@ -97,7 +97,7 @@ export default function PresentationPreviewPane({ step, currentStep, html, gener
 
   if (activeStep === "outlining" || activeStep === "review" || activeStep === "generating") {
     return (
-      <div className="relative">
+      <div className="relative h-full">
         <OutlinePreview outline={outline} isLoading={activeStep === "outlining"} />
         {activeStep === "generating" ? <GenerationProgress htmlGeneration={htmlGeneration} /> : null}
       </div>

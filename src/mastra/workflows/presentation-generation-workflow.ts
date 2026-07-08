@@ -21,8 +21,8 @@ type PresentationHtmlStepData = {
 // Free-tier reasoning models (e.g. tencent/hy3:free) can think for a long time
 // before emitting the first structured token, so idle timeouts must be generous.
 const OUTLINE_GENERATION_TIMEOUT_MS = 300_000;
-const HTML_GENERATION_TIMEOUT_MS = 300_000;
-const HTML_STREAM_IDLE_TIMEOUT_MS = 120_000;
+const HTML_GENERATION_TIMEOUT_MS = 360_000;
+const HTML_STREAM_IDLE_TIMEOUT_MS = 180_000;
 const OUTLINE_STREAM_IDLE_TIMEOUT_MS = 120_000;
 
 function stripHtmlCodeFence(html: string) {
@@ -65,10 +65,32 @@ function getTextDelta(chunk: unknown) {
     return "";
   }
 
-  const payload = (chunk as { payload?: { text?: unknown }; textDelta?: unknown }).payload;
-  const text = payload?.text ?? (chunk as { textDelta?: unknown }).textDelta;
+  const textChunk = chunk as {
+    text?: unknown;
+    delta?: unknown;
+    textDelta?: unknown;
+    payload?: { text?: unknown; delta?: unknown; textDelta?: unknown };
+  };
+  const text = textChunk.text
+    ?? textChunk.delta
+    ?? textChunk.textDelta
+    ?? textChunk.payload?.text
+    ?? textChunk.payload?.delta
+    ?? textChunk.payload?.textDelta;
 
   return typeof text === "string" ? text : "";
+}
+
+async function getCompletedStreamText(stream: { text?: Promise<string> }) {
+  if (!stream.text) return "";
+
+  return Promise.race([
+    stream.text,
+    timeoutAfter(
+      HTML_STREAM_IDLE_TIMEOUT_MS,
+      `HTML generation stream closed but text aggregation did not finish within ${Math.round(HTML_STREAM_IDLE_TIMEOUT_MS / 1000)} seconds`,
+    ),
+  ]);
 }
 
 export const presentationOutlineSuggestionStep = createStep({
@@ -276,6 +298,10 @@ const presentationHtmlGenerationStep = createStep({
     if (Date.now() - htmlStartedAt > HTML_GENERATION_TIMEOUT_MS) {
       await stream.fullStream.cancel().catch(() => undefined);
       throw new Error(`HTML generation timed out after ${Math.round(HTML_GENERATION_TIMEOUT_MS / 1000)} seconds`);
+    }
+
+    if (!html.trim()) {
+      html = await getCompletedStreamText(stream);
     }
 
     html = stripHtmlCodeFence(html);

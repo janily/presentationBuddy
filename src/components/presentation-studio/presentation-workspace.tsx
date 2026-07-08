@@ -24,12 +24,12 @@ export default function PresentationWorkspace({ previewContent, agentContent, on
         </div>
       </header>
 
-      <main className="mx-auto grid max-w-[1600px] gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_420px] xl:grid-cols-[minmax(0,1fr)_460px]">
+      <main className="mx-auto grid max-w-[1600px] items-start gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_420px] xl:grid-cols-[minmax(0,1fr)_460px]">
         <section className="relative min-h-[calc(100vh-112px)] overflow-hidden rounded-3xl border border-[var(--border-light)] bg-white shadow-lg">
           {previewContent}
         </section>
 
-        <aside className="flex min-h-[calc(100vh-112px)] flex-col gap-4 rounded-3xl border border-[var(--border-light)] bg-[var(--bg-card)] p-4 shadow-lg">
+        <aside className="flex max-h-[calc(100vh-112px)] min-h-[calc(100vh-112px)] flex-col gap-4 overflow-hidden rounded-3xl border border-[var(--border-light)] bg-[var(--bg-card)] p-4 shadow-lg lg:sticky lg:top-24">
           <div className="flex items-center gap-3 border-b border-[var(--border-light)] pb-4">
             <div className="rounded-2xl bg-[var(--accent-brass)]/10 p-3 text-[var(--accent-brass)]"><MessageCircle className="h-5 w-5" /></div>
             <div>
