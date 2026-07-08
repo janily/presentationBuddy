@@ -1,6 +1,8 @@
 import { createStep, createWorkflow } from "@mastra/core";
 import z from "zod";
 import { saveHtmlToFile } from "@/src/utils/save-html-to-file";
+import { invokeFrontendSlidesSkill, isFrontendSlidesConfigured } from "@/src/utils/frontend-slides-invoker";
+import { mapOutlineToFrontendSlides } from "@/src/utils/outline-to-slides-mapper";
 import { presentationInputSchema, presentationOutlineSchema } from "./presentation-generation-schemas";
 
 type PresentationOutlineStepData = {
@@ -26,6 +28,7 @@ const OUTLINE_GENERATION_TIMEOUT_MS = Math.floor(300_000 * TIMEOUT_MULTIPLIER);
 const HTML_GENERATION_TIMEOUT_MS = Math.floor(480_000 * TIMEOUT_MULTIPLIER);
 const HTML_STREAM_IDLE_TIMEOUT_MS = Math.floor(240_000 * TIMEOUT_MULTIPLIER);
 const OUTLINE_STREAM_IDLE_TIMEOUT_MS = Math.floor(180_000 * TIMEOUT_MULTIPLIER);
+const FRONTEND_SLIDES_TIMEOUT_MS = Math.floor(180_000 * TIMEOUT_MULTIPLIER);
 
 let didLogTimeoutConfiguration = false;
 
@@ -38,6 +41,7 @@ function logTimeoutConfiguration() {
     multiplier: TIMEOUT_MULTIPLIER,
     outlineGenerationTimeoutMs: OUTLINE_GENERATION_TIMEOUT_MS,
     htmlGenerationTimeoutMs: HTML_GENERATION_TIMEOUT_MS,
+    frontendSlidesTimeoutMs: FRONTEND_SLIDES_TIMEOUT_MS,
     outlineStreamIdleTimeoutMs: OUTLINE_STREAM_IDLE_TIMEOUT_MS,
     htmlStreamIdleTimeoutMs: HTML_STREAM_IDLE_TIMEOUT_MS,
   });
@@ -258,93 +262,138 @@ const presentationHtmlGenerationStep = createStep({
       } satisfies PresentationHtmlStepData,
     });
 
-    const generationAgent = mastra.getAgent("presentationHtmlGenerationAgent");
-    console.log("Presentation HTML generation: starting model stream", {
-      timestamp: new Date().toISOString(),
-      slideCount: inputData.outline.slides.length,
-      title: inputData.outline.title,
-      timeoutMs: HTML_GENERATION_TIMEOUT_MS,
-      idleTimeoutMs: HTML_STREAM_IDLE_TIMEOUT_MS,
-    });
-
-    const stream = await Promise.race([
-      generationAgent.stream([
-        {
-          role: "user",
-          content: `Generate a standalone HTML presentation from this approved outline and original request. Return only the complete HTML document, starting with <!doctype html> or <html>, and do not wrap it in Markdown fences:\n${JSON.stringify(
-            inputData,
-            null,
-            2,
-          )}`,
-        },
-      ]),
-      timeoutAfter(HTML_GENERATION_TIMEOUT_MS, `HTML generation did not start within ${Math.round(HTML_GENERATION_TIMEOUT_MS / 1000)} seconds`),
-    ]);
-
     let html = "";
-    let lastProgressWrite = 0;
+    const frontendSlidesInput = mapOutlineToFrontendSlides(inputData.outline, inputData.style);
 
-    writer.write({
-      type: "data-presentationHtml",
-      data: {
-        status: "in-progress",
-        phase: "html",
-        message: "Writing slide markup...",
-        progress: 30,
-      } satisfies PresentationHtmlStepData,
-    });
+    if (isFrontendSlidesConfigured()) {
+      writer.write({
+        type: "data-presentationHtml",
+        data: {
+          status: "in-progress",
+          phase: "html",
+          message: "Generating a polished presentation with frontend-slides...",
+          progress: 35,
+        } satisfies PresentationHtmlStepData,
+      });
 
-    const htmlStartedAt = Date.now();
-    const reader = stream.fullStream.getReader();
-
-    try {
-      while (Date.now() - htmlStartedAt <= HTML_GENERATION_TIMEOUT_MS) {
-        const { done, value } = await Promise.race([
-          reader.read(),
+      const frontendSlidesStartedAt = Date.now();
+      try {
+        const result = await Promise.race([
+          invokeFrontendSlidesSkill(frontendSlidesInput),
           timeoutAfter(
-            HTML_STREAM_IDLE_TIMEOUT_MS,
-            `HTML generation stream was idle for ${Math.round(HTML_STREAM_IDLE_TIMEOUT_MS / 1000)} seconds`,
+            FRONTEND_SLIDES_TIMEOUT_MS,
+            `frontend-slides generation timed out after ${Math.round(FRONTEND_SLIDES_TIMEOUT_MS / 1000)} seconds`,
           ),
         ]);
+        html = result.html;
 
-        if (done) break;
-
-        const textDelta = getTextDelta(value);
-        if (!textDelta) continue;
-
-        html += textDelta;
-
-        if (html.length - lastProgressWrite >= 800) {
-          lastProgressWrite = html.length;
-          console.log("Presentation HTML generation: received text", {
-            generatedCharacters: html.length,
-          });
-          writer.write({
-            type: "data-presentationHtml",
-            data: {
-              status: "in-progress",
-              phase: html.length > 4_000 ? "styles" : "html",
-              message: html.length > 4_000 ? "Applying layout and visual styling..." : "Writing slide markup...",
-              progress: Math.min(85, 30 + Math.floor(html.length / 250)),
-              generatedCharacters: html.length,
-            } satisfies PresentationHtmlStepData,
-          });
-        }
+        console.log("Presentation HTML generation: frontend-slides completed", {
+          timestamp: new Date().toISOString(),
+          durationMs: Date.now() - frontendSlidesStartedAt,
+          generatedCharacters: html.length,
+        });
+      } catch (error) {
+        console.warn("frontend-slides generation failed, falling back to legacy HTML agent:", {
+          message: error instanceof Error ? error.message : String(error),
+          error,
+        });
       }
-    } finally {
-      reader.releaseLock();
+    } else {
+      console.log("Presentation HTML generation: frontend-slides is not configured; using backup HTML agent");
     }
 
-    if (Date.now() - htmlStartedAt > HTML_GENERATION_TIMEOUT_MS) {
-      await stream.fullStream.cancel().catch(() => undefined);
-      throw new Error(`HTML generation timed out after ${Math.round(HTML_GENERATION_TIMEOUT_MS / 1000)} seconds`);
-    }
+    if (!html) {
 
-    if (!html.trim()) {
-      html = await getCompletedStreamText(stream);
-    }
+      writer.write({
+        type: "data-presentationHtml",
+        data: {
+          status: "in-progress",
+          phase: "html",
+          message: "Using backup HTML generator...",
+          progress: 40,
+        } satisfies PresentationHtmlStepData,
+      });
 
-    html = stripHtmlCodeFence(html);
+      const generationAgent = mastra.getAgent("presentationHtmlGenerationAgent");
+      console.log("Presentation HTML generation: starting backup model stream", {
+        timestamp: new Date().toISOString(),
+        slideCount: inputData.outline.slides.length,
+        title: inputData.outline.title,
+        timeoutMs: HTML_GENERATION_TIMEOUT_MS,
+        idleTimeoutMs: HTML_STREAM_IDLE_TIMEOUT_MS,
+      });
+
+      const stream = await Promise.race([
+        generationAgent.stream([
+          {
+            role: "user",
+            content: `Generate a standalone HTML presentation from this approved outline and original request. Return only the complete HTML document, starting with <!doctype html> or <html>, and do not wrap it in Markdown fences:\n${JSON.stringify(
+              inputData,
+              null,
+              2,
+            )}`,
+          },
+        ]),
+        timeoutAfter(HTML_GENERATION_TIMEOUT_MS, `HTML generation did not start within ${Math.round(HTML_GENERATION_TIMEOUT_MS / 1000)} seconds`),
+      ]);
+
+      let lastProgressWrite = 0;
+      const htmlStartedAt = Date.now();
+      const reader = stream.fullStream.getReader();
+
+      try {
+        while (Date.now() - htmlStartedAt <= HTML_GENERATION_TIMEOUT_MS) {
+          const { done, value } = await Promise.race([
+            reader.read(),
+            timeoutAfter(
+              HTML_STREAM_IDLE_TIMEOUT_MS,
+              `HTML generation stream was idle for ${Math.round(HTML_STREAM_IDLE_TIMEOUT_MS / 1000)} seconds`,
+            ),
+          ]);
+
+          if (done) break;
+
+          const textDelta = getTextDelta(value);
+          if (!textDelta) continue;
+
+          html += textDelta;
+
+          if (html.length - lastProgressWrite >= 800) {
+            lastProgressWrite = html.length;
+            console.log("Presentation HTML generation: received backup text", {
+              generatedCharacters: html.length,
+            });
+            writer.write({
+              type: "data-presentationHtml",
+              data: {
+                status: "in-progress",
+                phase: html.length > 4_000 ? "styles" : "html",
+                message: html.length > 4_000 ? "Applying layout and visual styling..." : "Writing slide markup...",
+                progress: Math.min(85, 40 + Math.floor(html.length / 250)),
+                generatedCharacters: html.length,
+              } satisfies PresentationHtmlStepData,
+            });
+          }
+        }
+      } finally {
+        reader.releaseLock();
+      }
+
+      if (Date.now() - htmlStartedAt > HTML_GENERATION_TIMEOUT_MS) {
+        await stream.fullStream.cancel().catch(() => undefined);
+        throw new Error(`HTML generation timed out after ${Math.round(HTML_GENERATION_TIMEOUT_MS / 1000)} seconds`);
+      }
+
+      if (!html.trim()) {
+        html = await getCompletedStreamText(stream);
+      }
+
+      console.log("Presentation HTML generation: backup model stream completed", {
+        timestamp: new Date().toISOString(),
+        durationMs: Date.now() - htmlStartedAt,
+        generatedCharacters: html.length,
+      });
+    }
 
     writer.write({
       type: "data-presentationHtml",
@@ -361,11 +410,7 @@ const presentationHtmlGenerationStep = createStep({
       throw new Error("HTML generation finished without returning any HTML content");
     }
 
-    console.log("Presentation HTML generation: model stream completed", {
-      timestamp: new Date().toISOString(),
-      durationMs: Date.now() - htmlStartedAt,
-      generatedCharacters: html.length,
-    });
+    html = stripHtmlCodeFence(html);
 
     const saveStartedAt = Date.now();
     const htmlUrl = await saveHtmlToFile(html, { prefix: "presentation-deck" });

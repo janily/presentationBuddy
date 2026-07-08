@@ -55,14 +55,28 @@ PRESENTATION_OUTLINE_PROVIDER=openrouter
 # Optional. Defaults to google/gemini-3-flash-preview.
 PRESENTATION_HTML_MODEL=google/gemini-3-flash-preview
 PRESENTATION_HTML_PROVIDER=openrouter
+
+# Optional. Enables the frontend-slides generation path before falling back to
+# the legacy Mastra HTML agent. Supports Anthropic-compatible /v1/messages
+# endpoints.
+ANTHROPIC_API_KEY=your-anthropic-compatible-api-key
+ANTHROPIC_BASE_URL=https://api.anthropic.com
+ANTHROPIC_MODEL=claude-3-5-sonnet-latest
+
+# Optional. Defaults to 16000.
+FRONTEND_SLIDES_MAX_TOKENS=16000
 ```
 
 Model values may be raw provider model IDs such as `google/gemini-3-flash-preview`. For backward compatibility, the helper also accepts `openrouter/`, `openai/`, `google/`, and `google-generative-ai/` prefixes and strips them before sending the model ID to the selected provider.
+
+The presentation workflow first tries the frontend-slides generator when `ANTHROPIC_API_KEY` is configured. If that request fails or times out, it logs the failure and automatically falls back to the existing `PRESENTATION_HTML_MODEL` agent so users can still generate a deck.
 
 ## Main directories and files
 
 - `src/app/api/analyze/route.ts`: Next.js API route that accepts presentation chat/workflow requests, validates user input, starts or resumes the presentation workflow, and streams workflow events back to the client.
 - `src/mastra/workflows/`: Mastra workflow definitions. The presentation workflow handles the brief → outline review → HTML generation sequence.
+- `src/utils/frontend-slides-invoker.ts`: Anthropic-compatible frontend-slides generator integration with HTML extraction.
+- `src/utils/outline-to-slides-mapper.ts`: Converts approved presentation outlines into structured frontend-slides input.
 - `src/components/presentation-studio/`: React components for the presentation creation UI, including the brief form, outline review panel, processing view, and HTML preview.
 
 ## Generated slide output
