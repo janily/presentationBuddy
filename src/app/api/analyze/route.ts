@@ -6,6 +6,8 @@ import { NextResponse } from "next/server";
 import z from "zod";
 import { formatValidationErrors, validatePresentationWorkflowRequest } from "./request-validation";
 
+export const maxDuration = 300;
+
 function validationErrorResponse(error: z.ZodError, action: "start" | "resume") {
   const fields = formatValidationErrors(error);
 

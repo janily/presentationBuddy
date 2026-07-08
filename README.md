@@ -55,19 +55,33 @@ PRESENTATION_OUTLINE_PROVIDER=openrouter
 # Optional. Defaults to google/gemini-3-flash-preview.
 PRESENTATION_HTML_MODEL=google/gemini-3-flash-preview
 PRESENTATION_HTML_PROVIDER=openrouter
+
+# Optional. Enables the frontend-slides generation path before falling back to
+# the legacy Mastra HTML agent. Supports Anthropic-compatible /v1/messages
+# endpoints.
+ANTHROPIC_API_KEY=your-anthropic-compatible-api-key
+ANTHROPIC_BASE_URL=https://api.anthropic.com
+ANTHROPIC_MODEL=claude-3-5-sonnet-latest
+
+# Optional. Defaults to 16000.
+FRONTEND_SLIDES_MAX_TOKENS=16000
 ```
 
 Model values may be raw provider model IDs such as `google/gemini-3-flash-preview`. For backward compatibility, the helper also accepts `openrouter/`, `openai/`, `google/`, and `google-generative-ai/` prefixes and strips them before sending the model ID to the selected provider.
+
+The presentation workflow first tries the frontend-slides generator when `ANTHROPIC_API_KEY` is configured. If that request fails or times out, it logs the failure and automatically falls back to the existing `PRESENTATION_HTML_MODEL` agent so users can still generate a deck.
 
 ## Main directories and files
 
 - `src/app/api/analyze/route.ts`: Next.js API route that accepts presentation chat/workflow requests, validates user input, starts or resumes the presentation workflow, and streams workflow events back to the client.
 - `src/mastra/workflows/`: Mastra workflow definitions. The presentation workflow handles the brief → outline review → HTML generation sequence.
+- `src/utils/frontend-slides-invoker.ts`: Anthropic-compatible frontend-slides generator integration with HTML extraction.
+- `src/utils/outline-to-slides-mapper.ts`: Converts approved presentation outlines into structured frontend-slides input.
 - `src/components/presentation-studio/`: React components for the presentation creation UI, including the brief form, outline review panel, processing view, and HTML preview.
 
 ## Generated slide output
 
-Generated HTML decks are written to:
+By default, generated HTML decks are written to:
 
 ```text
 public/generated-slides/
@@ -75,8 +89,19 @@ public/generated-slides/
 
 The returned deck URL is served from the public path, for example `/generated-slides/<file-name>.html`.
 
-## Current limitations
+Production deployments can override the output directory:
 
-- Generated presentation HTML is saved to the local `public/generated-slides/` directory.
-- The generated files are **not** stored in durable object storage. In production or serverless environments, local files may be lost across deploys, restarts, or instances.
-- For persistent production use, replace the local file writer with object storage such as S3, R2, GCS, or another durable asset store and return the stored asset URL.
+```bash
+# Recommended for Zeabur or other container platforms with a mounted volume.
+GENERATED_SLIDES_DIR=/data/generated-slides
+```
+
+When `GENERATED_SLIDES_DIR` is set, or when `VERCEL=1`, decks are served through the preview API because they are not under `public/`:
+
+```text
+/api/preview/<file-name>.html
+```
+
+For Zeabur, mount a persistent volume such as `/data`, then set `GENERATED_SLIDES_DIR=/data/generated-slides`. Without a volume, generated files can be lost after redeploys or restarts.
+
+For Vercel, the app writes generated decks to `/tmp/generated-slides` and exports `maxDuration = 300` on the analyze route. This is only suitable for short-lived previews; files in `/tmp` are not durable and may disappear after function restarts. For durable production history on serverless platforms, use object storage such as S3, R2, or GCS.

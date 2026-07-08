@@ -25,6 +25,6 @@ export const presentationOutlineSchema = z.object({
   title: z.string(),
   narrativeGoal: z.string(),
   sections: z.array(z.string()),
-  slides: z.array(slideOutlineSchema),
+  slides: z.array(slideOutlineSchema).min(1, "Outline must contain at least one slide"),
   designGuidance: z.array(z.string()),
 });

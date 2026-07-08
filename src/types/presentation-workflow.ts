@@ -33,6 +33,17 @@ export type AgentRequestData = {
 export type OutlineStepData = {
   status: "loading" | "streaming" | "completed";
   outline?: Partial<PresentationOutlineData>;
+  message?: string;
+  progress?: number;
+  lastUpdatedAt?: number;
+  steps?: OutlineProgressStep[];
+};
+
+export type OutlineProgressStep = {
+  id: "prepare" | "analyze" | "structure" | "detail" | "review";
+  label: string;
+  status: "pending" | "active" | "completed";
+  detail?: string;
 };
 
 export type HtmlGenerationStepData = {
@@ -41,8 +52,17 @@ export type HtmlGenerationStepData = {
   message?: string;
   progress?: number;
   generatedCharacters?: number;
+  lastUpdatedAt?: number;
+  steps?: HtmlGenerationProgressStep[];
   htmlUrl?: string;
   html?: string;
+};
+
+export type HtmlGenerationProgressStep = {
+  id: "prepare" | "load-skill" | "compose" | "validate" | "fallback" | "save";
+  label: string;
+  status: "pending" | "active" | "completed";
+  detail?: string;
 };
 
 export type MyUIMessage = UIMessage<
