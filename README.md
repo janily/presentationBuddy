@@ -67,7 +67,7 @@ Model values may be raw provider model IDs such as `google/gemini-3-flash-previe
 
 ## Generated slide output
 
-Generated HTML decks are written to:
+By default, generated HTML decks are written to:
 
 ```text
 public/generated-slides/
@@ -75,8 +75,19 @@ public/generated-slides/
 
 The returned deck URL is served from the public path, for example `/generated-slides/<file-name>.html`.
 
-## Current limitations
+Production deployments can override the output directory:
 
-- Generated presentation HTML is saved to the local `public/generated-slides/` directory.
-- The generated files are **not** stored in durable object storage. In production or serverless environments, local files may be lost across deploys, restarts, or instances.
-- For persistent production use, replace the local file writer with object storage such as S3, R2, GCS, or another durable asset store and return the stored asset URL.
+```bash
+# Recommended for Zeabur or other container platforms with a mounted volume.
+GENERATED_SLIDES_DIR=/data/generated-slides
+```
+
+When `GENERATED_SLIDES_DIR` is set, or when `VERCEL=1`, decks are served through the preview API because they are not under `public/`:
+
+```text
+/api/preview/<file-name>.html
+```
+
+For Zeabur, mount a persistent volume such as `/data`, then set `GENERATED_SLIDES_DIR=/data/generated-slides`. Without a volume, generated files can be lost after redeploys or restarts.
+
+For Vercel, the app writes generated decks to `/tmp/generated-slides` and exports `maxDuration = 300` on the analyze route. This is only suitable for short-lived previews; files in `/tmp` are not durable and may disappear after function restarts. For durable production history on serverless platforms, use object storage such as S3, R2, or GCS.

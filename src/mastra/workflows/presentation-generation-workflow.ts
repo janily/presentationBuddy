@@ -20,10 +20,28 @@ type PresentationHtmlStepData = {
 
 // Free-tier reasoning models (e.g. tencent/hy3:free) can think for a long time
 // before emitting the first structured token, so idle timeouts must be generous.
-const OUTLINE_GENERATION_TIMEOUT_MS = 300_000;
-const HTML_GENERATION_TIMEOUT_MS = 360_000;
-const HTML_STREAM_IDLE_TIMEOUT_MS = 180_000;
-const OUTLINE_STREAM_IDLE_TIMEOUT_MS = 120_000;
+const isProduction = process.env.NODE_ENV === "production";
+const TIMEOUT_MULTIPLIER = isProduction ? 1.5 : 1;
+const OUTLINE_GENERATION_TIMEOUT_MS = Math.floor(300_000 * TIMEOUT_MULTIPLIER);
+const HTML_GENERATION_TIMEOUT_MS = Math.floor(480_000 * TIMEOUT_MULTIPLIER);
+const HTML_STREAM_IDLE_TIMEOUT_MS = Math.floor(240_000 * TIMEOUT_MULTIPLIER);
+const OUTLINE_STREAM_IDLE_TIMEOUT_MS = Math.floor(180_000 * TIMEOUT_MULTIPLIER);
+
+let didLogTimeoutConfiguration = false;
+
+function logTimeoutConfiguration() {
+  if (didLogTimeoutConfiguration) return;
+  didLogTimeoutConfiguration = true;
+
+  console.log("Presentation workflow timeout configuration:", {
+    environment: isProduction ? "production" : "development",
+    multiplier: TIMEOUT_MULTIPLIER,
+    outlineGenerationTimeoutMs: OUTLINE_GENERATION_TIMEOUT_MS,
+    htmlGenerationTimeoutMs: HTML_GENERATION_TIMEOUT_MS,
+    outlineStreamIdleTimeoutMs: OUTLINE_STREAM_IDLE_TIMEOUT_MS,
+    htmlStreamIdleTimeoutMs: HTML_STREAM_IDLE_TIMEOUT_MS,
+  });
+}
 
 function stripHtmlCodeFence(html: string) {
   return html
@@ -107,6 +125,8 @@ export const presentationOutlineSuggestionStep = createStep({
     approvedOutline: presentationOutlineSchema,
   }),
   execute: async ({ inputData, suspend, resumeData, mastra, writer }) => {
+    logTimeoutConfiguration();
+
     const { approvedOutline } = resumeData ?? {};
 
     if (approvedOutline) {
@@ -124,6 +144,13 @@ export const presentationOutlineSuggestionStep = createStep({
     });
 
     const outlineAgent = mastra.getAgent("presentationOutlineSuggestionAgent");
+    console.log("Presentation outline generation: starting", {
+      timestamp: new Date().toISOString(),
+      topic: inputData.topic,
+      pageCount: inputData.pageCount,
+      timeoutMs: OUTLINE_GENERATION_TIMEOUT_MS,
+    });
+
     const stream = await outlineAgent.stream(
       [
         {
@@ -181,6 +208,12 @@ export const presentationOutlineSuggestionStep = createStep({
       ),
     ]);
 
+    console.log("Presentation outline generation: completed", {
+      timestamp: new Date().toISOString(),
+      durationMs: Date.now() - outlineStartedAt,
+      slideCount: outline.slides.length,
+    });
+
     writer.write({
       type: "data-presentationOutline",
       data: {
@@ -211,6 +244,10 @@ const presentationHtmlGenerationStep = createStep({
     htmlUrl: z.string().optional(),
   }),
   execute: async ({ inputData, mastra, writer }) => {
+    logTimeoutConfiguration();
+
+    const stepStartedAt = Date.now();
+
     writer.write({
       type: "data-presentationHtml",
       data: {
@@ -223,8 +260,11 @@ const presentationHtmlGenerationStep = createStep({
 
     const generationAgent = mastra.getAgent("presentationHtmlGenerationAgent");
     console.log("Presentation HTML generation: starting model stream", {
+      timestamp: new Date().toISOString(),
       slideCount: inputData.outline.slides.length,
       title: inputData.outline.title,
+      timeoutMs: HTML_GENERATION_TIMEOUT_MS,
+      idleTimeoutMs: HTML_STREAM_IDLE_TIMEOUT_MS,
     });
 
     const stream = await Promise.race([
@@ -322,10 +362,19 @@ const presentationHtmlGenerationStep = createStep({
     }
 
     console.log("Presentation HTML generation: model stream completed", {
+      timestamp: new Date().toISOString(),
+      durationMs: Date.now() - htmlStartedAt,
       generatedCharacters: html.length,
     });
 
+    const saveStartedAt = Date.now();
     const htmlUrl = await saveHtmlToFile(html, { prefix: "presentation-deck" });
+    console.log("Presentation HTML generation: saved preview document", {
+      timestamp: new Date().toISOString(),
+      durationMs: Date.now() - saveStartedAt,
+      totalDurationMs: Date.now() - stepStartedAt,
+      htmlUrl,
+    });
 
     writer.write({
       type: "data-presentationHtml",
