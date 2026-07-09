@@ -2,9 +2,11 @@ import { createStep, createWorkflow } from "@mastra/core";
 import z from "zod";
 import { saveHtmlToFile } from "@/src/utils/save-html-to-file";
 import {
+  assertFrontendSlidesDocument,
   assertFrontendSlidesComplete,
   invokeFrontendSlidesAgent,
   isFrontendSlidesAgentConfigured,
+  isFrontendSlidesRequired,
 } from "@/src/utils/frontend-slides-agent-runner";
 import { mapOutlineToFrontendSlides } from "@/src/utils/outline-to-slides-mapper";
 import { presentationInputSchema, presentationOutlineSchema } from "./presentation-generation-schemas";
@@ -46,6 +48,8 @@ type PresentationHtmlStepData = {
   phase?: "structure" | "html" | "styles" | "bundle";
   message?: string;
   progress?: number;
+  generator?: "frontend-slides" | "backup";
+  fallbackReason?: string;
   generatedCharacters?: number;
   lastUpdatedAt?: number;
   steps?: HtmlGenerationProgressStep[];
@@ -518,6 +522,8 @@ const presentationHtmlGenerationStep = createStep({
   outputSchema: z.object({
     html: z.string(),
     htmlUrl: z.string().optional(),
+    generator: z.enum(["frontend-slides", "backup"]).optional(),
+    fallbackReason: z.string().optional(),
   }),
   execute: async ({ inputData, mastra, writer }) => {
     logTimeoutConfiguration();
@@ -557,6 +563,8 @@ const presentationHtmlGenerationStep = createStep({
     });
 
     let html = "";
+    let generator: PresentationHtmlStepData["generator"] | undefined;
+    let fallbackReason: string | undefined;
     const frontendSlidesInput = mapOutlineToFrontendSlides(inputData.outline, inputData.style);
 
     if (isFrontendSlidesAgentConfigured()) {
@@ -591,9 +599,11 @@ const presentationHtmlGenerationStep = createStep({
           phase: "styles",
           message: "Checking slide count and document completeness...",
           progress: 84,
+          generator: "frontend-slides",
           generatedCharacters: html.length,
         });
-        assertFrontendSlidesComplete(html, frontendSlidesInput.slides.length);
+        assertFrontendSlidesDocument(html, frontendSlidesInput.slides.length);
+        generator = "frontend-slides";
 
         console.log("Presentation HTML generation: frontend-slides agent completed", {
           timestamp: new Date().toISOString(),
@@ -602,24 +612,38 @@ const presentationHtmlGenerationStep = createStep({
           expectedSlideCount: frontendSlidesInput.slides.length,
         });
       } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
         html = "";
+        fallbackReason = message;
         console.warn("frontend-slides agent generation failed, falling back to backup HTML agent:", {
-          message: error instanceof Error ? error.message : String(error),
+          message,
           error,
         });
+
+        if (isFrontendSlidesRequired()) {
+          throw new Error(`frontend-slides generation is required but failed: ${message}`);
+        }
       }
     } else {
       console.log("Presentation HTML generation: frontend-slides agent is not configured; using backup HTML agent");
+      fallbackReason = "ANTHROPIC_API_KEY is not configured";
+
+      if (isFrontendSlidesRequired()) {
+        throw new Error("frontend-slides generation is required but ANTHROPIC_API_KEY is not configured");
+      }
     }
 
     if (!html) {
       includeFallbackStep = true;
+      generator = "backup";
 
       writeHtmlProgress({
         activeStepId: "fallback",
         phase: "html",
         message: "Switching to backup HTML generator...",
         progress: 40,
+        generator,
+        fallbackReason,
       });
 
       const generationAgent = mastra.getAgent("presentationHtmlGenerationAgent");
@@ -678,6 +702,8 @@ const presentationHtmlGenerationStep = createStep({
                 phase: html.length > 4_000 ? "styles" : "html",
                 message: html.length > 4_000 ? "Applying layout and visual styling..." : "Writing slide markup...",
                 progress: Math.min(85, 40 + Math.floor(html.length / 250)),
+                generator,
+                fallbackReason,
                 generatedCharacters: html.length,
                 lastUpdatedAt: Date.now(),
                 steps: updateHtmlProgressSteps("compose", `${Math.max(1, Math.round(html.length / 1024))} KB generated`, {
@@ -712,6 +738,8 @@ const presentationHtmlGenerationStep = createStep({
       phase: "bundle",
       message: "Saving preview document...",
       progress: 92,
+      generator,
+      fallbackReason,
       generatedCharacters: html.length,
     });
 
@@ -725,9 +753,15 @@ const presentationHtmlGenerationStep = createStep({
       phase: "styles",
       message: "Checking slide count and document completeness...",
       progress: 88,
+      generator,
+      fallbackReason,
       generatedCharacters: html.length,
     });
-    assertFrontendSlidesComplete(html, frontendSlidesInput.slides.length);
+    if (generator === "frontend-slides") {
+      assertFrontendSlidesDocument(html, frontendSlidesInput.slides.length);
+    } else {
+      assertFrontendSlidesComplete(html, frontendSlidesInput.slides.length);
+    }
 
     const saveStartedAt = Date.now();
     const htmlUrl = await saveHtmlToFile(html, { prefix: "presentation-deck" });
@@ -745,6 +779,8 @@ const presentationHtmlGenerationStep = createStep({
         phase: "bundle",
         message: "HTML presentation ready.",
         progress: 100,
+        generator,
+        fallbackReason,
         generatedCharacters: html.length,
         lastUpdatedAt: Date.now(),
         steps: updateHtmlProgressSteps("save", "Preview document saved.", {
@@ -759,6 +795,8 @@ const presentationHtmlGenerationStep = createStep({
     return {
       html,
       htmlUrl,
+      generator,
+      fallbackReason,
     };
   },
 });
@@ -769,6 +807,8 @@ export const presentationGenerationWorkflow = createWorkflow({
   outputSchema: z.object({
     html: z.string(),
     htmlUrl: z.string().optional(),
+    generator: z.enum(["frontend-slides", "backup"]).optional(),
+    fallbackReason: z.string().optional(),
   }),
   description:
     "A workflow that drafts a presentation outline for approval, then generates a standalone HTML presentation.",

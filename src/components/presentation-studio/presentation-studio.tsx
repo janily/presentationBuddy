@@ -346,11 +346,23 @@ export default function PresentationStudio() {
         kind: "complete",
         slideCount: selectedSlides.length || outline.length,
         htmlUrl: generatedHtmlUrl,
+        generator: htmlGenerationStep?.data?.generator,
+        fallbackReason: htmlGenerationStep?.data?.fallbackReason,
       });
     }
 
     return messages;
-  }, [canApproveOutline, generateDisabledReason, generatedHtmlUrl, outline.length, phase, selectedSlides.length, workflowError]);
+  }, [
+    canApproveOutline,
+    generateDisabledReason,
+    generatedHtmlUrl,
+    htmlGenerationStep?.data?.fallbackReason,
+    htmlGenerationStep?.data?.generator,
+    outline.length,
+    phase,
+    selectedSlides.length,
+    workflowError,
+  ]);
 
   const agentMessages = useMemo(() => [...chatMessages, ...systemMessages], [chatMessages, systemMessages]);
 

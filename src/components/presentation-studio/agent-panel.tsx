@@ -7,7 +7,7 @@ import type { StudioErrorSource, StudioPhase } from "./use-studio-phase";
 export type AgentMessage =
   | { id: string; role: "assistant" | "user"; kind?: "text"; content: string }
   | { id: string; role: "system"; kind: "outline-review"; slideCount: number; canGenerate: boolean; disabledReason?: string | null }
-  | { id: string; role: "system"; kind: "complete"; slideCount: number; htmlUrl?: string }
+  | { id: string; role: "system"; kind: "complete"; slideCount: number; htmlUrl?: string; generator?: "frontend-slides" | "backup"; fallbackReason?: string }
   | { id: string; role: "system"; kind: "error"; message: string; retryKind: StudioErrorSource }
   | { id: string; role: "system"; kind: "generation-request"; message: string; queued?: boolean };
 

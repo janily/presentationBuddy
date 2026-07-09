@@ -51,6 +51,8 @@ export type HtmlGenerationStepData = {
   phase?: "structure" | "html" | "styles" | "bundle";
   message?: string;
   progress?: number;
+  generator?: "frontend-slides" | "backup";
+  fallbackReason?: string;
   generatedCharacters?: number;
   lastUpdatedAt?: number;
   steps?: HtmlGenerationProgressStep[];

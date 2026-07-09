@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Mastra AI Agent 框架入门：TypeScript 原生智能体开发指南</title>
+<style>
+  :root{
+    --blue:#0052FF;
+    --blue-light:#E8F0FF;
+    --blue-soft:#5C8CFF;
+    --gray:#8E959F;
+    --gray-bg:#F8F9FA;
+    --card-bg:#FFFFFF;
+    --ink:#1A1D20;
+    --line:#E3E6EA;
+    --code-bg:#F1F3F5;
+    --green:#12B76A;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{background:#000;overflow:hidden;height:100%;}
+  body{font-family:"Inter","PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink);}
+  #viewport{
+    position:absolute;top:50%;left:50%;
+    width:1920px;height:1080px;
+    transform-origin:center center;
+  }
+  .slide{
+    position:absolute;top:0;left:0;
+    width:1920px;height:1080px;
+    background:#FFFFFF;
+    display:none;
+    overflow:hidden;
+  }
+  .slide.active{display:block;}
+  .pad{padding:80px 100px;height:100%;}
+  .kicker{
+    display:inline-flex;align-items:center;gap:12px;
+    font-size:20px;font-weight:600;color:var(--blue);
+    letter-spacing:2px;text-transform:uppercase;
+  }
+  .kicker::before{content:"";width:28px;height:3px;background:var(--blue);border-radius:2px;}
+  h1{font-size:56px;font-weight:800;line-height:1.25;color:var(--ink);}
+  h2{font-size:44px;font-weight:800;color:var(--ink);}
+  .sub{font-size:24px;color:var(--gray);font-weight:400;margin-top:16px;line-height:1.6;}
+  .divider{width:64px;height:6px;background:var(--blue);border-radius:4px;margin:28px 0;}
+  .card{
+    background:var(--card-bg);
+    border-radius:12px;
+    box-shadow:0 8px 30px rgba(20,30,60,0.06);
+    border:1px solid var(--line);
+  }
+  .badge{
+    display:inline-flex;align-items:center;justify-content:center;
+    width:44px;height:44px;border-radius:10px;
+    background:var(--blue-light);color:var(--blue);font-weight:800;font-size:20px;
+    flex-shrink:0;
+  }
+  .footer-num{
+    position:absolute;bottom:40px;right:60px;
+    font-size:16px;color:var(--gray);font-weight:500;
+  }
+  .footer-brand{
+    position:absolute;bottom:40px;left:100px;
+    font-size:16px;color:var(--gray);font-weight:600;letter-spacing:1px;
+  }
+  code, .mono{font-family:"SF Mono","Fira Code","Consolas",monospace;}
+  ul.points{list-style:none;margin-top:20px;}
+  ul.points li{
+    position:relative;padding-left:32px;margin-bottom:22px;
+    font-size:22px;line-height:1.6;color:var(--ink);
+  }
+  ul.points li::before{
+    content:"";position:absolute;left:0;top:10px;
+    width:10px;height:10px;border-radius:50%;background:var(--blue);
+  }
+  .glow{
+    position:absolute;border-radius:50%;
+    background:radial-gradient(circle, rgba(0,82,255,0.16) 0%, rgba(0,82,255,0.0) 70%);
+  }
+
+  /* ---------- Slide 1 ---------- */
+  #s1{background:linear-gradient(180deg,#FFFFFF 0%, #F8F9FA 100%);}
+  #s1 .glow{width:900px;height:900px;top:-300px;right:-250px;}
+  #s1 .content{padding:140px 120px;height:100%;display:flex;flex-direction:column;justify-content:center;position:relative;z-index:2;}
+  #s1 h1{font-size:80px;max-width:1200px;}
+  #s1 .tagline{font-size:26px;color:var(--gray);margin-top:24px;max-width:900px;line-height:1.6;}
+  #s1 .logo-row{display:flex;align-items:center;gap:16px;margin-bottom:36px;}
+  #s1 .logo-mark{width:52px;height:52px;border-radius:12px;background:var(--blue);position:relative;}
+  #s1 .logo-mark::after{content:"";position:absolute;inset:14px;border-radius:4px;background:#fff;}
+  #s1 .logo-text{font-size:22px;font-weight:800;letter-spacing:1px;color:var(--ink);}
+  #s1 .pillars{display:flex;gap:60px;margin-top:60px;}
+  #s1 .pillar{font-size:20px;color:var(--gray);border-left:3px solid var(--blue);padding-left:16px;}
+  #s1 .pillar b{display:block;color:var(--ink);font-size:22px;margin-bottom:4px;}
+
+  /* ---------- Slide 2 ---------- */
+  #s2 .grid{display:grid;grid-template-columns:1fr 1fr;gap:48px;margin-top:40px;height:680px;}
+  .compare-card{border-radius:16px;padding:44px;display:flex;flex-direction:column;gap:20px;}
+  .compare-card.old{background:var(--gray-bg);border:1px solid var(--line);}
+  .compare-card.new{background:#fff;border:2px solid var(--blue);box-shadow:0 20px 50px rgba(0,82,255,0.12);}
+  .compare-title{font-size:26px;font-weight:800;display:flex;align-items:center;gap:12px;}
+  .row{display:flex;align-items:flex-start;gap:14px;font-size:20px;line-height:1.6;color:var(--ink);}
+  .icon-x{width:26px;height:26px;flex-shrink:0;border-radius:50%;background:#FEECEC;color:#E5484D;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;}
+  .icon-ok{width:26px;height:26px;flex-shrink:0;border-radius:50%;background:var(--blue-light);color:var(--blue);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;}
+
+  /* ---------- Slide 3 ---------- */
+  #s3{background:var(--gray-bg);}
+  #s3 .top{padding-top:80px;padding-left:100px;padding-right:100px;}
+  #s3 .cols{display:grid;grid-template-columns:1fr 1fr 1fr;gap:40px;padding:0 100px;margin-top:50px;}
+  #s3 .pcard{background:#fff;padding:44px 34px;text-align:left;}
+  #s3 .icon-box{width:64px;height:64px;border-radius:12px;background:var(--blue-light);display:flex;align-items:center;justify-content:center;margin-bottom:28px;}
+  #s3 .pcard h3{font-size:28px;font-weight:800;margin-bottom:14px;}
+  #s3 .pcard p{font-size:19px;color:var(--gray);line-height:1.7;}
+
+  /* ---------- Slide 4/5 code layout ---------- */
+  .split{display:grid;grid-template-columns:0.9fr 1.1fr;gap:56px;margin-top:36px;height:700px;}
+  .code-panel{
+    background:var(--code-bg);border-radius:12px;padding:36px 40px;
+    font-size:19px;line-height:2;overflow:auto;box-shadow:inset 0 0 0 1px var(--line);
+  }
+  .code-panel .kw{color:var(--blue);font-weight:600;}
+  .code-panel .str{color:#0B8457;}
+  .code-panel .com{color:var(--gray);}
+  .code-panel .fn{color:#7C3AED;}
+
+  /* ---------- Slide 6 DAG ---------- */
+  .dag-wrap{margin-top:60px;height:600px;position:relative;}
+  .dag-node{
+    position:absolute;background:#fff;border-radius:12px;box-shadow:0 8px 24px rgba(20,30,60,0.08);
+    border:1px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;
+    font-size:19px;font-weight:700;color:var(--ink);
+  }
+  .dag-node.llm{border-color:var(--blue);background:var(--blue-light);color:var(--blue);}
+  .dag-node small{font-weight:400;color:var(--gray);font-size:14px;margin-top:4px;}
+
+  /* ---------- Slide 7 steps ---------- */
+  .steps{display:flex;gap:40px;margin-top:50px;}
+  .step{flex:1;background:#fff;border:1px solid var(--line);border-radius:12px;padding:36px 30px;box-shadow:0 8px 24px rgba(20,30,60,0.05);}
+  .step-num{width:48px;height:48px;border-radius:50%;background:var(--blue);color:#fff;font-weight:800;font-size:22px;display:flex;align-items:center;justify-content:center;margin-bottom:22px;}
+  .step h4{font-size:22px;margin-bottom:10px;}
+  .step p{font-size:17px;color:var(--gray);line-height:1.6;}
+  .tree{margin-top:44px;background:var(--gray-bg);border-radius:12px;padding:30px 36px;font-size:17px;line-height:1.9;}
+
+  /* ---------- Slide 8 editor ---------- */
+  .editor{background:#FBFBFB;border-radius:14px;border:1px solid var(--line);box-shadow:0 20px 60px rgba(20,30,60,0.08);overflow:hidden;height:700px;margin-top:30px;display:flex;flex-direction:column;}
+  .editor-bar{height:44px;background:#F1F3F5;display:flex;align-items:center;padding:0 18px;gap:10px;}
+  .dot{width:12px;height:12px;border-radius:50%;}
+  .editor-body{flex:1;display:grid;grid-template-columns:1fr 420px;}
+  .editor-code{padding:30px 36px;font-size:18px;line-height:1.9;overflow:auto;}
+  .output-panel{background:var(--gray-bg);padding:30px;display:flex;flex-direction:column;justify-content:flex-end;}
+  .bubble{background:#fff;border-radius:12px;border:1px solid var(--line);padding:22px;box-shadow:0 8px 24px rgba(20,30,60,0.08);font-size:16px;line-height:1.7;}
+
+  /* ---------- Slide 9 studio ---------- */
+  .studio{background:var(--gray-bg);border-radius:16px;padding:44px;margin-top:36px;height:700px;box-shadow:0 20px 60px rgba(20,30,60,0.06);}
+  .studio-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:30px;}
+  .studio-header span{font-size:18px;color:var(--gray);font-weight:600;}
+  .trace-row{display:flex;align-items:center;gap:20px;background:#fff;border-radius:10px;padding:18px 24px;margin-bottom:16px;border:1px solid var(--line);}
+  .trace-bar{height:10px;border-radius:6px;background:var(--blue);}
+  .trace-label{width:220px;font-size:16px;font-weight:700;color:var(--ink);flex-shrink:0;}
+  .trace-track{flex:1;height:10px;background:#EDEFF2;border-radius:6px;position:relative;overflow:hidden;}
+  .trace-time{width:90px;text-align:right;font-size:15px;color:var(--gray);flex-shrink:0;}
+
+  /* ---------- Slide 10 ---------- */
+  #s10{background:linear-gradient(180deg,#FFFFFF 0%,#F8F9FA 100%);}
+  #s10 .center{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 160px;}
+  #s10 .quote{font-size:30px;color:var(--gray);font-weight:500;margin-bottom:20px;}
+  #s10 .slogan{font-size:64px;font-weight:800;color:var(--ink);line-height:1.3;}
+  #s10 .slogan .accent{color:var(--blue);font-weight:900;}
+  #s10 .links{display:flex;gap:36px;margin-top:60px;}
+  #s10 .link-card{width:280px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:30px 26px;box-shadow:0 8px 24px rgba(20,30,60,0.06);text-align:left;}
+  #s10 .link-card b{display:block;font-size:19px;margin-bottom:6px;}
+  #s10 .link-card span{font-size:15px;color:var(--gray);}
+
+  .nav-controls{
+    position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+    display:flex;gap:14px;z-index:99;background:rgba(255,255,255,0.9);
+    padding:10px 18px;border-radius:30px;box-shadow:0 4px 20px rgba(0,0,0,0.15);
+    font-family:sans-serif;
+  }
+  .nav-controls button{
+    border:none;background:var(--blue);color:#fff;width:36px;height:36px;border-radius:50%;
+    font-size:16px;cursor:pointer;
+  }
+  .nav-controls span{font-size:14px;color:#555;align-self:center;min-width:60px;text-align:center;}
+</style>
+</head>
+<body>
+<div id="viewport">
+
+  <!-- Slide 1 -->
+  <section class="slide active" id="s1">
+    <div class="glow"></div>
+    <div class="content">
+      <div class="logo-row"><div class="logo-mark"></div><div class="logo-text">MASTRA</div></div>
+      <span class="kicker">TypeScript-Native AI Framework</span>
+      <h1 style="margin-top:20px;">Mastra：TypeScript 原生的<br>AI Agent 开发框架</h1>
+      <div class="divider"></div>
+      <p class="tagline">专为 JS/TS 生态量身定制，摆脱 Python 框架移植的繁琐开销，以 Agents、Tools 与 Workflows 构建现代化智能体架构。</p>
+      <div class="pillars">
+        <div class="pillar"><b>Agents</b>动态决策核心</div>
+        <div class="pillar"><b>Tools</b>类型安全触角</div>
+        <div class="pillar"><b>Workflows</b>确定性执行图</div>
+      </div>
+    </div>
+    <div class="footer-brand">MASTRA · TS-NATIVE AGENT FRAMEWORK</div>
+    <div class="footer-num">01 / 10</div>
+  </section>
+
+  <!-- Slide 2 -->
+  <section class="slide" id="s2">
+    <div class="pad">
+      <span class="kicker">Why Mastra</span>
+      <h2 style="margin-top:14px;">为什么是 Mastra？打破 Python 框架的生态垄断</h2>
+      <div class="grid">
+        <div class="compare-card old">
+          <div class="compare-title" style="color:#B42318;">传统 Python-First 框架</div>
+          <div class="row"><span class="icon-x">✕</span>Node.js 环境下冷启动缓慢，桥接层臃肿</div>
+          <div class="row"><span class="icon-x">✕</span>缺乏自然直观的类型支持，IDE 提示形同虚设</div>
+          <div class="row"><span class="icon-x">✕</span>与前端现有工具链（React / Next.js）脱节，需额外维护中转服务</div>
+          <div class="row"><span class="icon-x">✕</span>运行时依赖庞杂，打包体积与部署成本高</div>
+        </div>
+        <div class="compare-card new">
+          <div class="compare-title" style="color:var(--blue);">Mastra · TS 原生方案</div>
+          <div class="row"><span class="icon-ok">✓</span>100% 纯正 TypeScript 类型推导，端到端类型安全</div>
+          <div class="row"><span class="icon-ok">✓</span>完美契合前端现有工具链，可直接嵌入 React / Next.js 项目</div>
+          <div class="row"><span class="icon-ok">✓</span>底层性能优化，更低运行时延迟与极佳打包体积</div>
+          <div class="row"><span class="icon-ok">✓</span>轻量级、开箱即用，一套技术栈直达生产</div>
+        </div>
+      </div>
+    </div>
+    <div class="footer-brand">MASTRA</div>
+    <div class="footer-num">02 / 10</div>
+  </section>
+
+  <!-- Slide 3 -->
+  <section class="slide" id="s3">
+    <div class="top">
+      <span class="kicker">Core Architecture</span>
+      <h2 style="margin-top:14px;">Mastra 核心基石：三位一体的架构设计</h2>
+    </div>
+    <div class="cols">
+      <div class="pcard card">
+        <div class="icon-box">
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#0052FF" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.5-7 8-7s8 3 8 7"/></svg>
+        </div>
+        <h3>Agents 智能体</h3>
+        <p>搭载 LLM 的动态决策核心，自主思考、规划并驱动工具链完成开放式任务。</p>
+      </div>
+      <div class="pcard card">
+        <div class="icon-box">
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#0052FF" stroke-width="1.6"><path d="M14 3l7 7-3 3-7-7 3-3z"/><path d="M3 21l6-2 8-8-4-4-8 8-2 6z"/></svg>
+        </div>
+        <h3>Tools 业务工具</h3>
+        <p>类型安全的函数集合，是智能体触达数据库、API 与真实物理世界的触角。</p>
+      </div>
+      <div class="pcard card">
+        <div class="icon-box">
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#0052FF" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>
+        </div>
+        <h3>Workflows 工作流</h3>
+        <p>以有向无环图（DAG）精准锁定复杂业务的确定性执行边界，稳定可控。</p>
+      </div>
+    </div>
+    <div class="footer-brand">MASTRA</div>
+    <div class="footer-num">03 / 10</div>
+  </section>
+
+  <!-- Slide 4 -->
+  <section class="slide" id="s4">
+    <div class="pad">
+      <span class="kicker">Primitives 1</span>
+      <h2 style="margin-top:14px;">Agents —— 动态决策与心脑机制</h2>
+      <div class="split">
+        <div>
+          <ul class="points">
+            <li>基于 ReAct（推理-行动）循环，LLM 自行决定执行路径，直至得出最终答案</li>
+            <li>支持 System Prompts、记忆组件（Memory System）与结构化输出（Structured Output）深度集成</li>
+            <li>无缝接入 OpenAI、Anthropic、DeepSeek 等主流闭源与开源大模型</li>
+          </ul>
+        </div>
+        <div class="code-panel mono">
+<span class="com">// 声明一个天气助手 Agent</span><br>
+<span class="kw">import</span> { Agent } <span class="kw">from</span> <span class="str">"@mastra/core"</span>;<br><br>
+<span class="kw">export const</span> weatherAgent = <span class="kw">new</span> <span class="fn">Agent</span>({<br>
+&nbsp;&nbsp;name: <span class="str">"weather-agent"</span>,<br>
+&nbsp;&nbsp;instructions: <span class="str">"你是一名天气助手"</span>,<br>
+&nbsp;&nbsp;model: openai(<span class="str">"gpt-4o-mini"</span>),<br>
+&nbsp;&nbsp;tools: { weatherTool },<br>
+&nbsp;&nbsp;memory: <span class="kw">new</span> <span class="fn">Memory</span>(),<br>
+});
+        </div>
+      </div>
+    </div>
+    <div class="footer-brand">MASTRA</div>
+    <div class="footer-num">04 / 10</div>
+  </section>
+
+  <!-- Slide 5 -->
+  <section class="slide" id="s5">
+    <div class="pad">
+      <span class="kicker">Primitives 2</span>
+      <h2 style="margin-top:14px;">Tools —— Zod 驱动的强类型工具</h2>
+      <div class="split">
+        <div class="code-panel mono">
+<span class="kw">import</span> { createTool } <span class="kw">from</span> <span class="str">"@mastra/core"</span>;<br>
+<span class="kw">import</span> { z } <span class="kw">from</span> <span class="str">"zod"</span>;<br><br>
+<span class="kw">export const</span> weatherTool = <span class="fn">createTool</span>({<br>
+&nbsp;&nbsp;id: <span class="str">"get-weather"</span>,<br>
+&nbsp;&nbsp;inputSchema: z.<span class="fn">object</span>({<br>
+&nbsp;&nbsp;&nbsp;&nbsp;city: <span style="color:#0052FF;">z.string()</span>,<br>
+&nbsp;&nbsp;}),<br>
+&nbsp;&nbsp;outputSchema: z.<span class="fn">object</span>({<br>
+&nbsp;&nbsp;&nbsp;&nbsp;tempC: z.number(),<br>
+&nbsp;&nbsp;}),<br>
+&nbsp;&nbsp;execute: <span class="kw">async</span> ({ city }) =&gt; fetchWeather(city),<br>
+});
+        </div>
+        <div>
+          <ul class="points">
+            <li>使用 createTool API 定义工具，借助 Zod 完美声明强类型输入 / 输出 Schema</li>
+            <li>自动生成符合大模型标准的工具描述，告别手工拼凑 Prompt 格式</li>
+            <li>完美兼容 MCP（Model Context Protocol），轻松连接企业现有数据接口</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="footer-brand">MASTRA</div>
+    <div class="footer-num">05 / 10</div>
+  </section>
+
+  <!-- Slide 6 -->
+  <section class="slide" id="s6">
+    <div class="pad">
+      <span class="kicker">Primitives 3</span>
+      <h2 style="margin-top:14px;">Workflows —— 确定性的业务工作流</h2>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:56px;margin-top:16px;">
+        <ul class="points" style="margin-top:30px;">
+          <li>并非所有流程都需要让 LLM 自行发挥，支付结算、核心审核需要 100% 确定性控制</li>
+          <li>支持分支判断（Branching）、并行步骤（Parallel）与集合遍历（Foreach）</li>
+          <li>混合模式：在特定步骤中嵌入 Agent 推理，实现『确定性骨架 + 灵活性肌肉』</li>
+        </ul>
+        <div class="dag-wrap">
+          <svg width="100%" height="100%" viewBox="0 0 720 560" style="position:absolute;">
+            <line x1="120" y1="90" x2="360" y2="220" stroke="#0052FF" stroke-width="2"/>
+            <line x1="120" y1="90" x2="120" y2="220" stroke="#0052FF" stroke-width="2"/>
+            <line x1="120" y1="270" x2="360" y2="400" stroke="#0052FF" stroke-width="2"/>
+            <line x1="360" y1="270" x2="360" y2="400" stroke="#0052FF" stroke-width="2"/>
+          </svg>
+          <div class="dag-node" style="width:170px;height:64px;top:20px;left:35px;">Step A<small>接单请求</small></div>
+          <div class="dag-node" style="width:170px;height:64px;top:210px;left:35px;">Step B<small>库存校验</small></div>
+          <div class="dag-node llm" style="width:170px;height:64px;top:210px;left:275px;">Step C<small>Agent 推理</small></div>
+          <div class="dag-node" style="width:170px;height:64px;top:400px;left:150px;">Step D<small>结果汇总</small></div>
+        </div>
+      </div>
+    </div>
+    <div class="footer-brand">MASTRA</div>
+    <div class="footer-num">06 / 10</div>
+  </section>
+
+  <!-- Slide 7 -->
+  <section class="slide" id="s7">
+    <div class="pad">
+      <span class="kicker">Quick Start</span>
+      <h2 style="margin-top:14px;">快速上手：5 分钟初始化你的 Mastra 项目</h2>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <h4>单行命令启动</h4>
+          <p class="mono" style="background:var(--code-bg);padding:10px 12px;border-radius:8px;display:inline-block;">npm create mastra@latest</p>
+          <p style="margin-top:10px;">自动化创建完整模板项目，零配置起步。</p>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <h4>标准工程结构</h4>
+          <p>开箱即用的目录划分，agents / tools / workflows 各司其职，结构清晰。</p>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <h4>配置并上线</h4>
+          <p>一键式环境变量配置 API Key，立即通过 Node.js 或前端路由对外提供服务。</p>
+        </div>
+      </div>
+      <div class="tree mono">
+project-root/<br>
+└── src/mastra/<br>
+&nbsp;&nbsp;&nbsp;&nbsp;├── agents/&nbsp;&nbsp;&nbsp;&nbsp;<span class="com">// 智能体定义</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;├── tools/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="com">// 强类型工具</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;├── workflows/&nbsp;&nbsp;<span class="com">// 确定性流程</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;└── index.ts
+      </div>
+    </div>
+    <div class="footer-brand">MASTRA</div>
+    <div class="footer-num">07 / 10</div>
+  </section>
+
+  <!-- Slide 8 -->
+  <section class="slide" id="s8">
+    <div class="pad">
+      <span class="kicker">Hands-on</span>
+      <h2 style="margin-top:14px;">实战代码：编写并运行你的第一个 AI 智能体</h2>
+      <div class="editor">
+        <div class="editor-bar">
+          <div class="dot" style="background:#FF5F57;"></div>
+          <div class="dot" style="background:#FEBC2E;"></div>
+          <div class="dot" style="background:#28C840;"></div>
+          <span style="margin-left:12px;font-size:14px;color:var(--gray);">weather-agent.ts</span>
+        </div>
+        <div class="editor-body">
+          <div class="editor-code mono">
+<span class="kw">import</span> { z } <span class="kw">from</span> <span class="str">"zod"</span>;<br>
+<span class="kw">import</span> { createTool, Agent } <span class="kw">from</span> <span class="str">"@mastra/core"</span>;<br><br>
+<span class="com">// 1. 定义强类型天气工具</span><br>
+<span class="kw">const</span> weatherTool = <span class="fn">createTool</span>({<br>
+&nbsp;&nbsp;id: <span class="str">"get-weather"</span>,<br>
+&nbsp;&nbsp;inputSchema: z.object({ city: z.string() }),<br>
+&nbsp;&nbsp;outputSchema: z.object({ tempC: z.number() }),<br>
+&nbsp;&nbsp;execute: <span class="kw">async</span> ({ city }) =&gt; fetchWeather(city),<br>
+});<br><br>
+<span class="com">// 2. 创建 Weather Agent 并注入工具</span><br>
+<span class="kw">const</span> weatherAgent = <span class="kw">new</span> <span class="fn">Agent</span>({<br>
+&nbsp;&nbsp;name: <span class="str">"weather-agent"</span>,<br>
+&nbsp;&nbsp;instructions: <span class="str">"你是本地天气播报员"</span>,<br>
+&nbsp;&nbsp;model: openai(<span class="str">"gpt-4o-mini"</span>),<br>
+&nbsp;&nbsp;tools: { weatherTool },<br>
+});<br><br>
+<span class="com">// 3. 直接运行</span><br>
+<span class="kw">const</span> res = <span class="kw">await</span> weatherAgent.<span class="fn">generate</span>(<span class="str">"上海今天天气如何？"</span>);<br>
+console.log(res.text);
+          </div>
+          <div class="output-panel">
+            <div class="bubble">
+              <b style="color:#0052FF;">Output</b>
+              <div class="mono" style="margin-top:10px;color:var(--ink);">
+                { "city": "上海", "tempC": 27, "text": "上海今天多云，27°C，体感舒适。" }
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="footer-brand">MASTRA</div>
+    <div class="footer-num">08 / 10</div>
+  </section>
+
+  <!-- Slide 9 -->
+  <section class="slide" id="s9">
+    <div class="pad">
+      <span class="kicker">Observability</span>
+      <h2 style="margin-top:14px;">Mastra Studio：可视化调试与全链路可观测性</h2>
+      <div class="studio">
+        <div class="studio-header">
+          <b style="font-size:22px;">Local Dev Server · Trace Timeline</b>
+          <span>Run #482 · 完成于 1.2s</span>
+        </div>
+        <div class="trace-row">
+          <div class="trace-label">Agent Reasoning</div>
+          <div class="trace-track"><div class="trace-bar" style="width:65%;background:#0052FF;"></div></div>
+          <div class="trace-time">620ms</div>
+        </div>
+        <div class="trace-row">
+          <div class="trace-label">Tool: get-weather</div>
+          <div class="trace-track"><div class="trace-bar" style="width:30%;background:#5C8CFF;"></div></div>
+          <div class="trace-time">280ms</div>
+        </div>
+        <div class="trace-row">
+          <div class="trace-label">Token 消耗</div>
+          <div class="trace-track"><div class="trace-bar" style="width:45%;background:#12B76A;"></div></div>
+          <div class="trace-time">412 tok</div>
+        </div>
+        <div class="trace-row">
+          <div class="trace-label">Evals 评分</div>
+          <div class="trace-track"><div class="trace-bar" style="width:92%;background:#12B76A;"></div></div>
+          <div class="trace-time">0.92</div>
+        </div>
+        <p style="margin-top:26px;font-size:18px;color:var(--gray);line-height:1.7;">
+          内置 Local Dev Server 一键开启可视化 Chat 交互面板；毫秒级 Trace 追踪全面复盘 Token 消耗、Tool 延迟与 Workflow 流转；集成 Evals 评测，确保迭代不产生输出退化。
+        </p>
+      </div>
+    </div>
+    <div class="footer-brand">MASTRA</div>
+    <div class="footer-num">09 / 10</div>
+  </section>
+
+  <!-- Slide 10 -->
+  <section class="slide" id="s10">
+    <div class="center">
+      <div class="quote">重塑 AI 开发：属于前端工程师的智能体时代</div>
+      <div class="slogan">Build Agents<br><span class="accent">the TypeScript Way.</span></div>
+      <p style="margin-top:28px;font-size:20px;color:var(--gray);max-width:900px;">
+        Mastra 将 AI 的研发主导权交还给 TypeScript 与全栈工程师，即刻起步，构建轻量、极速且百分之百可控的下一代 AI 原生应用。
+      </p>
+      <div class="links">
+        <div class="link-card"><b>官方文档</b><span>mastra.ai/docs</span></div>
+        <div class="link-card"><b>GitHub 仓库</b><span>github.com/mastra-ai/mastra</span></div>
+        <div class="link-card"><b>官方教程</b><span>mastra.ai/guides</span></div>
+      </div>
+    </div>
+    <div class="footer-brand">MASTRA</div>
+    <div class="footer-num">10 / 10</div>
+  </section>
+
+</div>
+
+<div class="nav-controls">
+  <button id="prevBtn">‹</button>
+  <span id="counter">1 / 10</span>
+  <button id="nextBtn">›</button>
+</div>
+
+<script>
+  var slides = document.querySelectorAll('.slide');
+  var total = slides.length;
+  var current = 0;
+
+  function showSlide(i){
+    current = (i + total) % total;
+    slides.forEach(function(s, idx){ s.classList.toggle('active', idx === current); });
+    document.getElementById('counter').textContent = (current+1) + ' / ' + total;
+  }
+
+  document.getElementById('nextBtn').addEventListener('click', function(){ showSlide(current+1); });
+  document.getElementById('prevBtn').addEventListener('click', function(){ showSlide(current-1); });
+
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'ArrowRight' || e.key === 'PageDown'){ showSlide(current+1); }
+    if(e.key === 'ArrowLeft' || e.key === 'PageUp'){ showSlide(current-1); }
+  });
+
+  function scaleStage(){
+    var vw = window.innerWidth, vh = window.innerHeight;
+    var scale = Math.min(vw/1920, vh/1080);
+    var viewport = document.getElementById('viewport');
+    viewport.style.transform = 'translate(-50%, -50%) scale(' + scale + ')';
+  }
+  window.addEventListener('resize', scaleStage);
+  scaleStage();
+  showSlide(0);
+</script>
+</body>
+</html>
