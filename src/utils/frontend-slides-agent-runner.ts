@@ -60,6 +60,212 @@ Requirements:
 - Do not return Markdown fences, commentary, or instructions.`;
 }
 
+export type FrontendSlidesTurnResult =
+  | { kind: "question"; sessionId: string; runId: string; assistantMessage: string }
+  | { kind: "done"; sessionId: string; runId: string; html: string };
+
+type FrontendSlidesBrief = {
+  topic: string;
+  audience?: string;
+  pageCount?: number;
+  style?: string;
+  requirements?: string;
+};
+
+export function buildFrontendSlidesInteractivePrompt(brief: FrontendSlidesBrief, outputPath: string) {
+  const details = [
+    `Topic: ${brief.topic}`,
+    brief.audience ? `Audience: ${brief.audience}` : null,
+    brief.pageCount ? `Approximate slide count: ${brief.pageCount}` : null,
+    brief.style ? `Requested style: ${brief.style}` : null,
+    brief.requirements ? `Additional requirements: ${brief.requirements}` : null,
+  ].filter(Boolean).join("\n");
+
+  return `You are running inside a chat product's presentation-building assistant. This is an interactive, multi-turn session.
+
+Follow the frontend-slides skill's discovery process (Phase 0/1): ask the user your clarifying questions directly in your response text as plain conversational text (do NOT use interactive prompt/tool UIs; the product's chat UI will show your message and the user's typed reply will arrive as your next turn). Only ask what you still need — some information is already provided below.
+
+Known so far:
+${details || "(nothing yet, this is the user's first message)"}
+
+Once you have enough information and have gone through the skill's phases (including style discovery/preview if applicable), write the complete final standalone HTML presentation to exactly this path: ${outputPath}. It must start with <!doctype html> or <html>, follow the frontend-slides fixed 1920x1080 stage rules, and embed all CSS/JS. After writing the file, reply with a brief confirmation only — you do not need to repeat the HTML in your text reply once it is saved to that path.`;
+}
+
+export async function startOrContinueFrontendSlidesSession(params: {
+  sessionId?: string;
+  runId?: string;
+  userMessage: string;
+  brief?: FrontendSlidesBrief;
+  onProgress?: (message: string) => void;
+}): Promise<FrontendSlidesTurnResult> {
+  if (!isFrontendSlidesAgentConfigured()) {
+    throw new Error("ANTHROPIC_API_KEY is required to invoke frontend-slides agent");
+  }
+
+  const runId = params.runId ?? randomUUID();
+  const relativeOutputPath = path.posix.join(".frontend-slides-runs", runId, "deck.html");
+  const absoluteOutputPath = path.join(process.cwd(), ".frontend-slides-runs", runId, "deck.html");
+  await mkdir(path.dirname(absoluteOutputPath), { recursive: true });
+
+  const maxAttempts = Number(process.env.FRONTEND_SLIDES_AGENT_MAX_RETRIES || 2) + 1;
+  let sessionId = params.sessionId;
+  let isFirstTurnOfSession = !params.sessionId;
+  let resultText = "";
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const isResumedAfterDrop = attempt > 1 && !isFirstTurnOfSession;
+    const prompt = isFirstTurnOfSession
+      ? buildFrontendSlidesInteractivePrompt(params.brief ?? { topic: params.userMessage }, relativeOutputPath)
+      : isResumedAfterDrop
+        ? "(the previous connection dropped mid-response; please continue from where you left off)"
+        : params.userMessage;
+
+    if (attempt > 1) {
+      params.onProgress?.("Connection dropped, retrying...");
+    } else {
+      params.onProgress?.(isFirstTurnOfSession ? "Loading presentation design instructions..." : "Thinking about your reply...");
+    }
+
+    const agentQuery = query({
+      prompt,
+      options: {
+        cwd: process.cwd(),
+        skills: ["frontend-slides"],
+        tools: ["Read", "Write", "Edit", "Glob", "Grep"],
+        permissionMode: "bypassPermissions",
+        allowDangerouslySkipPermissions: true,
+        resume: sessionId,
+        maxTurns: Number(process.env.FRONTEND_SLIDES_AGENT_MAX_TURNS || 20),
+        model: process.env.FRONTEND_SLIDES_MODEL || process.env.ANTHROPIC_MODEL,
+        env: {
+          ...process.env,
+          CLAUDE_AGENT_SDK_CLIENT_APP: "presentation-buddy/frontend-slides",
+        },
+        stderr: (data: string) => {
+          if (process.env.FRONTEND_SLIDES_AGENT_DEBUG === "true") {
+            console.warn("frontend-slides agent stderr:", data);
+          }
+        },
+      },
+    });
+
+    if (isFirstTurnOfSession) {
+      await assertFrontendSlidesSkillAvailable(agentQuery);
+    }
+
+    try {
+      for await (const message of agentQuery) {
+        const messageSessionId = (message as { session_id?: string }).session_id;
+        if (messageSessionId) sessionId = messageSessionId;
+
+        emitTurnProgress(message, params.onProgress);
+
+        if (message.type === "result" && message.subtype === "success") {
+          resultText = message.result;
+        }
+      }
+
+      lastError = undefined;
+      break;
+    } catch (error) {
+      lastError = error;
+
+      if (!isRetryableConnectionError(error) || attempt >= maxAttempts) {
+        throw error;
+      }
+
+      // The underlying transport dropped mid-stream. If we already captured a
+      // session id from earlier messages in this same turn, resume it on the
+      // retry instead of re-submitting the original prompt (which the server
+      // may have already partially processed).
+      isFirstTurnOfSession = false;
+      console.warn("frontend-slides agent connection dropped mid-response; retrying:", {
+        attempt,
+        sessionId,
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  if (lastError) {
+    throw lastError;
+  }
+
+  if (!sessionId) {
+    throw new Error("frontend-slides agent did not report a session id");
+  }
+
+  let html: string | null = null;
+  try {
+    const fileHtml = await readGeneratedHtmlFile(absoluteOutputPath);
+    if (fileHtml) {
+      assertFrontendSlidesDocument(fileHtml, 1);
+      html = fileHtml;
+    }
+  } catch {
+    html = null;
+  }
+
+  if (html) {
+    if (process.env.FRONTEND_SLIDES_KEEP_RUN_FILES !== "true") {
+      await rm(path.dirname(absoluteOutputPath), { recursive: true, force: true }).catch(() => undefined);
+    }
+    return { kind: "done", sessionId, runId, html };
+  }
+
+  if (!resultText.trim()) {
+    throw new Error("frontend-slides agent did not return a reply");
+  }
+
+  return { kind: "question", sessionId, runId, assistantMessage: resultText };
+}
+
+// Translate raw SDK stream messages into short, human-friendly progress lines so
+// the UI can show live activity instead of a silent multi-minute wait.
+function emitTurnProgress(message: unknown, onProgress?: (message: string) => void) {
+  if (!onProgress || !message || typeof message !== "object") return;
+
+  const typed = message as {
+    type?: string;
+    subtype?: string;
+    message?: { content?: Array<{ type?: string; text?: string; name?: string; input?: { file_path?: string } }> };
+  };
+
+  if (typed.type === "assistant" && Array.isArray(typed.message?.content)) {
+    for (const block of typed.message.content) {
+      if (block.type === "text" && block.text?.trim()) {
+        onProgress(block.text.trim().slice(0, 120));
+      } else if (block.type === "tool_use") {
+        onProgress(describeToolUse(block.name, block.input?.file_path));
+      }
+    }
+  }
+}
+
+function describeToolUse(name?: string, filePath?: string) {
+  switch (name) {
+    case "Read":
+      return filePath?.endsWith(".css") || filePath?.endsWith(".md")
+        ? "正在读取设计规范..."
+        : "正在读取参考资料...";
+    case "Write":
+      return "正在写入演示文稿 HTML...";
+    case "Edit":
+      return "正在调整演示文稿内容...";
+    case "Glob":
+    case "Grep":
+      return "正在检索项目资源...";
+    default:
+      return "正在处理...";
+  }
+}
+
+function isRetryableConnectionError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return /connection closed mid-response|econnreset|socket hang up|network error|fetch failed/i.test(message);
+}
+
 export async function invokeFrontendSlidesAgent(
   input: FrontendSlidesInput,
   options: InvokeFrontendSlidesAgentOptions = {},

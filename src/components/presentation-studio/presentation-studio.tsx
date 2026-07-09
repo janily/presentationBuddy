@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePresentationWorkflow } from "@/src/hooks/use-presentation-workflow";
-import type { PresentationOutlineData } from "@/src/types/presentation-workflow";
+import type { HtmlGenerationStepData, PresentationOutlineData } from "@/src/types/presentation-workflow";
 import AgentPanel, { type AgentMessage } from "./agent-panel";
 import PresentationPreviewPane from "./presentation-preview-pane";
 import PresentationWorkspace from "./presentation-workspace";
@@ -24,7 +24,32 @@ type AgentChatResponse = {
   readyToGenerate?: boolean;
   brief?: AgentBriefData | null;
   error?: string;
+  frontendSlidesSessionId?: string;
+  frontendSlidesRunId?: string;
+  done?: boolean;
+  html?: string;
+  htmlUrl?: string;
+  generator?: "frontend-slides" | "backup";
+  fallbackReason?: string;
 };
+
+// One line of the /api/agent-chat NDJSON stream. Mirrors the server-side
+// AgentChatStreamEvent type in src/app/api/agent-chat/route.ts.
+type AgentChatStreamEvent =
+  | { type: "progress"; message: string }
+  | { type: "result"; payload: AgentChatResponse }
+  | { type: "error"; error: string };
+
+function parseStreamLine(line: string): AgentChatStreamEvent | null {
+  const trimmed = line.trim();
+  if (!trimmed) return null;
+
+  try {
+    return JSON.parse(trimmed) as AgentChatStreamEvent;
+  } catch {
+    return null;
+  }
+}
 
 const getErrorMessage = (error: Error | undefined, fallback: string) => {
   if (!error?.message) return fallback;
@@ -89,6 +114,9 @@ export default function PresentationStudio() {
   const [chatMessages, setChatMessages] = useState<AgentMessage[]>([]);
   const [isAgentReplying, setIsAgentReplying] = useState(false);
   const [queuedGenerationMessage, setQueuedGenerationMessage] = useState<string | null>(null);
+  const [frontendSlidesSession, setFrontendSlidesSession] = useState<{ sessionId?: string; runId?: string }>({});
+  const [interactiveResult, setInteractiveResult] = useState<HtmlGenerationStepData | null>(null);
+  const [agentProgressMessage, setAgentProgressMessage] = useState<string | null>(null);
 
   const workflowOutline = useMemo(() => {
     return outlineStep?.data?.outline ?? suspenseData?.outline ?? null;
@@ -108,8 +136,10 @@ export default function PresentationStudio() {
   }, [baseOutline, workflowOutline]);
 
   const selectedSlides = useMemo(() => outline.filter((item) => item.selected), [outline]);
-  const generatedHtml = htmlGenerationStep?.data?.html ?? "";
-  const generatedHtmlUrl = htmlGenerationStep?.data?.htmlUrl;
+  const activeHtmlGenerationStepData = interactiveResult ?? htmlGenerationStep?.data;
+  const generatedHtml = activeHtmlGenerationStepData?.html ?? "";
+  const generatedHtmlUrl = activeHtmlGenerationStepData?.htmlUrl;
+
 
   const workflowError = useMemo((): { kind: StudioErrorSource; message: string } | null => {
     if (htmlWatchdogError) {
@@ -153,11 +183,11 @@ export default function PresentationStudio() {
     workflowErrorSource: workflowError?.kind,
     workflowErrorMessage: workflowError?.message,
     hasGeneratedHtml: Boolean(generatedHtml),
-    htmlGeneration: htmlGenerationStep?.data,
+    htmlGeneration: activeHtmlGenerationStepData,
     hasSuspenseOutline: Boolean(suspenseData?.outline),
     hasOutlineSlides: outline.length > 0,
     workflowStatus: status,
-  }), [generatedHtml, htmlGenerationStep?.data, outline.length, status, suspenseData?.outline, workflowError]);
+  }), [activeHtmlGenerationStepData, generatedHtml, outline.length, status, suspenseData?.outline, workflowError]);
 
   const phase = phaseState.phase;
   const previewStep = toPreviewStep(phase);
@@ -200,23 +230,68 @@ export default function PresentationStudio() {
     });
   }, [brief, resetWorkflow, sendAgentRequest]);
 
-  const sendToAgentChat = useCallback(async (history: AgentMessage[], hasGeneratedDeck: boolean) => {
+  const sendToAgentChat = useCallback(async (
+    history: AgentMessage[],
+    hasGeneratedDeck: boolean,
+    onProgress: (message: string) => void,
+  ) => {
     const response = await fetch("/api/agent-chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         messages: textHistory(history),
         hasGeneratedDeck,
+        frontendSlidesSessionId: frontendSlidesSession.sessionId,
+        frontendSlidesRunId: frontendSlidesSession.runId,
       }),
     });
-    const data = await response.json().catch(() => ({})) as AgentChatResponse;
 
-    if (!response.ok || !data.reply) {
+    if (!response.ok || !response.body) {
+      const data = await response.json().catch(() => ({})) as AgentChatResponse;
       throw new Error(data.error || `Agent chat failed (HTTP ${response.status})`);
     }
 
-    return data;
-  }, []);
+    // The response is NDJSON: one JSON object per line. "progress" lines can
+    // arrive any number of times before the single terminal "result"/"error"
+    // line closes the stream, so the UI can show live activity instead of a
+    // silent multi-minute wait.
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let result: AgentChatResponse | null = null;
+    let streamError: string | null = null;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+
+      for (const line of lines) {
+        const event = parseStreamLine(line);
+        if (!event) continue;
+
+        if (event.type === "progress") {
+          onProgress(event.message);
+        } else if (event.type === "result") {
+          result = event.payload;
+        } else if (event.type === "error") {
+          streamError = event.error;
+        }
+      }
+    }
+
+    const trailingEvent = parseStreamLine(buffer);
+    if (trailingEvent?.type === "result") result = trailingEvent.payload;
+    if (trailingEvent?.type === "error") streamError = trailingEvent.error;
+
+    if (streamError) throw new Error(streamError);
+    if (!result?.reply) throw new Error("Agent chat stream ended without a result");
+
+    return result;
+  }, [frontendSlidesSession.runId, frontendSlidesSession.sessionId]);
 
   const handleAgentSend = useCallback(async (message: string, options: { force?: boolean } = {}) => {
     const userMessage: AgentMessage = { id: makeId(), role: "user", kind: "text", content: message };
@@ -235,13 +310,27 @@ export default function PresentationStudio() {
     setHtmlWatchdogError(null);
     setChatMessages(history);
     setIsAgentReplying(true);
+    setAgentProgressMessage(null);
 
     try {
-      const data = await sendToAgentChat(history, Boolean(generatedHtml));
+      const data = await sendToAgentChat(history, Boolean(generatedHtml), setAgentProgressMessage);
 
       setChatMessages((current) => [...current, { id: makeId(), role: "assistant", kind: "text", content: data.reply! }]);
 
-      if (data.readyToGenerate && data.brief) {
+      if (data.frontendSlidesSessionId || data.frontendSlidesRunId) {
+        setFrontendSlidesSession({ sessionId: data.frontendSlidesSessionId, runId: data.frontendSlidesRunId });
+      }
+
+      if (data.done && data.html) {
+        setInteractiveResult({
+          status: "completed",
+          html: data.html,
+          htmlUrl: data.htmlUrl,
+          generator: data.generator,
+          fallbackReason: data.fallbackReason,
+          lastUpdatedAt: Date.now(),
+        });
+      } else if (data.readyToGenerate && data.brief) {
         startGenerationFromBrief(data.brief);
       }
     } catch (error) {
@@ -252,6 +341,7 @@ export default function PresentationStudio() {
       ]);
     } finally {
       setIsAgentReplying(false);
+      setAgentProgressMessage(null);
     }
   }, [chatMessages, generatedHtml, phase, sendToAgentChat, startGenerationFromBrief]);
 
@@ -268,6 +358,9 @@ export default function PresentationStudio() {
     setChatMessages([]);
     setIsAgentReplying(false);
     setQueuedGenerationMessage(null);
+    setFrontendSlidesSession({});
+    setInteractiveResult(null);
+    setAgentProgressMessage(null);
   }, [resetWorkflow]);
 
   const handleRetry = useCallback((kind: StudioErrorSource) => {
@@ -346,18 +439,18 @@ export default function PresentationStudio() {
         kind: "complete",
         slideCount: selectedSlides.length || outline.length,
         htmlUrl: generatedHtmlUrl,
-        generator: htmlGenerationStep?.data?.generator,
-        fallbackReason: htmlGenerationStep?.data?.fallbackReason,
+        generator: activeHtmlGenerationStepData?.generator,
+        fallbackReason: activeHtmlGenerationStepData?.fallbackReason,
       });
     }
 
     return messages;
   }, [
+    activeHtmlGenerationStepData?.fallbackReason,
+    activeHtmlGenerationStepData?.generator,
     canApproveOutline,
     generateDisabledReason,
     generatedHtmlUrl,
-    htmlGenerationStep?.data?.fallbackReason,
-    htmlGenerationStep?.data?.generator,
     outline.length,
     phase,
     selectedSlides.length,
@@ -371,6 +464,7 @@ export default function PresentationStudio() {
       messages={agentMessages}
       phase={phase}
       isSending={isAgentReplying}
+      progressMessage={agentProgressMessage}
       onSend={handleAgentSend}
       onGenerate={handleGenerate}
       onRetry={handleRetry}
@@ -382,7 +476,7 @@ export default function PresentationStudio() {
 
   return (
     <PresentationWorkspace
-      previewContent={<PresentationPreviewPane currentStep={previewStep} generatedHtml={generatedHtml} outline={outline} outlineGeneration={outlineStep?.data} htmlGeneration={htmlGenerationStep?.data} />}
+      previewContent={<PresentationPreviewPane currentStep={previewStep} generatedHtml={generatedHtml} outline={outline} outlineGeneration={outlineStep?.data} htmlGeneration={activeHtmlGenerationStepData} />}
       agentContent={agentContent}
     />
   );

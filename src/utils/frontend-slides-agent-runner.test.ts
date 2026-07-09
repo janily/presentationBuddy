@@ -5,12 +5,14 @@ import {
   assertFrontendSlidesDocument,
   assertFrontendSlidesComplete,
   buildFrontendSlidesAgentPrompt,
+  buildFrontendSlidesInteractivePrompt,
   countGeneratedSlides,
   extractHtmlFromAgentResult,
   invokeFrontendSlidesAgent,
   isFrontendSlidesAgentConfigured,
   isFrontendSlidesRequired,
   resolveFrontendSlidesHtml,
+  startOrContinueFrontendSlidesSession,
 } from "./frontend-slides-agent-runner";
 import type { FrontendSlidesInput } from "./outline-to-slides-mapper";
 
@@ -177,5 +179,125 @@ describe("frontend-slides agent runner helpers", () => {
     queryMock.mockReturnValue(makeQueryMock([], [{ name: "other-skill" }]));
 
     await expect(invokeFrontendSlidesAgent(input)).rejects.toThrow("did not discover the frontend-slides skill");
+  });
+
+  it("builds an interactive prompt that invites the agent to ask follow-up questions", () => {
+    const prompt = buildFrontendSlidesInteractivePrompt({ topic: "Q3 launch" }, ".frontend-slides-runs/abc/deck.html");
+
+    expect(prompt).toContain("interactive, multi-turn session");
+    expect(prompt).toContain("Topic: Q3 launch");
+    expect(prompt).not.toContain("headless");
+  });
+
+  describe("startOrContinueFrontendSlidesSession", () => {
+    const runId = "test-interactive";
+    const runDir = path.join(process.cwd(), ".frontend-slides-runs", runId);
+
+    afterEach(async () => {
+      await rm(runDir, { recursive: true, force: true });
+    });
+
+    it("returns a question turn when the agent has not written the deck yet", async () => {
+      process.env.ANTHROPIC_API_KEY = "test-key";
+      queryMock.mockReturnValue(makeQueryMock([
+        { type: "system", session_id: "session-1" },
+        { type: "result", subtype: "success", result: "What is this presentation for?", session_id: "session-1" },
+      ]));
+
+      const result = await startOrContinueFrontendSlidesSession({
+        runId,
+        userMessage: "Help me build a pitch deck",
+      });
+
+      expect(result).toEqual({
+        kind: "question",
+        sessionId: "session-1",
+        runId,
+        assistantMessage: "What is this presentation for?",
+      });
+    });
+
+    it("returns a done turn once the agent has written a valid deck to disk", async () => {
+      process.env.ANTHROPIC_API_KEY = "test-key";
+      process.env.FRONTEND_SLIDES_KEEP_RUN_FILES = "true";
+      await mkdir(runDir, { recursive: true });
+      await writeFile(path.join(runDir, "deck.html"), validFrontendSlidesHtml, "utf8");
+
+      queryMock.mockReturnValue(makeQueryMock([
+        { type: "result", subtype: "success", result: "Done, it's ready.", session_id: "session-2" },
+      ]));
+
+      const result = await startOrContinueFrontendSlidesSession({
+        sessionId: "session-1",
+        runId,
+        userMessage: "Looks great, finish it",
+      });
+
+      expect(result.kind).toBe("done");
+      if (result.kind === "done") {
+        expect(result.html).toContain("<!doctype html>");
+        expect(result.sessionId).toBe("session-2");
+      }
+
+      delete process.env.FRONTEND_SLIDES_KEEP_RUN_FILES;
+    });
+
+    it("resumes an existing session id instead of re-checking skill availability", async () => {
+      process.env.ANTHROPIC_API_KEY = "test-key";
+      const mock = makeQueryMock([
+        { type: "result", subtype: "success", result: "Sure, one more question...", session_id: "session-1" },
+      ]);
+      queryMock.mockReturnValue(mock);
+
+      await startOrContinueFrontendSlidesSession({
+        sessionId: "session-1",
+        runId,
+        userMessage: "Reading deck, please",
+      });
+
+      expect(mock.supportedCommands).not.toHaveBeenCalled();
+      expect(queryMock).toHaveBeenCalledWith(expect.objectContaining({
+        prompt: "Reading deck, please",
+        options: expect.objectContaining({ resume: "session-1" }),
+      }));
+    });
+
+    it("reports live progress from assistant text and tool_use messages via onProgress", async () => {
+      process.env.ANTHROPIC_API_KEY = "test-key";
+      queryMock.mockReturnValue(makeQueryMock([
+        {
+          type: "assistant",
+          session_id: "session-1",
+          message: {
+            content: [
+              { type: "text", text: "Let me check the design guidelines first." },
+              { type: "tool_use", name: "Read", input: { file_path: "viewport-base.css" } },
+            ],
+          },
+        },
+        {
+          type: "assistant",
+          session_id: "session-1",
+          message: {
+            content: [{ type: "tool_use", name: "Write", input: { file_path: "deck.html" } }],
+          },
+        },
+        { type: "result", subtype: "success", result: "What is this presentation for?", session_id: "session-1" },
+      ]));
+
+      const progress: string[] = [];
+
+      await startOrContinueFrontendSlidesSession({
+        runId,
+        userMessage: "Help me build a pitch deck",
+        onProgress: (message) => progress.push(message),
+      });
+
+      // The first onProgress call is the fixed "loading instructions" message;
+      // the rest are derived from the streamed assistant/tool_use messages.
+      expect(progress).toContain("Let me check the design guidelines first.");
+      expect(progress).toContain("正在读取设计规范...");
+      expect(progress).toContain("正在写入演示文稿 HTML...");
+    });
   });
 });

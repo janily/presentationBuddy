@@ -15,6 +15,7 @@ interface AgentPanelProps {
   messages: AgentMessage[];
   phase: StudioPhase;
   isSending: boolean;
+  progressMessage?: string | null;
   onSend: (message: string) => void;
   onGenerate: () => void;
   onRetry: (kind: StudioErrorSource) => void;
@@ -210,6 +211,7 @@ export default function AgentPanel({
   messages,
   phase,
   isSending,
+  progressMessage,
   onSend,
   onGenerate,
   onRetry,
@@ -311,8 +313,11 @@ export default function AgentPanel({
 
           {isSending ? (
             <div className="flex justify-start">
-              <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-card)] px-4 py-3">
+              <div className="flex items-center gap-2 rounded-2xl border border-[var(--border-light)] bg-[var(--bg-card)] px-4 py-3">
                 <TypingDots />
+                {progressMessage ? (
+                  <span className="text-sm text-[var(--text-muted)]">{progressMessage}</span>
+                ) : null}
               </div>
             </div>
           ) : null}
