@@ -3,7 +3,7 @@
 import { CheckCircle2, Circle, FileCode2, LayoutTemplate, Loader2, Sparkles } from "lucide-react";
 import HtmlPreview from "./html-preview";
 import type { HtmlGenerationStepData, OutlineStepData } from "@/src/types/presentation-workflow";
-import type { SlideOutlineItem } from "./slide-outline-card";
+import type { SlideOutlineItem } from "./presentation-outline-utils";
 
 type PreviewPaneStep = "brief" | "outlining" | "review" | "generating" | "preview";
 
@@ -18,22 +18,21 @@ interface PresentationPreviewPaneProps {
 }
 
 const generationSteps = [
-  { id: "structure", text: "Structuring selected slides...", icon: LayoutTemplate },
-  { id: "html", text: "Writing semantic HTML...", icon: FileCode2 },
-  { id: "styles", text: "Applying presentation styles...", icon: Sparkles },
-  { id: "bundle", text: "Preparing preview document...", icon: FileCode2 },
+  { id: "structure", text: "正在组织已选定的幻灯片…", icon: LayoutTemplate },
+  { id: "html", text: "正在编写语义化 HTML…", icon: FileCode2 },
+  { id: "styles", text: "正在应用演示样式…", icon: Sparkles },
+  { id: "bundle", text: "正在准备预览文档…", icon: FileCode2 },
 ] as const;
 
 function EmptyPreview() {
   return (
-    <div className="flex h-full min-h-[620px] items-center justify-center bg-[linear-gradient(135deg,#faf7f1_0%,#fff_52%,#f7efe5_100%)] p-8 text-center">
-      <div className="max-w-xl rounded-3xl border border-dashed border-[var(--border-light)] bg-white/75 p-10 shadow-sm backdrop-blur">
+    <div className="flex h-full min-h-[620px] items-center justify-center p-8 text-center">
+      <div className="max-w-md">
         <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--accent-terracotta)]/10 text-[var(--accent-terracotta)]">
           <Sparkles className="h-8 w-8" />
         </div>
-        <p className="text-sm font-medium uppercase tracking-[0.2em] text-[var(--accent-brass)]">Live preview</p>
-        <h2 className="mt-3 text-3xl font-semibold text-[var(--text-primary)]" style={{ fontFamily: "var(--font-fraunces), Georgia, serif" }}>你的演示文稿将在这里实时预览</h2>
-        <p className="mt-4 text-[var(--text-secondary)]">Use the agent panel to create a brief, review the outline, and generate an HTML deck without leaving this workspace.</p>
+        <h2 className="text-3xl font-semibold text-[var(--text-primary)]" style={{ fontFamily: "var(--font-fraunces), Georgia, serif" }}>你的演示文稿将在这里实时预览</h2>
+        <p className="mt-4 text-[var(--text-secondary)]">在右侧告诉我你的想法，大纲和成片都会在这里出现。</p>
       </div>
     </div>
   );
@@ -76,13 +75,13 @@ function WorkflowStepList({ steps }: { steps: Array<{ id: string; label: string;
 
 function OutlineProgress({ outlineGeneration }: { outlineGeneration?: OutlineStepData }) {
   const progress = outlineGeneration?.progress ?? 12;
-  const message = outlineGeneration?.message ?? "Preparing the outline workflow...";
+  const message = outlineGeneration?.message ?? "正在准备大纲工作流…";
   const steps = outlineGeneration?.steps ?? [
-    { id: "prepare", label: "Reading your request", status: "active" as const },
-    { id: "analyze", label: "Identifying audience and goals", status: "pending" as const },
-    { id: "structure", label: "Planning the deck structure", status: "pending" as const },
-    { id: "detail", label: "Writing slide-level details", status: "pending" as const },
-    { id: "review", label: "Preparing outline for review", status: "pending" as const },
+    { id: "prepare", label: "正在阅读你的需求", status: "active" as const },
+    { id: "analyze", label: "识别受众与目标", status: "pending" as const },
+    { id: "structure", label: "规划整体结构", status: "pending" as const },
+    { id: "detail", label: "撰写每页详细内容", status: "pending" as const },
+    { id: "review", label: "准备大纲供确认", status: "pending" as const },
   ];
 
   return (
@@ -92,15 +91,14 @@ function OutlineProgress({ outlineGeneration }: { outlineGeneration?: OutlineSte
           <Loader2 className="h-6 w-6 animate-spin" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium uppercase tracking-[0.2em] text-[var(--accent-brass)]">Outline generation</p>
-          <h3 className="mt-2 text-2xl font-semibold text-[var(--text-primary)]" style={{ fontFamily: "var(--font-fraunces), Georgia, serif" }}>
-            Drafting your presentation structure...
+          <h3 className="text-xl font-semibold text-[var(--text-primary)]" style={{ fontFamily: "var(--font-fraunces), Georgia, serif" }}>
+            正在起草大纲…
           </h3>
           <p className="mt-2 text-[var(--text-secondary)]">{message}</p>
           <div className="mt-5 h-2 overflow-hidden rounded-full bg-[var(--bg-secondary)]">
             <div className="h-full rounded-full bg-[var(--accent-terracotta)] transition-all duration-500" style={{ width: `${progress}%` }} />
           </div>
-          <p className="mt-2 text-sm text-[var(--text-muted)]">{progress}% complete</p>
+          <p className="mt-2 text-sm text-[var(--text-muted)]">{progress}% 已完成</p>
         </div>
       </div>
       <div className="mt-6">
@@ -115,16 +113,14 @@ function OutlinePreview({ outline, isLoading, outlineGeneration }: { outline: Sl
     <div className="h-full min-h-[calc(100vh-112px)] overflow-auto bg-[linear-gradient(135deg,#faf7f1_0%,#fff_60%,#f7efe5_100%)] p-6">
       <div className="mx-auto max-w-5xl space-y-4 pb-8">
         <div className="rounded-3xl border border-[var(--border-light)] bg-white/85 p-6 shadow-sm backdrop-blur">
-          <p className="text-sm font-medium uppercase tracking-[0.2em] text-[var(--accent-brass)]">Outline preview</p>
-          <h2 className="mt-2 text-3xl font-semibold text-[var(--text-primary)]" style={{ fontFamily: "var(--font-fraunces), Georgia, serif" }}>
-            {isLoading ? "Drafting your presentation structure..." : "Review the story before HTML generation"}
+          <h2 className="text-2xl font-semibold text-[var(--text-primary)]" style={{ fontFamily: "var(--font-fraunces), Georgia, serif" }}>
+            {isLoading ? "正在起草大纲…" : `请确认大纲（${outline.length} 页）——在右侧点击生成，或直接说修改意见`}
           </h2>
-          <p className="mt-3 text-[var(--text-secondary)]">The left workspace reflects the current workflow state while the agent controls stay available on the right.</p>
         </div>
         {isLoading && outline.length === 0 ? <OutlineProgress outlineGeneration={outlineGeneration} /> : null}
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {outline.map((slide, index) => (
-            <article key={slide.id} className={`min-h-44 rounded-2xl border bg-white/90 p-5 shadow-sm ${slide.selected ? "border-[var(--border-light)]" : "border-dashed border-[var(--border-light)] opacity-60"}`}>
+            <article key={slide.id} className="min-h-44 rounded-2xl border border-[var(--border-light)] bg-white/90 p-5 shadow-sm">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <span className="rounded-full bg-[var(--accent-terracotta)]/10 px-3 py-1 text-xs font-semibold text-[var(--accent-terracotta)]">{index + 1}</span>
                 {isLoading ? <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--accent-terracotta)]" /> : null}
@@ -152,15 +148,14 @@ function GenerationProgress({ htmlGeneration }: { htmlGeneration?: HtmlGeneratio
           <ActiveIcon className="h-7 w-7 animate-pulse" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium uppercase tracking-[0.2em] text-[var(--accent-brass)]">HTML generation</p>
-          <h2 className="mt-3 text-3xl font-semibold text-[var(--text-primary)]" style={{ fontFamily: "var(--font-fraunces), Georgia, serif" }}>
-            Generating your HTML presentation...
+          <h2 className="text-3xl font-semibold text-[var(--text-primary)]" style={{ fontFamily: "var(--font-fraunces), Georgia, serif" }}>
+            正在生成你的演示文稿…
           </h2>
           <p className="mt-3 text-[var(--text-secondary)]">{htmlGeneration?.message ?? generationSteps[activeIndex]?.text}</p>
           <div className="mt-6 h-2 overflow-hidden rounded-full bg-[var(--bg-secondary)]">
             <div className="h-full rounded-full bg-[var(--accent-terracotta)] transition-all duration-500" style={{ width: `${progress}%` }} />
           </div>
-          <p className="mt-3 text-sm text-[var(--text-muted)]">{progress}% complete</p>
+          <p className="mt-3 text-sm text-[var(--text-muted)]">{progress}% 已完成</p>
           {progressSteps.length > 0 ? (
             <div className="mt-6 grid gap-3">
               <WorkflowStepList steps={progressSteps} />

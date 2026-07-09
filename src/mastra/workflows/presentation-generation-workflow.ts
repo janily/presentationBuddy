@@ -9,6 +9,20 @@ import {
 import { mapOutlineToFrontendSlides } from "@/src/utils/outline-to-slides-mapper";
 import { presentationInputSchema, presentationOutlineSchema } from "./presentation-generation-schemas";
 
+// Progress chunks are best-effort telemetry: if the underlying stream was already
+// closed/canceled (e.g. the client aborted the request), writer.write() throws
+// "Invalid state: WritableStream is locked"/closed errors that must not crash the step.
+function safeWrite(writer: { write: (chunk: unknown) => unknown }, chunk: unknown) {
+  try {
+    const result = writer.write(chunk);
+    if (result && typeof (result as Promise<unknown>).catch === "function") {
+      (result as Promise<unknown>).catch(() => undefined);
+    }
+  } catch {
+    // ignore
+  }
+}
+
 type PresentationOutlineStepData = {
   status: "loading" | "streaming" | "completed";
   outline?: Partial<z.infer<typeof presentationOutlineSchema>>;
@@ -316,7 +330,7 @@ export const presentationOutlineSuggestionStep = createStep({
     ) => {
       const { activeStepId, stepDetail, completeThrough, ...rest } = data;
 
-      writer.write({
+      safeWrite(writer, {
         type: "data-presentationOutline",
         data: {
           ...rest,
@@ -521,7 +535,7 @@ const presentationHtmlGenerationStep = createStep({
     ) => {
       const { activeStepId, stepDetail, completeThrough, ...rest } = data;
 
-      writer.write({
+      safeWrite(writer, {
         type: "data-presentationHtml",
         data: {
           status: "in-progress",
@@ -657,7 +671,7 @@ const presentationHtmlGenerationStep = createStep({
             console.log("Presentation HTML generation: received backup text", {
               generatedCharacters: html.length,
             });
-            writer.write({
+            safeWrite(writer, {
               type: "data-presentationHtml",
               data: {
                 status: "in-progress",
@@ -724,7 +738,7 @@ const presentationHtmlGenerationStep = createStep({
       htmlUrl,
     });
 
-    writer.write({
+    safeWrite(writer, {
       type: "data-presentationHtml",
       data: {
         status: "completed",

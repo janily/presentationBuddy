@@ -1,16 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { X } from "lucide-react";
 import { usePresentationWorkflow } from "@/src/hooks/use-presentation-workflow";
 import type { PresentationOutlineData } from "@/src/types/presentation-workflow";
 import AgentPanel, { type AgentMessage } from "./agent-panel";
-import { type PresentationBrief } from "./brief-form";
-import OutlinePanel from "./outline-panel";
 import PresentationPreviewPane from "./presentation-preview-pane";
 import PresentationWorkspace from "./presentation-workspace";
-import { emptyOutline, toApprovedOutline, toSlideItem } from "./presentation-outline-utils";
-import { type SlideOutlineItem } from "./slide-outline-card";
+import { emptyOutline, toApprovedOutline, toSlideItem, type PresentationBrief, type SlideOutlineItem } from "./presentation-outline-utils";
 import { deriveStudioPhase, type StudioErrorSource, type StudioPhase } from "./use-studio-phase";
 
 type PreviewPaneStep = "brief" | "outlining" | "review" | "generating" | "preview";
@@ -45,13 +41,6 @@ const getErrorMessage = (error: Error | undefined, fallback: string) => {
 };
 
 const makeId = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-
-const initialGuidanceMessage: AgentMessage = {
-  id: "initial-guidance",
-  role: "assistant",
-  kind: "text",
-  content: "Tell me what presentation you want to create. Include the topic, audience, slide count, style, and any must-have sections. I will turn that into an outline first.",
-};
 
 function toPreviewStep(phase: StudioPhase): PreviewPaneStep {
   switch (phase) {
@@ -96,10 +85,8 @@ export default function PresentationStudio() {
   } = usePresentationWorkflow();
 
   const [brief, setBrief] = useState<PresentationBrief | null>(null);
-  const [userModifiedOutline, setUserModifiedOutline] = useState<SlideOutlineItem[] | null>(null);
   const [htmlWatchdogError, setHtmlWatchdogError] = useState<string | null>(null);
-  const [isOutlineDrawerOpen, setIsOutlineDrawerOpen] = useState(false);
-  const [chatMessages, setChatMessages] = useState<AgentMessage[]>([initialGuidanceMessage]);
+  const [chatMessages, setChatMessages] = useState<AgentMessage[]>([]);
   const [isAgentReplying, setIsAgentReplying] = useState(false);
   const [queuedGenerationMessage, setQueuedGenerationMessage] = useState<string | null>(null);
 
@@ -116,10 +103,9 @@ export default function PresentationStudio() {
   }, [brief, workflowOutline]);
 
   const outline = useMemo(() => {
-    if (userModifiedOutline) return userModifiedOutline;
     if (baseOutline?.slides?.length) return baseOutline.slides.map(toSlideItem);
     return workflowOutline?.slides?.map(toStreamingSlideItem) ?? [];
-  }, [baseOutline, userModifiedOutline, workflowOutline]);
+  }, [baseOutline, workflowOutline]);
 
   const selectedSlides = useMemo(() => outline.filter((item) => item.selected), [outline]);
   const generatedHtml = htmlGenerationStep?.data?.html ?? "";
@@ -145,20 +131,20 @@ export default function PresentationStudio() {
     if (!activeRunId && baseOutline?.slides?.length) {
       return {
         kind: "resume",
-        message: "Workflow run ID is missing. Please create the outline again before generating HTML.",
+        message: "工作流会话已失效，请重新生成大纲后再试。",
       };
     }
 
     if (baseOutline?.slides?.length) {
       return {
         kind: "html",
-        message: getErrorMessage(error, "HTML generation failed. Please retry from the approved outline."),
+        message: getErrorMessage(error, "生成 HTML 失败，请从已确认的大纲重试。"),
       };
     }
 
     return {
       kind: "outline",
-      message: getErrorMessage(error, "Outline generation failed. Please return to the brief and try again."),
+      message: getErrorMessage(error, "生成大纲失败，请重新描述你的需求后重试。"),
     };
   }, [activeRunId, approvalError, baseOutline, error, htmlWatchdogError]);
 
@@ -175,7 +161,7 @@ export default function PresentationStudio() {
 
   const phase = phaseState.phase;
   const previewStep = toPreviewStep(phase);
-  const generateDisabledReason = !activeRunId ? (approvalError ?? "Waiting for the workflow run ID before generating HTML.") : approvalError;
+  const generateDisabledReason = !activeRunId ? (approvalError ?? "正在等待工作流会话 ID 后才能生成 HTML。") : approvalError;
 
   useEffect(() => {
     if (htmlGenerationStep?.data?.status !== "in-progress") return;
@@ -184,7 +170,7 @@ export default function PresentationStudio() {
     const timeout = window.setTimeout(() => {
       if (Date.now() - lastUpdatedAt >= 240_000) {
         stop();
-        setHtmlWatchdogError("Generation has not reported progress for several minutes. Please retry, reduce selected slides, or switch to a faster HTML model.");
+        setHtmlWatchdogError("生成长时间没有进展，请重试，或减少页数后再试。");
       }
     }, 240_000);
 
@@ -206,8 +192,6 @@ export default function PresentationStudio() {
 
     setHtmlWatchdogError(null);
     setBrief(nextBrief);
-    setUserModifiedOutline(null);
-    setIsOutlineDrawerOpen(false);
     sendAgentRequest(nextBrief.requirements || nextBrief.topic, {
       topic: nextBrief.topic,
       audience: nextBrief.audience,
@@ -264,43 +248,15 @@ export default function PresentationStudio() {
       const detail = error instanceof Error ? error.message : String(error);
       setChatMessages((current) => [
         ...current,
-        { id: makeId(), role: "assistant", kind: "text", content: `I hit an issue: ${detail}\n\nTry again in a moment, or check the model/API key configuration if it keeps happening.` },
+        { id: makeId(), role: "assistant", kind: "text", content: `遇到了点问题：${detail}\n\n请稍后重试；如果反复出现，请检查模型或 API Key 配置。` },
       ]);
     } finally {
       setIsAgentReplying(false);
     }
   }, [chatMessages, generatedHtml, phase, sendToAgentChat, startGenerationFromBrief]);
 
-  const handleToggle = useCallback((id: string) => {
-    setUserModifiedOutline((current) => (current ?? outline).map((item) => (item.id === id ? { ...item, selected: !item.selected } : item)));
-  }, [outline]);
-
-  const handleEdit = useCallback((id: string, updates: Pick<SlideOutlineItem, "title" | "notes">) => {
-    setUserModifiedOutline((current) => (current ?? outline).map((item) => (item.id === id ? { ...item, ...updates } : item)));
-  }, [outline]);
-
-  const handleDelete = useCallback((id: string) => {
-    setUserModifiedOutline((current) => (current ?? outline).filter((item) => item.id !== id));
-  }, [outline]);
-
-  const handleAdd = useCallback((title: string) => {
-    setUserModifiedOutline((current) => [
-      ...(current ?? outline),
-      {
-        id: makeId(),
-        title,
-        notes: "Add supporting detail, examples, and speaker notes for this slide.",
-        selected: true,
-        purpose: "Add supporting detail, examples, and speaker notes for this slide.",
-        keyPoints: ["Add supporting detail, examples, and speaker notes for this slide."],
-        designSuggestion: baseOutline?.designGuidance.join(" ") || "Use a polished, readable slide layout.",
-      },
-    ]);
-  }, [baseOutline, outline]);
-
   const handleGenerate = useCallback(() => {
     if (!baseOutline || selectedSlides.length === 0 || !canApproveOutline) return;
-    setIsOutlineDrawerOpen(false);
     setHtmlWatchdogError(null);
     approveOutline(toApprovedOutline(baseOutline, outline));
   }, [approveOutline, baseOutline, canApproveOutline, outline, selectedSlides.length]);
@@ -309,9 +265,7 @@ export default function PresentationStudio() {
     resetWorkflow();
     setHtmlWatchdogError(null);
     setBrief(null);
-    setUserModifiedOutline(null);
-    setIsOutlineDrawerOpen(false);
-    setChatMessages([initialGuidanceMessage]);
+    setChatMessages([]);
     setIsAgentReplying(false);
     setQueuedGenerationMessage(null);
   }, [resetWorkflow]);
@@ -325,23 +279,8 @@ export default function PresentationStudio() {
       return;
     }
 
-    setUserModifiedOutline(null);
-    setIsOutlineDrawerOpen(false);
     setBrief(null);
   }, [clearError, handleGenerate]);
-
-  useEffect(() => {
-    if (!isOutlineDrawerOpen) return;
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setIsOutlineDrawerOpen(false);
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [isOutlineDrawerOpen]);
 
   const markGenerationRequestQueued = useCallback((messageId: string) => {
     setChatMessages((current) => current.map((message) => (
@@ -400,28 +339,6 @@ export default function PresentationStudio() {
       });
     }
 
-    if (phase === "outlining") {
-      messages.push({
-        id: "outline-progress-card",
-        role: "system",
-        kind: "progress",
-        message: outlineStep?.data?.message ?? "Drafting the presentation outline...",
-        progress: outlineStep?.data?.progress,
-        steps: outlineStep?.data?.steps,
-      });
-    }
-
-    if (phase === "generating") {
-      messages.push({
-        id: "generation-progress-card",
-        role: "system",
-        kind: "progress",
-        message: htmlGenerationStep?.data?.message ?? "Generating the HTML presentation...",
-        progress: htmlGenerationStep?.data?.progress,
-        steps: htmlGenerationStep?.data?.steps,
-      });
-    }
-
     if (phase === "previewing") {
       messages.push({
         id: "complete-card",
@@ -433,74 +350,28 @@ export default function PresentationStudio() {
     }
 
     return messages;
-  }, [canApproveOutline, generateDisabledReason, generatedHtmlUrl, htmlGenerationStep?.data?.message, htmlGenerationStep?.data?.progress, htmlGenerationStep?.data?.steps, outline.length, outlineStep?.data?.message, outlineStep?.data?.progress, outlineStep?.data?.steps, phase, selectedSlides.length, workflowError]);
+  }, [canApproveOutline, generateDisabledReason, generatedHtmlUrl, outline.length, phase, selectedSlides.length, workflowError]);
 
   const agentMessages = useMemo(() => [...chatMessages, ...systemMessages], [chatMessages, systemMessages]);
 
   const agentContent = (
-    <>
-      <AgentPanel
-        messages={agentMessages}
-        phase={phase}
-        isSending={isAgentReplying}
-        onSend={handleAgentSend}
-        onGenerate={handleGenerate}
-        onOpenOutline={() => setIsOutlineDrawerOpen(true)}
-        onRetry={handleRetry}
-        onQueueAfterGeneration={handleQueueAfterGeneration}
-        onRestartWithMessage={handleRestartWithMessage}
-        title={phase === "previewing" ? "Keep refining this deck" : "Presentation agent"}
-      />
-
-      {isOutlineDrawerOpen && outline.length > 0 ? (
-        <div
-          className="fixed inset-0 z-50 flex justify-end bg-black/25 p-4 backdrop-blur-sm"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Edit presentation outline"
-          onClick={() => setIsOutlineDrawerOpen(false)}
-        >
-          <div
-            className="flex h-full w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-[var(--border-light)] bg-[var(--bg-card)] shadow-2xl"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="flex shrink-0 items-center justify-between gap-4 border-b border-[var(--border-light)] bg-[var(--bg-secondary)] px-5 py-4">
-              <div>
-                <h3 className="font-semibold text-[var(--text-primary)]">Edit outline</h3>
-                <p className="text-sm text-[var(--text-muted)]">Make slide-level changes, then return to the conversation.</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsOutlineDrawerOpen(false)}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--border-light)] bg-white text-[var(--text-muted)] transition hover:text-[var(--text-primary)]"
-                aria-label="Close outline editor"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <div className="min-h-0 flex-1 p-4">
-              <OutlinePanel
-                items={outline}
-                isLoading={phase === "outlining"}
-                onToggle={handleToggle}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-                onAdd={handleAdd}
-                onGenerate={handleGenerate}
-                generateDisabledReason={generateDisabledReason}
-              />
-            </div>
-          </div>
-        </div>
-      ) : null}
-    </>
+    <AgentPanel
+      messages={agentMessages}
+      phase={phase}
+      isSending={isAgentReplying}
+      onSend={handleAgentSend}
+      onGenerate={handleGenerate}
+      onRetry={handleRetry}
+      onQueueAfterGeneration={handleQueueAfterGeneration}
+      onRestartWithMessage={handleRestartWithMessage}
+      onStartOver={handleStartOver}
+    />
   );
 
   return (
     <PresentationWorkspace
       previewContent={<PresentationPreviewPane currentStep={previewStep} generatedHtml={generatedHtml} outline={outline} outlineGeneration={outlineStep?.data} htmlGeneration={htmlGenerationStep?.data} />}
       agentContent={agentContent}
-      onStartOver={handleStartOver}
     />
   );
 }

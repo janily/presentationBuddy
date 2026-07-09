@@ -1,0 +1,525 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Mastra 1.0 入门教程：TypeScript 原生 AI Agent 开发指南</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap');
+
+  :root{
+    --bg:#0F0F11;
+    --cyan:#00f2fe;
+    --purple:#a154f2;
+    --green:#39ff14;
+    --grid:rgba(255,255,255,0.045);
+    --card:#171719;
+    --card-border:rgba(255,255,255,0.08);
+    --text:#EDEDEF;
+    --sub:#9A9AA3;
+    --mono:'JetBrains Mono','Fira Code',monospace;
+    --sans:'Noto Sans SC','PingFang SC',sans-serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{background:#000;overflow:hidden;width:100%;height:100%;font-family:var(--sans);}
+  #stage-wrap{width:100vw;height:100vh;display:flex;align-items:center;justify-content:center;background:#000;}
+  #deck{position:relative;width:1920px;height:1080px;transform-origin:center center;flex-shrink:0;}
+
+  .slide{
+    position:absolute;top:0;left:0;width:1920px;height:1080px;
+    background:
+      linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px) 0 0/48px 48px,
+      linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px) 0 0/48px 48px,
+      var(--bg);
+    color:var(--text);
+    display:none;
+    padding:90px 110px;
+    overflow:hidden;
+  }
+  .slide.active{display:block;}
+  .slide::before{
+    content:'';position:absolute;top:-300px;right:-300px;width:700px;height:700px;border-radius:50%;
+    background:radial-gradient(circle, rgba(0,242,254,0.10), transparent 70%);pointer-events:none;
+  }
+  .slide::after{
+    content:'';position:absolute;bottom:-300px;left:-200px;width:700px;height:700px;border-radius:50%;
+    background:radial-gradient(circle, rgba(161,84,242,0.09), transparent 70%);pointer-events:none;
+  }
+
+  .kicker{
+    font-family:var(--mono);font-size:20px;letter-spacing:3px;color:var(--cyan);
+    text-transform:uppercase;margin-bottom:20px;display:flex;align-items:center;gap:14px;
+  }
+  .kicker::before{content:'';width:34px;height:2px;background:linear-gradient(90deg,var(--cyan),var(--purple));}
+
+  .slide-title{
+    font-size:52px;font-weight:900;line-height:1.28;margin-bottom:30px;letter-spacing:-0.5px;
+    background:linear-gradient(90deg,#fff 20%,var(--cyan) 60%,var(--purple) 100%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .core-msg{font-size:24px;color:var(--sub);line-height:1.6;max-width:1100px;margin-bottom:44px;font-weight:400;}
+
+  .grad-text{background:linear-gradient(90deg,var(--cyan),var(--purple));-webkit-background-clip:text;background-clip:text;color:transparent;}
+
+  /* Slide 1 - title */
+  .s1{display:flex;align-items:center;height:100%;padding:0 110px;}
+  .s1-left{width:55%;position:relative;z-index:2;}
+  .s1-badge{display:inline-block;font-family:var(--mono);font-size:16px;color:var(--green);border:1px solid rgba(57,255,20,0.4);
+    background:rgba(57,255,20,0.06);padding:8px 18px;border-radius:30px;margin-bottom:32px;letter-spacing:1px;}
+  .s1-title{font-size:78px;font-weight:900;line-height:1.15;margin-bottom:28px;letter-spacing:-1px;}
+  .s1-title .line1{color:#fff;display:block;}
+  .s1-title .line2{background:linear-gradient(90deg,var(--cyan),var(--purple));-webkit-background-clip:text;background-clip:text;color:transparent;display:block;}
+  .s1-slogan{font-size:22px;color:var(--sub);max-width:620px;line-height:1.7;margin-bottom:48px;}
+  .s1-points{display:flex;flex-direction:column;gap:20px;}
+  .s1-point{display:flex;gap:16px;align-items:flex-start;font-size:19px;color:#D8D8DE;}
+  .s1-point .dot{min-width:8px;height:8px;border-radius:50%;background:var(--cyan);margin-top:9px;box-shadow:0 0 10px var(--cyan);}
+  .s1-right{width:45%;height:720px;position:relative;display:flex;align-items:center;justify-content:center;}
+  .ts-orbit{position:relative;width:560px;height:560px;border:1px solid rgba(0,242,254,0.18);border-radius:50%;display:flex;align-items:center;justify-content:center;}
+  .ts-orbit::before{content:'';position:absolute;width:380px;height:380px;border:1px solid rgba(161,84,242,0.22);border-radius:50%;}
+  .ts-orbit::after{content:'';position:absolute;width:220px;height:220px;border:1px dashed rgba(255,255,255,0.12);border-radius:50%;}
+  .ts-core{width:170px;height:170px;border-radius:28px;background:linear-gradient(135deg,#00f2fe22,#a154f222);
+    border:1px solid rgba(0,242,254,0.4);display:flex;align-items:center;justify-content:center;
+    font-family:var(--mono);font-weight:700;font-size:64px;color:var(--cyan);box-shadow:0 0 60px rgba(0,242,254,0.15);
+    backdrop-filter:blur(4px);}
+  .float-tag{position:absolute;font-family:var(--mono);font-size:14px;padding:6px 12px;border-radius:6px;
+    background:var(--card);border:1px solid var(--card-border);color:var(--sub);}
+  .ft1{top:14px;right:60px;color:var(--green);border-color:rgba(57,255,20,0.3);}
+  .ft2{bottom:40px;left:0px;color:var(--purple);border-color:rgba(161,84,242,0.3);}
+  .ft3{top:60%;right:-10px;}
+
+  /* generic two/three column */
+  .row{display:flex;gap:40px;height:670px;}
+  .col{flex:1;background:var(--card);border:1px solid var(--card-border);border-radius:18px;padding:36px;position:relative;overflow:hidden;}
+  .col-title{font-family:var(--mono);font-size:16px;color:var(--cyan);letter-spacing:2px;margin-bottom:18px;text-transform:uppercase;}
+
+  .code-box{background:#0A0A0C;border:1px solid rgba(0,242,254,0.25);border-radius:14px;padding:28px 30px;
+    font-family:var(--mono);font-size:18px;line-height:1.85;color:#c9c9d4;position:relative;box-shadow:inset 0 0 40px rgba(0,242,254,0.03);}
+  .code-box .tl{display:flex;gap:8px;margin-bottom:16px;}
+  .code-box .tl span{width:11px;height:11px;border-radius:50%;display:inline-block;}
+  .tl .r{background:#ff5f56;} .tl .y{background:#ffbd2e;} .tl .g{background:#27c93f;}
+  .cm{color:#5c5c66;} .kw{color:var(--purple);} .fn{color:var(--cyan);} .str{color:var(--green);} .ty{color:#ffb86c;}
+
+  .feature-list{display:flex;flex-direction:column;gap:22px;margin-top:10px;}
+  .feature-item{display:flex;gap:16px;align-items:flex-start;}
+  .feature-item .num{font-family:var(--mono);font-size:14px;color:#000;background:linear-gradient(135deg,var(--cyan),var(--purple));
+    min-width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;}
+  .feature-item .txt{font-size:18px;line-height:1.6;color:#D8D8DE;}
+  .feature-item .txt b{color:#fff;font-weight:600;}
+
+  /* footer/pagination */
+  .pagenum{position:absolute;bottom:40px;right:56px;font-family:var(--mono);font-size:15px;color:#5c5c66;letter-spacing:2px;}
+  .brand{position:absolute;bottom:40px;left:110px;font-family:var(--mono);font-size:14px;color:#4a4a52;letter-spacing:3px;text-transform:uppercase;}
+
+  /* slide 2 */
+  .s2-flow{display:flex;flex-direction:column;gap:26px;}
+  .s2-step{display:flex;gap:18px;align-items:flex-start;}
+  .step-dot{width:34px;height:34px;border-radius:50%;border:2px solid var(--purple);display:flex;align-items:center;justify-content:center;
+    font-family:var(--mono);font-size:15px;color:var(--purple);flex-shrink:0;}
+  .studio-mock{background:#0A0A0C;border:1px solid var(--card-border);border-radius:14px;height:100%;padding:0;overflow:hidden;}
+  .studio-top{background:#161618;padding:14px 20px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--card-border);}
+  .studio-top span{width:11px;height:11px;border-radius:50%;background:#333;}
+  .studio-top .label{margin-left:12px;font-family:var(--mono);font-size:13px;color:#7a7a84;}
+  .studio-body{display:flex;height:calc(100% - 50px);}
+  .studio-side{width:180px;border-right:1px solid var(--card-border);padding:20px 16px;display:flex;flex-direction:column;gap:14px;}
+  .studio-side .item{font-family:var(--mono);font-size:13px;color:#8a8a92;padding:8px 10px;border-radius:6px;}
+  .studio-side .item.active{background:rgba(0,242,254,0.1);color:var(--cyan);border:1px solid rgba(0,242,254,0.25);}
+  .studio-main{flex:1;padding:24px;display:flex;flex-direction:column;gap:14px;}
+  .chat-bubble{max-width:75%;padding:12px 16px;border-radius:10px;font-size:14px;line-height:1.5;}
+  .chat-bubble.user{align-self:flex-end;background:rgba(161,84,242,0.15);border:1px solid rgba(161,84,242,0.3);color:#e6d9fb;}
+  .chat-bubble.agent{align-self:flex-start;background:rgba(0,242,254,0.08);border:1px solid rgba(0,242,254,0.25);color:#cdeff2;font-family:var(--mono);}
+  .trace-tag{align-self:flex-start;font-family:var(--mono);font-size:12px;color:var(--green);border:1px solid rgba(57,255,20,0.3);padding:4px 10px;border-radius:20px;background:rgba(57,255,20,0.05);}
+
+  /* slide 3 tri-column */
+  .tri-card{display:flex;flex-direction:column;height:100%;}
+  .tri-icon{width:52px;height:52px;border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:22px;
+    font-family:var(--mono);font-weight:700;font-size:22px;}
+  .connector{position:absolute;top:50%;right:-41px;width:40px;height:2px;background:linear-gradient(90deg,var(--cyan),var(--purple));z-index:2;}
+  .connector::after{content:'▶';position:absolute;right:-8px;top:-9px;color:var(--purple);font-size:12px;}
+
+  /* slide 4 flow diagram */
+  .loop-flow{display:flex;flex-direction:column;justify-content:center;height:100%;gap:0;position:relative;}
+  .loop-node{background:#0A0A0C;border:1px solid var(--card-border);border-radius:12px;padding:20px 24px;font-family:var(--mono);
+    font-size:16px;color:#d8d8de;display:flex;align-items:center;gap:14px;}
+  .loop-node .lbl{color:var(--cyan);font-weight:700;}
+  .loop-arrow{align-self:center;color:#4a4a52;font-size:22px;padding:10px 0;}
+  .loop-node.hl{border-color:rgba(57,255,20,0.4);}
+  .loop-node.hl .lbl{color:var(--green);}
+
+  /* slide 5 workflow diagram */
+  .wf-diagram{position:relative;height:100%;display:flex;align-items:center;justify-content:center;}
+  .wf-node{position:absolute;background:#0A0A0C;border:1px solid var(--cyan);border-radius:10px;padding:14px 20px;
+    font-family:var(--mono);font-size:15px;color:#fff;box-shadow:0 0 18px rgba(0,242,254,0.15);}
+  .wf-node.branch{border-color:var(--purple);box-shadow:0 0 18px rgba(161,84,242,0.15);}
+  .wf-node.pause{border-color:var(--green);box-shadow:0 0 18px rgba(57,255,20,0.15);color:var(--green);}
+  .wf-line{position:absolute;background:linear-gradient(90deg,var(--cyan),var(--purple));height:2px;}
+  .wf-line.v{width:2px;background:linear-gradient(180deg,var(--cyan),var(--purple));}
+
+  /* slide 6 memory/rag */
+  .split-h{display:flex;flex-direction:column;height:670px;gap:26px;}
+  .split-panel{flex:1;background:var(--card);border:1px solid var(--card-border);border-radius:16px;padding:30px 40px;display:flex;flex-direction:column;justify-content:center;}
+  .timeline{display:flex;align-items:center;gap:0;margin-top:16px;}
+  .tl-node{width:16px;height:16px;border-radius:50%;background:var(--cyan);box-shadow:0 0 10px var(--cyan);flex-shrink:0;}
+  .tl-seg{flex:1;height:2px;background:linear-gradient(90deg,var(--cyan),var(--purple));}
+  .tl-labels{display:flex;justify-content:space-between;margin-top:10px;font-family:var(--mono);font-size:13px;color:var(--sub);}
+  .rag-chain{display:flex;align-items:center;gap:0;margin-top:16px;}
+  .rag-step{background:#0A0A0C;border:1px solid var(--card-border);border-radius:10px;padding:14px 22px;font-family:var(--mono);font-size:15px;color:#d8d8de;text-align:center;flex:1;}
+  .rag-step.hl{border-color:var(--green);color:var(--green);}
+  .rag-arrow{padding:0 14px;color:#4a4a52;font-size:20px;}
+
+  /* slide 7 star network */
+  .star-wrap{position:relative;height:670px;display:flex;align-items:center;justify-content:center;}
+  .star-core{width:160px;height:160px;border-radius:50%;background:linear-gradient(135deg,#00f2fe33,#a154f233);border:1px solid var(--cyan);
+    display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:22px;color:#fff;
+    box-shadow:0 0 60px rgba(0,242,254,0.2);z-index:2;}
+  .star-node{position:absolute;background:#0A0A0C;border:1px solid var(--card-border);border-radius:10px;padding:12px 20px;
+    font-family:var(--mono);font-size:14px;color:#d8d8de;z-index:2;}
+  .star-link{position:absolute;border-top:1.5px dashed rgba(0,242,254,0.4);z-index:1;transform-origin:left center;}
+
+  /* slide 8 quote/summary */
+  .s8-card{position:relative;height:100%;border-radius:28px;background:linear-gradient(135deg,#170f24 0%,#0a1a1e 55%,#0F0F11 100%);
+    border:1px solid rgba(161,84,242,0.3);display:flex;padding:70px 90px;overflow:hidden;}
+  .s8-left{flex:1.2;display:flex;flex-direction:column;justify-content:center;}
+  .s8-eyebrow{font-family:var(--mono);color:var(--green);letter-spacing:3px;font-size:16px;margin-bottom:24px;}
+  .s8-cmd{font-family:var(--mono);font-size:40px;color:#fff;background:rgba(0,0,0,0.4);border:1px solid rgba(0,242,254,0.35);
+    padding:22px 32px;border-radius:14px;display:inline-block;margin-bottom:36px;width:fit-content;}
+  .s8-cmd .p{color:var(--green);} .s8-cmd .c{color:var(--cyan);}
+  .s8-resources{font-size:18px;color:var(--sub);line-height:1.8;max-width:560px;}
+  .s8-resources b{color:#fff;}
+  .s8-right{flex:0.9;display:flex;flex-direction:column;justify-content:center;gap:22px;}
+  .s8-step{display:flex;align-items:center;gap:20px;}
+  .s8-step .n{font-family:var(--mono);font-size:26px;font-weight:700;color:#000;background:linear-gradient(135deg,var(--cyan),var(--purple));
+    width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .s8-step .t{font-size:19px;color:#e6e6eb;font-family:var(--mono);}
+
+  /* nav controls */
+  #nav{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);display:flex;gap:14px;z-index:999;
+    background:rgba(15,15,17,0.7);backdrop-filter:blur(8px);padding:10px 18px;border-radius:30px;border:1px solid rgba(255,255,255,0.1);}
+  #nav button{background:transparent;border:1px solid rgba(255,255,255,0.2);color:#ccc;border-radius:20px;padding:6px 16px;
+    font-family:var(--mono);font-size:13px;cursor:pointer;}
+  #nav button:hover{border-color:var(--cyan);color:var(--cyan);}
+  #counter{font-family:var(--mono);color:#888;font-size:13px;align-self:center;padding:0 6px;}
+</style>
+</head>
+<body>
+<div id="stage-wrap">
+  <div id="deck">
+
+    <!-- Slide 1 -->
+    <section class="slide active" id="slide-1">
+      <div class="s1">
+        <div class="s1-left">
+          <div class="s1-badge">MASTRA 1.0 · TYPESCRIPT-NATIVE AI FRAMEWORK</div>
+          <div class="s1-title">
+            <span class="line1">Mastra 入门教程</span>
+            <span class="line2">TypeScript 原生 AI Agent 开发指南</span>
+          </div>
+          <div class="s1-slogan">为 TypeScript 开发者打造的 AI Agent 框架——从 Gatsby 原班团队出发，重新定义 Type-Safe 的 Agent 开发体验。</div>
+          <div class="s1-points">
+            <div class="s1-point"><span class="dot"></span>Gatsby 原班团队打造，专为 TS/JS 生态原生设计，而非 Python 框架的简单移植</div>
+            <div class="s1-point"><span class="dot"></span>Type-Safe First：借助 TypeScript 强类型系统与 Zod，提供极致开发与编译校验体验</div>
+            <div class="s1-point"><span class="dot"></span>轻量、模块化，支持本地调试、Tracing、Eval 以及生产级部署</div>
+          </div>
+        </div>
+        <div class="s1-right">
+          <div class="ts-orbit">
+            <div class="ts-core">TS</div>
+            <div class="float-tag ft1">Zod ✓</div>
+            <div class="float-tag ft2">Agent Runtime</div>
+            <div class="float-tag ft3">Trace/Eval</div>
+          </div>
+        </div>
+      </div>
+      <div class="brand">Mastra · TypeScript AI Agent Framework</div>
+      <div class="pagenum">01 / 08</div>
+    </section>
+
+    <!-- Slide 2 -->
+    <section class="slide" id="slide-2">
+      <div class="kicker">Getting Started</div>
+      <div class="slide-title">快速上手：<span class="grad-text">npm create mastra</span> 与本地调试工具</div>
+      <div class="core-msg">演示极简的一键初始化，以及开箱即用的可视化调试面板 Mastra Studio。</div>
+      <div class="row">
+        <div class="col" style="flex:0.9;">
+          <div class="col-title">// Terminal</div>
+          <div class="code-box">
+            <div class="tl"><span class="r"></span><span class="y"></span><span class="g"></span></div>
+            <div><span class="cm">$</span> npx <span class="fn">create-mastra</span> my-agent-app</div>
+            <div><span class="cm">✔</span> <span class="str">Project scaffolded</span></div>
+            <div><span class="cm">$</span> cd my-agent-app</div>
+            <div><span class="cm">$</span> npm run dev</div>
+            <div style="color:var(--green);">✔ Mastra Studio running at http://localhost:4111</div>
+          </div>
+          <div class="s2-flow" style="margin-top:30px;">
+            <div class="s2-step"><div class="step-dot">1</div><div class="feature-item txt" style="font-size:17px;color:#D8D8DE;">只需一步：<b style="color:#fff;">npm create mastra</b> 瞬间构建规范的 Agent 项目结构</div></div>
+            <div class="s2-step"><div class="step-dot">2</div><div class="feature-item txt" style="font-size:17px;color:#D8D8DE;">本地黑科技：<b style="color:#fff;">Mastra Studio</b> 提供可视化 Chat UI、Agent 状态跟踪与调试面板</div></div>
+            <div class="s2-step"><div class="step-dot">3</div><div class="feature-item txt" style="font-size:17px;color:#D8D8DE;">无缝集成：极简配置，完美融入 Next.js、Node.js 等现有技术栈</div></div>
+          </div>
+        </div>
+        <div class="col" style="flex:1.1;padding:0;">
+          <div class="studio-mock">
+            <div class="studio-top"><span></span><span></span><span></span><div class="label">Mastra Studio — localhost:4111</div></div>
+            <div class="studio-body">
+              <div class="studio-side">
+                <div class="item active">▣ Agents</div>
+                <div class="item">◇ Tools</div>
+                <div class="item">▭ Workflows</div>
+                <div class="item">◈ Traces</div>
+                <div class="item">▢ Evals</div>
+              </div>
+              <div class="studio-main">
+                <div class="trace-tag">● trace: agent.generate() · 214ms</div>
+                <div class="chat-bubble user">帮我查询今天上海的天气</div>
+                <div class="chat-bubble agent">调用 getWeather(city: "上海") → 24°C，多云</div>
+                <div class="chat-bubble user">生成一段旅行建议</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="brand">Mastra · TypeScript AI Agent Framework</div>
+      <div class="pagenum">02 / 08</div>
+    </section>
+
+    <!-- Slide 3 -->
+    <section class="slide" id="slide-3">
+      <div class="kicker">Core Pillar · 01</div>
+      <div class="slide-title">核心支柱：<span class="grad-text">Agents</span>（基于 Vercel AI SDK 驱动）</div>
+      <div class="core-msg">讲解 Agent 的定义，以及如何通过声明式代码绑定模型、提示词与工具。</div>
+      <div class="row">
+        <div class="col tri-card" style="position:relative;">
+          <div class="tri-icon" style="background:rgba(0,242,254,0.1);color:var(--cyan);border:1px solid rgba(0,242,254,0.3);">M</div>
+          <div class="col-title" style="color:var(--cyan);">Model 绑定</div>
+          <div class="code-box" style="font-size:16px;flex:1;">
+            <div><span class="kw">model:</span> <span class="fn">openai</span>(<span class="str">'gpt-4o'</span>)</div>
+            <div class="cm">// Anthropic / Gemini / Groq</div>
+            <div class="cm">// 开箱即用，统一接口</div>
+          </div>
+          <div class="connector"></div>
+        </div>
+        <div class="col tri-card" style="position:relative;">
+          <div class="tri-icon" style="background:rgba(161,84,242,0.1);color:var(--purple);border:1px solid rgba(161,84,242,0.3);">I</div>
+          <div class="col-title" style="color:var(--purple);">Instructions 提示词</div>
+          <div class="code-box" style="font-size:16px;flex:1;">
+            <div><span class="kw">instructions:</span></div>
+            <div><span class="str">"你是一名严谨的旅行顾问，</span></div>
+            <div><span class="str">回答需结构化、可执行"</span></div>
+          </div>
+          <div class="connector"></div>
+        </div>
+        <div class="col tri-card">
+          <div class="tri-icon" style="background:rgba(57,255,20,0.1);color:var(--green);border:1px solid rgba(57,255,20,0.3);">T</div>
+          <div class="col-title" style="color:var(--green);">Tools 联动</div>
+          <div class="code-box" style="font-size:16px;flex:1;">
+            <div><span class="kw">tools:</span> { getWeather, bookHotel }</div>
+            <div class="cm">// 强类型自动挂载</div>
+            <div class="cm">// 支持结构化数据输出</div>
+          </div>
+        </div>
+      </div>
+      <div class="brand">Mastra · TypeScript AI Agent Framework</div>
+      <div class="pagenum">03 / 08</div>
+    </section>
+
+    <!-- Slide 4 -->
+    <section class="slide" id="slide-4">
+      <div class="kicker">Core Pillar · 02</div>
+      <div class="slide-title">核心支柱：<span class="grad-text">Tools</span>（定义强类型的自定义工具）</div>
+      <div class="core-msg">介绍 Tool 的概念、使用 Zod 定义参数 Schema，以及 Agent 如何智能调用工具。</div>
+      <div class="row">
+        <div class="col">
+          <div class="col-title">// tools/weather.ts</div>
+          <div class="code-box" style="font-size:17px;">
+            <div class="tl"><span class="r"></span><span class="y"></span><span class="g"></span></div>
+            <div><span class="kw">export const</span> <span class="fn">weatherTool</span> = <span class="fn">createTool</span>({</div>
+            <div>&nbsp;&nbsp;id: <span class="str">'get-weather'</span>,</div>
+            <div>&nbsp;&nbsp;inputSchema: <span class="ty">z</span>.object({</div>
+            <div>&nbsp;&nbsp;&nbsp;&nbsp;city: <span class="ty">z</span>.string(),</div>
+            <div>&nbsp;&nbsp;}),</div>
+            <div>&nbsp;&nbsp;outputSchema: <span class="ty">z</span>.object({ temp: <span class="ty">z</span>.number() }),</div>
+            <div>&nbsp;&nbsp;<span class="kw">execute</span>: <span class="kw">async</span> ({ city }) =&gt; {</div>
+            <div>&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">return</span> fetchWeather(city);</div>
+            <div>&nbsp;&nbsp;}</div>
+            <div>});</div>
+          </div>
+          <div class="feature-list" style="margin-top:20px;">
+            <div class="feature-item"><div class="num">01</div><div class="txt">自定义强类型工具：<b>createTool</b> API 强制绑定 Zod Schema 校验输入输出</div></div>
+            <div class="feature-item"><div class="num">02</div><div class="txt">纯 TS 体验：参数与返回值拥有完美的编辑器自动补全与类型守卫</div></div>
+          </div>
+        </div>
+        <div class="col">
+          <div class="col-title">// 调用闭环</div>
+          <div class="loop-flow">
+            <div class="loop-node"><span class="lbl">LLM</span> 理解用户意图，判断需要调用工具</div>
+            <div class="loop-arrow">↓</div>
+            <div class="loop-node"><span class="lbl">参数提取</span> 依据 Zod inputSchema 自动解析</div>
+            <div class="loop-arrow">↓</div>
+            <div class="loop-node"><span class="lbl">工具执行</span> execute() 运行业务逻辑</div>
+            <div class="loop-arrow">↓</div>
+            <div class="loop-node hl"><span class="lbl">结果返回</span> outputSchema 校验后回传 Agent</div>
+          </div>
+        </div>
+      </div>
+      <div class="brand">Mastra · TypeScript AI Agent Framework</div>
+      <div class="pagenum">04 / 08</div>
+    </section>
+
+    <!-- Slide 5 -->
+    <section class="slide" id="slide-5">
+      <div class="kicker">Core Pillar · 03</div>
+      <div class="slide-title">核心支柱：<span class="grad-text">Workflows</span>（高可控的确定性工作流）</div>
+      <div class="core-msg">讲解 Workflows 在复杂、多步骤任务中的价值，与自由发挥的 Agent 形成互补。</div>
+      <div class="row">
+        <div class="col" style="flex:0.85;">
+          <div class="feature-list">
+            <div class="feature-item"><div class="num">01</div><div class="txt">图控制流：基于 <b>DAG</b>（有向无环图）的 Workflow，通过 <b>.then()</b>、<b>.foreach()</b> 自由组合步骤</div></div>
+            <div class="feature-item"><div class="num">02</div><div class="txt">分支与并行处理：支持复杂的分支条件（Condition）与高并发的并行节点执行</div></div>
+            <div class="feature-item"><div class="num">03</div><div class="txt">人机协同（Human-in-the-Loop）：支持工作流暂停，等待人工确认/输入后继续执行</div></div>
+          </div>
+        </div>
+        <div class="col" style="flex:1.15;">
+          <div class="wf-diagram">
+            <div class="wf-node" style="top:60px;left:60px;">Start</div>
+            <div class="wf-line" style="top:78px;left:150px;width:110px;"></div>
+            <div class="wf-node branch" style="top:60px;left:270px;">Condition</div>
+
+            <div class="wf-line v" style="top:96px;left:325px;height:120px;"></div>
+            <div class="wf-node" style="top:230px;left:220px;">Parallel A</div>
+            <div class="wf-line v" style="top:96px;left:420px;height:120px;"></div>
+            <div class="wf-node" style="top:230px;left:390px;">Parallel B</div>
+
+            <div class="wf-line" style="top:250px;left:330px;width:70px;"></div>
+            <div class="wf-node pause" style="top:230px;left:560px;">⏸ Pause · Human Input</div>
+
+            <div class="wf-line v" style="top:270px;left:640px;height:130px;"></div>
+            <div class="wf-node" style="top:410px;left:520px;">Resume</div>
+            <div class="wf-line" style="top:428px;left:640px;width:90px;"></div>
+            <div class="wf-node" style="top:410px;left:740px;border-color:var(--green);color:var(--green);">✔ Finish</div>
+          </div>
+        </div>
+      </div>
+      <div class="brand">Mastra · TypeScript AI Agent Framework</div>
+      <div class="pagenum">05 / 08</div>
+    </section>
+
+    <!-- Slide 6 -->
+    <section class="slide" id="slide-6">
+      <div class="kicker">Core Pillar · 04</div>
+      <div class="slide-title">核心支柱：<span class="grad-text">Memory</span> 与 <span class="grad-text">RAG</span>（上下文持久化与检索增强）</div>
+      <div class="core-msg">阐述 Mastra 如何解决 AI 应用的长期记忆问题，以及海量外部知识的检索增强。</div>
+      <div class="split-h">
+        <div class="split-panel">
+          <div class="col-title">MEMORY · 上下文持久化</div>
+          <div style="font-size:17px;color:#D8D8DE;margin-bottom:6px;">开箱即用的多 Session 会话记忆管理，自动同步至数据库</div>
+          <div class="timeline">
+            <div class="tl-node"></div><div class="tl-seg"></div>
+            <div class="tl-node"></div><div class="tl-seg"></div>
+            <div class="tl-node"></div><div class="tl-seg"></div>
+            <div class="tl-node" style="background:var(--purple);box-shadow:0 0 10px var(--purple);"></div>
+          </div>
+          <div class="tl-labels"><span>Session #1</span><span>Session #2</span><span>Session #3</span><span>Persisted DB</span></div>
+        </div>
+        <div class="split-panel">
+          <div class="col-title">RAG · 检索增强</div>
+          <div style="font-size:17px;color:#D8D8DE;margin-bottom:6px;">内置 Vector DB 抽象与 Embedding 生成，实时追踪相似度计算与召回详情</div>
+          <div class="rag-chain">
+            <div class="rag-step">文档 Document</div><div class="rag-arrow">→</div>
+            <div class="rag-step">分块 Chunking</div><div class="rag-arrow">→</div>
+            <div class="rag-step">向量化 Embedding</div><div class="rag-arrow">→</div>
+            <div class="rag-step hl">检索召回 Retrieval</div>
+          </div>
+        </div>
+      </div>
+      <div class="brand">Mastra · TypeScript AI Agent Framework</div>
+      <div class="pagenum">06 / 08</div>
+    </section>
+
+    <!-- Slide 7 -->
+    <section class="slide" id="slide-7">
+      <div class="kicker">Advanced</div>
+      <div class="slide-title">进阶特性：<span class="grad-text">MCP 协议</span> 与多 Agent 协同</div>
+      <div class="core-msg">探索 Mastra 的前沿架构：Model Context Protocol (MCP) 与多智能体协同网络。</div>
+      <div class="star-wrap">
+        <div class="star-core">Mastra Core</div>
+
+        <div class="star-node" style="top:60px;left:640px;">🔌 MCP Servers</div>
+        <div class="star-link" style="top:130px;left:735px;width:200px;transform:rotate(28deg);"></div>
+
+        <div class="star-node" style="top:60px;left:1180px;">🤝 Other Agents</div>
+        <div class="star-link" style="top:130px;left:1150px;width:200px;transform:rotate(-28deg);"></div>
+
+        <div class="star-node" style="bottom:60px;left:640px;">📊 Evaluation / Eval</div>
+        <div class="star-link" style="bottom:130px;left:735px;width:200px;transform:rotate(-28deg);"></div>
+
+        <div class="star-node" style="bottom:60px;left:1180px;">🧵 Tracing / Observability</div>
+        <div class="star-link" style="bottom:130px;left:1150px;width:200px;transform:rotate(28deg);"></div>
+
+        <div class="star-node" style="top:340px;left:1500px;">🌐 External Tool Ecosystem</div>
+        <div class="star-link" style="top:400px;left:960px;width:520px;"></div>
+      </div>
+      <div class="feature-list" style="flex-direction:row;gap:50px;margin-top:-30px;">
+        <div class="feature-item"><div class="num">01</div><div class="txt">MCP 协议深度集成：无需编写胶水代码，一键连接现成的外部服务与工具生态</div></div>
+        <div class="feature-item"><div class="num">02</div><div class="txt">多 Agent 协同：定义多个专业 Agent，通过 Workflows 编排接力合作</div></div>
+        <div class="feature-item"><div class="num">03</div><div class="txt">内置 Tracing，生产环境持续对 Agent 行为进行评分与调试</div></div>
+      </div>
+      <div class="brand">Mastra · TypeScript AI Agent Framework</div>
+      <div class="pagenum">07 / 08</div>
+    </section>
+
+    <!-- Slide 8 -->
+    <section class="slide" id="slide-8">
+      <div class="s8-card">
+        <div class="s8-left">
+          <div class="s8-eyebrow">// SUMMARY & NEXT STEPS</div>
+          <div class="slide-title" style="font-size:44px;">实战总结：构建并运行你的第一个 AI 应用</div>
+          <div class="s8-cmd"><span class="p">$</span> npm <span class="c">create</span> mastra</div>
+          <div class="s8-resources">开发者福利：官方 <b>Mastra Course</b> 课程、丰富的 <b>Github</b> 社区案例持续更新。<br><br>
+          立即行动：运行上方命令，<b style="color:var(--green);">五分钟内</b>跑通你的专属 TypeScript AI 助手。</div>
+        </div>
+        <div class="s8-right">
+          <div class="s8-step"><div class="n">1</div><div class="t">Define Tools</div></div>
+          <div class="s8-step"><div class="n">2</div><div class="t">Configure Agent</div></div>
+          <div class="s8-step"><div class="n">3</div><div class="t">Wrap with Workflow</div></div>
+          <div class="s8-step"><div class="n">4</div><div class="t">Run &amp; Debug</div></div>
+        </div>
+      </div>
+      <div class="pagenum" style="color:rgba(255,255,255,0.4);">08 / 08</div>
+    </section>
+
+  </div>
+</div>
+
+<div id="nav">
+  <button id="prevBtn">◀ 上一页</button>
+  <span id="counter">1 / 8</span>
+  <button id="nextBtn">下一页 ▶</button>
+</div>
+
+<script>
+(function(){
+  var slides = document.querySelectorAll('.slide');
+  var total = slides.length;
+  var current = 0;
+
+  function show(i){
+    slides[current].classList.remove('active');
+    current = (i + total) % total;
+    slides[current].classList.add('active');
+    document.getElementById('counter').textContent = (current+1) + ' / ' + total;
+  }
+  document.getElementById('nextBtn').addEventListener('click', function(){ show(current+1); });
+  document.getElementById('prevBtn').addEventListener('click', function(){ show(current-1); });
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'ArrowRight' || e.key === ' ') show(current+1);
+    if(e.key === 'ArrowLeft') show(current-1);
+  });
+
+  function scaleStage(){
+    var scale = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    document.getElementById('deck').style.transform = 'scale(' + scale + ')';
+  }
+  window.addEventListener('resize', scaleStage);
+  scaleStage();
+})();
+</script>
+</body>
+</html>

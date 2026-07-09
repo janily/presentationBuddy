@@ -1,6 +1,23 @@
-import type { PresentationBrief } from "./brief-form";
-import type { SlideOutlineItem } from "./slide-outline-card";
 import type { PresentationOutlineData } from "@/src/types/presentation-workflow";
+
+export interface PresentationBrief {
+  topic: string;
+  audience: string;
+  slideCount: number;
+  style: string;
+  requirements: string;
+}
+
+export interface SlideOutlineItem {
+  id: string;
+  title: string;
+  notes: string;
+  selected: boolean;
+  purpose?: string;
+  keyPoints?: string[];
+  designSuggestion?: string;
+  originalNotes?: string;
+}
 
 export const emptyOutline = (brief: PresentationBrief): PresentationOutlineData => ({
   title: brief.topic,

@@ -2,7 +2,7 @@ import { Agent } from "@mastra/core";
 import z from "zod";
 import { getConfiguredModel } from "../../utils/model-provider";
 
-const DEFAULT_PRESENTATION_BRIEF_MODEL = "tencent/hy3:free";
+const DEFAULT_PRESENTATION_BRIEF_MODEL = "gemini-3.5-flash";
 
 export const briefDecisionSchema = z.object({
   reply: z.string().describe("The conversational reply shown to the user, in the user's language."),

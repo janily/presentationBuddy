@@ -58,16 +58,16 @@ export function deriveStudioPhase(input: StudioPhaseInput): StudioPhaseState {
 export function getPhaseLabel(phase: StudioPhase) {
   switch (phase) {
     case "briefing":
-      return "Briefing";
+      return "准备中";
     case "outlining":
-      return "Drafting outline";
+      return "起草大纲";
     case "reviewing":
-      return "Review outline";
+      return "确认大纲";
     case "generating":
-      return "Generating";
+      return "生成中";
     case "previewing":
-      return "Preview ready";
+      return "预览就绪";
     case "error":
-      return "Needs attention";
+      return "需要处理";
   }
 }

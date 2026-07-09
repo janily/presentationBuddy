@@ -1,0 +1,703 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1920, initial-scale=1.0">
+<title>Mastra AI Agent 开发框架快速入门教程</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+  :root{
+    --bg: #0B0F19;
+    --fg: #F5F7FA;
+    --fg-dim: #9AA5B1;
+    --green: #39FF14;
+    --blue: #00E5FF;
+    --card: rgba(255,255,255,0.03);
+    --border: rgba(255,255,255,0.08);
+  }
+
+  *{ box-sizing: border-box; margin:0; padding:0; }
+  html,body{ background: var(--bg); }
+
+  body{
+    font-family: 'Inter', sans-serif;
+    color: var(--fg);
+  }
+
+  .deck{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+  }
+
+  .slide{
+    width:1920px;
+    height:1080px;
+    position:relative;
+    overflow:hidden;
+    background: var(--bg);
+    flex-shrink:0;
+  }
+
+  .grid-bg{
+    position:absolute;
+    inset:0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px);
+    background-size: 48px 48px;
+    opacity:0.5;
+    pointer-events:none;
+  }
+
+  .glow-blob{
+    position:absolute;
+    border-radius:50%;
+    filter: blur(80px);
+    pointer-events:none;
+  }
+
+  .mono{ font-family:'JetBrains Mono', monospace; }
+
+  .slide-num{
+    position:absolute;
+    bottom:36px;
+    right:56px;
+    font-family:'JetBrains Mono', monospace;
+    color: var(--fg-dim);
+    font-size:16px;
+    letter-spacing:2px;
+    z-index:5;
+  }
+
+  .kicker{
+    font-family:'JetBrains Mono', monospace;
+    color: var(--green);
+    letter-spacing:4px;
+    font-size:18px;
+    text-transform:uppercase;
+    font-weight:700;
+  }
+
+  .term-card{
+    background: rgba(255,255,255,0.02);
+    border:1px solid var(--border);
+    border-radius:14px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    overflow:hidden;
+  }
+
+  .term-header{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:14px 20px;
+    background: rgba(255,255,255,0.03);
+    border-bottom:1px solid var(--border);
+  }
+  .dot{ width:12px; height:12px; border-radius:50%; }
+  .dot.r{ background:#FF5F56; }
+  .dot.y{ background:#FFBD2E; }
+  .dot.g{ background:#27C93F; }
+  .term-title{
+    margin-left:12px;
+    font-family:'JetBrains Mono', monospace;
+    font-size:14px;
+    color: var(--fg-dim);
+  }
+
+  .term-body{
+    padding:28px 32px;
+    font-family:'JetBrains Mono', monospace;
+    font-size:20px;
+    line-height:1.9;
+    color: var(--fg);
+    white-space:pre;
+  }
+
+  .code-comment{ color:#5C6773; }
+  .code-key{ color: var(--blue); }
+  .code-str{ color: var(--green); }
+  .code-fn{ color:#FFB86C; }
+  .code-punct{ color:#7C8794; }
+
+  h1.title{
+    font-size:72px;
+    font-weight:900;
+    line-height:1.15;
+    letter-spacing:-1px;
+  }
+  h2.headline{
+    font-size:48px;
+    font-weight:800;
+    letter-spacing:-0.5px;
+  }
+  .sub{
+    font-size:22px;
+    color: var(--fg-dim);
+    line-height:1.7;
+  }
+
+  .accent-line{
+    width:64px;
+    height:4px;
+    background: linear-gradient(90deg, var(--green), var(--blue));
+    border-radius:2px;
+  }
+
+  ul.points{
+    list-style:none;
+    display:flex;
+    flex-direction:column;
+    gap:22px;
+  }
+  ul.points li{
+    display:flex;
+    gap:16px;
+    align-items:flex-start;
+    font-size:22px;
+    color:#DCE1E8;
+    line-height:1.6;
+  }
+  ul.points li .marker{
+    color: var(--green);
+    font-family:'JetBrains Mono', monospace;
+    font-weight:700;
+    font-size:20px;
+    margin-top:4px;
+  }
+  ul.points li b{ color: var(--fg); font-weight:700; }
+
+  .badge{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    padding:6px 16px;
+    border:1px solid var(--border);
+    border-radius:100px;
+    font-family:'JetBrains Mono', monospace;
+    font-size:14px;
+    color: var(--blue);
+    background: rgba(0,229,255,0.06);
+  }
+
+  /* node graphic slide 1 */
+  .node-graphic{ position:absolute; right:80px; bottom:80px; width:420px; height:280px; }
+  .node-graphic circle{ fill: var(--blue); opacity:0.85; }
+  .node-graphic line{ stroke: var(--blue); stroke-width:1; opacity:0.35; }
+
+  /* slide 2 comparison */
+  .compare-wrap{ display:flex; height:100%; }
+  .compare-col{ flex:1; padding:110px 80px; position:relative; }
+  .compare-col.bad{ }
+  .compare-col.good{
+    background: radial-gradient(circle at 30% 20%, rgba(0,229,255,0.08), transparent 60%);
+    border-left:1px solid var(--border);
+  }
+  .compare-heading{ font-size:32px; font-weight:800; margin-bottom:40px; }
+  .compare-item{ display:flex; gap:16px; align-items:flex-start; margin-bottom:28px; font-size:21px; line-height:1.6; }
+  .icon-x{ color:#FF5F56; font-weight:900; font-size:22px; }
+  .icon-check{ color: var(--green); font-weight:900; font-size:22px; }
+  .compare-item.bad-text{ color: var(--fg-dim); }
+  .compare-item.good-text{ color: var(--fg); }
+
+  /* slide 3 grid */
+  .pillar-grid{
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap:32px;
+    width:1100px;
+    height:640px;
+  }
+  .pillar-card{
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:36px;
+    background: rgba(255,255,255,0.02);
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+    position:relative;
+    transition: none;
+  }
+  .pillar-card.focus{
+    border-color: var(--green);
+    box-shadow: 0 0 0 1px var(--green), 0 0 40px rgba(57,255,20,0.25);
+  }
+  .pillar-icon{
+    width:48px; height:48px;
+    border-radius:10px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:24px;
+    background: rgba(255,255,255,0.05);
+  }
+  .pillar-title{ font-size:26px; font-weight:800; }
+  .pillar-desc{ font-size:17px; color: var(--fg-dim); line-height:1.6; }
+
+  /* slide 4 tree */
+  .file-tree{
+    font-family:'JetBrains Mono', monospace;
+    font-size:19px;
+    line-height:2.0;
+    color: var(--fg-dim);
+  }
+  .file-tree .dir{ color: var(--blue); }
+  .file-tree .hi{ color: var(--green); }
+
+  .split-half{ position:absolute; top:0; bottom:0; width:50%; }
+
+  /* generic two col content layout */
+  .content-shell{ display:flex; height:100%; padding:100px 90px; gap:70px; }
+  .content-left{ flex:1; display:flex; flex-direction:column; justify-content:center; gap:30px; }
+  .content-right{ flex:1.2; display:flex; flex-direction:column; justify-content:center; }
+
+  /* workflow topology */
+  .topo{ position:relative; width:100%; height:420px; }
+  .topo-node{
+    position:absolute;
+    border:1px solid var(--border);
+    background: rgba(255,255,255,0.03);
+    border-radius:10px;
+    padding:16px 22px;
+    font-family:'JetBrains Mono', monospace;
+    font-size:18px;
+    color: var(--fg);
+  }
+  .topo-node.active{ border-color: var(--green); box-shadow:0 0 24px rgba(57,255,20,0.3); color: var(--green); }
+  .topo-arrow{ position:absolute; color: var(--green); font-size:22px; }
+
+  /* memory funnel */
+  .funnel-wrap{ display:flex; flex-direction:column; align-items:center; gap:6px; }
+  .funnel-row{ display:flex; gap:14px; }
+  .funnel-line{
+    font-family:'JetBrains Mono', monospace; font-size:16px; color: var(--fg-dim);
+    border:1px solid var(--border); padding:8px 18px; border-radius:8px;
+  }
+
+  /* dashboard slide 10 */
+  .dash-grid{ display:grid; grid-template-columns: repeat(3, 1fr); gap:36px; width:1600px; }
+  .dash-card{
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:34px;
+    background: rgba(255,255,255,0.02);
+    text-align:center;
+    box-shadow: 0 0 40px rgba(57,255,20,0.05) inset;
+  }
+  .dash-metric{
+    font-family:'JetBrains Mono', monospace;
+    font-size:56px;
+    font-weight:700;
+    color: var(--green);
+    text-shadow: 0 0 24px rgba(57,255,20,0.5);
+  }
+  .dash-label{ margin-top:12px; font-size:17px; color: var(--fg-dim); letter-spacing:1px; text-transform:uppercase; }
+
+  .quote-strip{
+    margin-top:60px;
+    font-size:28px;
+    font-weight:700;
+    color: var(--fg);
+    border-top:1px solid var(--border);
+    padding-top:36px;
+    text-align:center;
+  }
+  .quote-strip .hl{ color: var(--blue); }
+
+  /* rag network */
+  .rag-wrap{ position:relative; height:520px; display:flex; align-items:center; justify-content:space-between; padding:0 60px; }
+  .rag-node{
+    display:flex; flex-direction:column; align-items:center; gap:14px;
+    font-family:'JetBrains Mono', monospace; font-size:16px; color: var(--fg-dim);
+  }
+  .rag-icon-box{
+    width:120px; height:120px; border-radius:16px;
+    border:1px solid var(--border); background: rgba(255,255,255,0.02);
+    display:flex; align-items:center; justify-content:center; font-size:44px;
+  }
+  .rag-center{
+    width:180px; height:180px; border-radius:50%;
+    border:1px solid var(--green);
+    box-shadow: 0 0 50px rgba(57,255,20,0.3);
+    display:flex; align-items:center; justify-content:center;
+    font-weight:800; font-size:22px; color: var(--green);
+    background: rgba(57,255,20,0.04);
+  }
+  .rag-connector{ flex:1; height:1px; background: linear-gradient(90deg, var(--blue), var(--green)); position:relative; margin:0 -20px; z-index:0; }
+</style>
+</head>
+<body>
+<div class="deck">
+
+<!-- SLIDE 1: TITLE -->
+<section class="slide">
+  <div class="grid-bg"></div>
+  <div class="glow-blob" style="width:600px;height:600px;background:var(--blue);opacity:0.08;top:-200px;left:-150px;"></div>
+  <div class="glow-blob" style="width:500px;height:500px;background:var(--green);opacity:0.07;bottom:-150px;right:200px;"></div>
+
+  <svg class="node-graphic" viewBox="0 0 420 280">
+    <line x1="40" y1="60" x2="180" y2="120"/>
+    <line x1="180" y1="120" x2="340" y2="50"/>
+    <line x1="180" y1="120" x2="260" y2="220"/>
+    <line x1="260" y1="220" x2="380" y2="180"/>
+    <line x1="40" y1="60" x2="90" y2="200"/>
+    <circle cx="40" cy="60" r="6"/>
+    <circle cx="180" cy="120" r="9"/>
+    <circle cx="340" cy="50" r="5"/>
+    <circle cx="260" cy="220" r="7"/>
+    <circle cx="380" cy="180" r="5"/>
+    <circle cx="90" cy="200" r="5"/>
+  </svg>
+
+  <div style="position:absolute; top:120px; left:120px;">
+    <div class="kicker">// AI AGENT FRAMEWORK · TYPESCRIPT NATIVE</div>
+  </div>
+
+  <div style="position:absolute; top:230px; left:120px; width:1000px;">
+    <h1 class="title">Mastra: <span style="color:var(--green);">JS/TS</span> 生态原生的<br>AI Agent 开发利器</h1>
+    <div style="height:28px;"></div>
+    <div class="accent-line"></div>
+  </div>
+
+  <div style="position:absolute; top:560px; left:120px;">
+    <div class="term-card" style="width:820px;">
+      <div class="term-header">
+        <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+        <span class="term-title">bash — mastra-init</span>
+      </div>
+      <div class="term-body"><span style="color:var(--fg-dim);">~$</span> <span style="color:var(--green); text-shadow:0 0 12px rgba(57,255,20,0.6);">npx create-mastra@latest</span>
+<span class="code-comment">✔ Scaffolding Agents, Tools & Workflows...</span></div>
+    </div>
+  </div>
+
+  <div class="slide-num">01 / 10</div>
+</section>
+
+<!-- SLIDE 2: COMPARE -->
+<section class="slide">
+  <div class="grid-bg" style="opacity:0.25;"></div>
+  <div style="position:absolute; top:70px; left:90px;">
+    <div class="kicker">// FRAMEWORK COMPARISON</div>
+    <h2 class="headline" style="margin-top:14px;">为什么是 Mastra？打破 Python-First 框架的束缚</h2>
+  </div>
+
+  <div class="compare-wrap" style="padding-top:70px;">
+    <div class="compare-col bad">
+      <div class="compare-heading" style="color:var(--fg-dim);">传统 Python 框架</div>
+      <div class="compare-item bad-text"><span class="icon-x">✕</span><span>陷入 <b class="mono" style="color:#c8ccd2;">YAML</b> 配置泥潭，逻辑与声明割裂，维护成本高</span></div>
+      <div class="compare-item bad-text"><span class="icon-x">✕</span><span>动态类型运行时风险，工具入参错误往往在生产环境才暴露</span></div>
+      <div class="compare-item bad-text"><span class="icon-x">✕</span><span>缺乏统一本地调试面板，只能反复翻查 CLI 日志排障</span></div>
+    </div>
+    <div class="compare-col good">
+      <div class="compare-heading" style="color:var(--fg);">Mastra · TypeScript</div>
+      <div class="compare-item good-text"><span class="icon-check">✓</span><span>100% <b>声明式 TypeScript</b> 工程构建，类型提示零延迟</span></div>
+      <div class="compare-item good-text"><span class="icon-check">✓</span><span>全面集成 <b>Zod</b> 规范，工具输入输出与模型生成链路建立天然容错壁垒</span></div>
+      <div class="compare-item good-text"><span class="icon-check">✓</span><span>自带 <b>Mastra Studio</b> 本地开发面板，可视化调试摆脱低效日志排查</span></div>
+    </div>
+  </div>
+  <div class="slide-num">02 / 10</div>
+</section>
+
+<!-- SLIDE 3: SPLIT / 2x2 PILLARS -->
+<section class="slide">
+  <div class="grid-bg" style="opacity:0.3;"></div>
+  <div style="position:absolute; top:70px; left:90px;">
+    <div class="kicker">// CORE ARCHITECTURE</div>
+    <h2 class="headline" style="margin-top:14px;">Mastra 架构全景：四大支柱构建 AI 基础设施</h2>
+  </div>
+
+  <div style="position:absolute; top:270px; left:410px;">
+    <div class="pillar-grid">
+      <div class="pillar-card focus">
+        <div class="pillar-icon" style="color:var(--green);">◆</div>
+        <div class="pillar-title">Agents</div>
+        <div class="pillar-desc">AI 推理大脑，通过 System Prompt 规范行为，自主做决策</div>
+      </div>
+      <div class="pillar-card">
+        <div class="pillar-icon" style="color:var(--blue);">◈</div>
+        <div class="pillar-title">Tools</div>
+        <div class="pillar-desc">由 Zod 严格定义入参与出参的 TypeScript 业务逻辑函数</div>
+      </div>
+      <div class="pillar-card">
+        <div class="pillar-icon" style="color:var(--blue);">◉</div>
+        <div class="pillar-title">Workflows</div>
+        <div class="pillar-desc">具备持久化、挂起恢复能力的确定性图状状态机</div>
+      </div>
+      <div class="pillar-card">
+        <div class="pillar-icon" style="color:var(--blue);">◎</div>
+        <div class="pillar-title">Memory &amp; RAG</div>
+        <div class="pillar-desc">管理会话状态与长期记忆，与向量数据库（Elastic、Turso 等）无缝互通</div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-num">03 / 10</div>
+</section>
+
+<!-- SLIDE 4: QUICKSTART -->
+<section class="slide">
+  <div class="grid-bg" style="opacity:0.25;"></div>
+  <div style="position:absolute; top:70px; left:90px;">
+    <div class="kicker">// QUICKSTART</div>
+    <h2 class="headline" style="margin-top:14px;">快速上手：从一键初始化到 Mastra Studio</h2>
+  </div>
+
+  <div class="content-shell" style="padding-top:220px;">
+    <div class="content-left">
+      <ul class="points">
+        <li><span class="marker">▸</span><span><b>初始化安装：</b>通过 CLI 快速建立 <span class="mono" style="color:var(--blue);">src/mastra/</span> 目录结构与必备依赖</span></li>
+        <li><span class="marker">▸</span><span><b>配置接入：</b>仅需配置 <span class="mono" style="color:var(--blue);">.env</span> 模型密钥，原生融合 Vercel AI SDK，灵活切换主流大模型</span></li>
+        <li><span class="marker">▸</span><span><b>启动 Studio：</b>运行 <span class="mono" style="color:var(--blue);">npm run dev</span> 即可在本地 UI 界面调试、追溯 Agent 运行</span></li>
+      </ul>
+    </div>
+    <div class="content-right" style="gap:26px;">
+      <div class="file-tree">
+src/mastra/<span class="hi"></span>
+├── <span class="dir">agents/</span>
+│   └── support-agent.ts
+├── <span class="dir">tools/</span>
+│   └── weather-tool.ts
+├── <span class="dir">workflows/</span>
+│   └── onboarding.ts
+└── index.ts</div>
+      <div class="term-card">
+        <div class="term-header">
+          <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+          <span class="term-title">bash — mastra dev</span>
+        </div>
+        <div class="term-body"><span style="color:var(--fg-dim);">~$</span> npm run dev
+<span class="code-comment">✔ Mastra Studio ready</span>
+<span style="color:var(--fg-dim);">➜ Local:</span> <b style="color:var(--blue); text-shadow:0 0 10px rgba(0,229,255,0.6);">http://localhost:4111</b></div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-num">04 / 10</div>
+</section>
+
+<!-- SLIDE 5: TOOLS CODE -->
+<section class="slide">
+  <div class="grid-bg" style="opacity:0.25;"></div>
+  <div style="position:absolute; top:70px; left:90px;">
+    <div class="kicker">// TOOLS</div>
+    <h2 class="headline" style="margin-top:14px;">声明 Tools：Zod 驱动的强类型安全边界</h2>
+  </div>
+
+  <div class="content-shell" style="padding-top:220px;">
+    <div class="content-left">
+      <ul class="points">
+        <li><span class="marker">▸</span><span>使用 <span class="mono" style="color:var(--blue);">createTool</span> 精确封装：定义唯一的 <b>id</b> 与 <b>description</b> 作为 LLM 识别凭证</span></li>
+        <li><span class="marker">▸</span><span>Zod 定义边界：<span class="mono" style="color:var(--green);">inputSchema</span> 与 <span class="mono" style="color:var(--green);">outputSchema</span> 强制约束数据流，杜绝模型幻觉导致的入参错误</span></li>
+        <li><span class="marker">▸</span><span>强大的 TS 类型推断：在 <span class="mono" style="color:var(--blue);">execute</span> 执行体中完美享受 IDE 自动补全与类型检查</span></li>
+      </ul>
+    </div>
+    <div class="content-right">
+      <div class="term-card">
+        <div class="term-header"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="term-title">weather-tool.ts</span></div>
+        <div class="term-body"><span class="code-key">import</span> { createTool } <span class="code-key">from</span> <span class="code-str">'@mastra/core'</span>;
+<span class="code-key">import</span> { z } <span class="code-key">from</span> <span class="code-str">'zod'</span>;
+
+<span class="code-key">export const</span> <span class="code-fn">weatherTool</span> = createTool({
+  id: <span class="code-str">'get-weather'</span>,
+  description: <span class="code-str">'查询指定城市实时天气'</span>,
+  <span class="code-key">inputSchema</span>: z.object({
+    city: z.string(),
+  }),
+  <span class="code-key">outputSchema</span>: z.object({
+    temperature: z.number(),
+  }),
+  <span class="code-key">execute</span>: <span class="code-key">async</span> ({ input }) => {
+    <span class="code-key">return</span> fetchWeather(input.city);
+  },
+});</div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-num">05 / 10</div>
+</section>
+
+<!-- SLIDE 6: AGENTS -->
+<section class="slide">
+  <div class="grid-bg" style="opacity:0.25;"></div>
+  <div style="position:absolute; top:70px; left:90px;">
+    <div class="kicker">// AGENTS</div>
+    <h2 class="headline" style="margin-top:14px;">构建 Agents：将大脑与强类型工具深度绑定</h2>
+  </div>
+
+  <div style="position:absolute; top:220px; left:90px; width:1740px;">
+    <div class="term-card" style="width:1100px; margin:0 auto;">
+      <div class="term-header"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="term-title">support-agent.ts</span></div>
+      <div class="term-body" style="font-size:19px;"><span class="code-key">import</span> { Agent } <span class="code-key">from</span> <span class="code-str">'@mastra/core'</span>;
+<span class="code-key">import</span> { weatherTool } <span class="code-key">from</span> <span class="code-str">'../tools/weather-tool'</span>;
+
+<span class="code-key">export const</span> <span class="code-fn">supportAgent</span> = <span class="code-key">new</span> Agent({
+  name: <span class="code-str">'support-agent'</span>,
+  instructions: <span class="code-str">'你是一名专业的天气助理'</span>,
+  model: openai(<span class="code-str">'gpt-4o'</span>),
+  <span class="code-key">tools</span>: { weatherTool },
+});
+
+<span class="code-key">const</span> res = <span class="code-key">await</span> supportAgent.<span class="code-fn">generate</span>(<span class="code-str">'北京天气如何？'</span>);</div>
+    </div>
+  </div>
+
+  <div style="position:absolute; top:690px; left:0; width:100%;">
+    <div style="display:flex; justify-content:center; align-items:center; gap:60px;">
+      <div class="topo-node active">🧠 思考 (Reasoning)</div>
+      <div class="topo-arrow" style="position:relative;">➜</div>
+      <div class="topo-node">🛠 工具执行 (weatherTool)</div>
+      <div class="topo-arrow" style="position:relative;">➜</div>
+      <div class="topo-node">💬 回答生成</div>
+    </div>
+    <div style="text-align:center; margin-top:22px; color:var(--fg-dim); font-family:'JetBrains Mono',monospace; font-size:16px;">Tool-calling Loop · 循环感知直至任务完成</div>
+  </div>
+  <div class="slide-num">06 / 10</div>
+</section>
+
+<!-- SLIDE 7: WORKFLOWS -->
+<section class="slide">
+  <div class="grid-bg" style="opacity:0.25;"></div>
+  <div style="position:absolute; top:70px; left:90px;">
+    <div class="kicker">// DURABLE WORKFLOWS</div>
+    <h2 class="headline" style="margin-top:14px;">Durable Workflows：超越不确定性的工作流编排</h2>
+  </div>
+
+  <div class="content-shell" style="padding-top:220px; align-items:center;">
+    <div class="content-left" style="flex:1;">
+      <div class="sub" style="margin-bottom:10px; color:var(--fg);">图状拓扑 → 代码一一对应</div>
+      <div class="topo" style="height:340px;">
+        <div class="topo-node active" style="top:20px; left:20px;">Step 1: validate</div>
+        <div class="topo-node" style="top:120px; left:280px;">Step 2: approve</div>
+        <div class="topo-node" style="top:220px; left:280px;">Step 3: notify</div>
+        <div class="topo-node" style="top:170px; left:560px;">Step 4: complete</div>
+        <div class="topo-arrow" style="top:60px; left:220px;">➜</div>
+        <div class="topo-arrow" style="top:150px; left:480px;">➜</div>
+        <div class="topo-arrow" style="top:250px; left:480px;">➜</div>
+      </div>
+      <ul class="points" style="margin-top:10px;">
+        <li><span class="marker">▸</span><span>多步骤、长链路、含审批与容错场景下的确定性流程控制</span></li>
+      </ul>
+    </div>
+    <div class="content-right">
+      <div class="term-card">
+        <div class="term-header"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="term-title">onboarding.ts</span></div>
+        <div class="term-body"><span class="code-key">const</span> step1 = createStep({ id: <span class="code-str">'validate'</span>, inputSchema: z.object({...}) });
+<span class="code-key">const</span> step2 = createStep({ id: <span class="code-str">'approve'</span> });
+<span class="code-key">const</span> step3 = createStep({ id: <span class="code-str">'notify'</span> });
+<span class="code-key">const</span> step4 = createStep({ id: <span class="code-str">'complete'</span> });
+
+<span class="code-key">export const</span> workflow = createWorkflow({ id: <span class="code-str">'onboarding'</span> })
+  .<span class="code-fn">step</span>(step1)
+  .<span class="code-fn">parallel</span>([step2, step3])
+  .<span class="code-fn">then</span>(step4)
+  .commit();</div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-num">07 / 10</div>
+</section>
+
+<!-- SLIDE 8: MEMORY -->
+<section class="slide">
+  <div class="grid-bg" style="opacity:0.25;"></div>
+  <div style="position:absolute; top:70px; left:90px;">
+    <div class="kicker">// MEMORY</div>
+    <h2 class="headline" style="margin-top:14px;">状态管理：开箱即用的 Memory 持久化方案</h2>
+  </div>
+
+  <div class="content-shell" style="padding-top:220px; align-items:center;">
+    <div class="content-left">
+      <ul class="points">
+        <li><span class="marker">▸</span><span><b>两级记忆管理：</b>Thread-scoped 会话内长短期对话，Cross-session 跨会话语义检索</span></li>
+        <li><span class="marker">▸</span><span><b>语义化寻回：</b>通过语义相似度自动匹配并注入上下文，赋予 Agent 长久精准记忆</span></li>
+        <li><span class="marker">▸</span><span><b>极简数据库集成：</b>使用 <span class="mono" style="color:var(--blue);">new Memory</span> 配置存储器（如 Postgres / PgVector），免去手工建表</span></li>
+      </ul>
+    </div>
+    <div class="content-right" style="align-items:center;">
+      <div class="funnel-wrap">
+        <div class="funnel-row">
+          <div class="funnel-line">Thread A</div>
+          <div class="funnel-line">Thread B</div>
+          <div class="funnel-line">Thread C</div>
+        </div>
+        <div style="width:2px; height:36px; background:linear-gradient(var(--blue),var(--green));"></div>
+        <div style="border:1px solid var(--green); box-shadow:0 0 30px rgba(57,255,20,0.3); border-radius:12px; padding:20px 50px; font-family:'JetBrains Mono',monospace; color:var(--green); font-weight:700;">Memory Filter</div>
+        <div style="width:2px; height:36px; background:linear-gradient(var(--green),var(--blue));"></div>
+        <div class="funnel-line" style="border-color:var(--blue); color:var(--blue);">→ Relevant Context → Agent</div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-num">08 / 10</div>
+</section>
+
+<!-- SLIDE 9: RAG -->
+<section class="slide">
+  <div class="grid-bg" style="opacity:0.25;"></div>
+  <div style="position:absolute; top:70px; left:90px;">
+    <div class="kicker">// RAG PIPELINE</div>
+    <h2 class="headline" style="margin-top:14px;">RAG 深度集成：向量数据库与检索工具封装</h2>
+  </div>
+
+  <div style="position:absolute; top:260px; left:100px; width:1720px;">
+    <div class="rag-wrap">
+      <div class="rag-node">
+        <div class="rag-icon-box">📄</div>
+        <div>本地文档 / Docs</div>
+      </div>
+      <div class="rag-connector"></div>
+      <div class="rag-center">Mastra<br>createVectorQueryTool</div>
+      <div class="rag-connector"></div>
+      <div class="rag-node">
+        <div class="rag-icon-box" style="color:var(--blue);">🗄</div>
+        <div>Turso / LibSQL / ElasticSearch</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="position:absolute; bottom:110px; left:0; width:100%; text-align:center;">
+    <ul class="points" style="display:inline-flex; flex-direction:row; gap:60px;">
+      <li><span class="marker">▸</span><span>一键连接向量库：ElasticSearch / Turso / MongoDB Vector</span></li>
+      <li><span class="marker">▸</span><span>语义检索即工具，秒变 Agent 可调用能力</span></li>
+      <li><span class="marker">▸</span><span>自动切片、Embedding、索引存储与相关性搜索</span></li>
+    </ul>
+  </div>
+  <div class="slide-num">09 / 10</div>
+</section>
+
+<!-- SLIDE 10: QUOTE / DASHBOARD -->
+<section class="slide">
+  <div class="grid-bg" style="opacity:0.3;"></div>
+  <div class="glow-blob" style="width:700px;height:700px;background:var(--green);opacity:0.06;top:-250px;right:-200px;"></div>
+  <div style="position:absolute; top:70px; left:90px;">
+    <div class="kicker">// PRODUCTION READY</div>
+    <h2 class="headline" style="margin-top:14px;">走向生产：系统观测、评估与极速部署</h2>
+  </div>
+
+  <div style="position:absolute; top:250px; left:160px;">
+    <div class="dash-grid">
+      <div class="dash-card">
+        <div class="dash-metric">12.4k</div>
+        <div class="dash-label">Tokens / min · OpenTelemetry</div>
+      </div>
+      <div class="dash-card">
+        <div class="dash-metric">86ms</div>
+        <div class="dash-label">Avg Tool Call Latency</div>
+      </div>
+      <div class="dash-card">
+        <div class="dash-metric">98%</div>
+        <div class="dash-label">Eval Accuracy Score</div>
+      </div>
+    </div>
+    <ul class="points" style="margin-top:50px; flex-direction:row; gap:60px; justify-content:center;">
+      <li><span class="marker">▸</span><span>零磨损部署 Next.js / Cloudflare Workers / Node.js</span></li>
+      <li><span class="marker">▸</span><span>原生 OpenTelemetry 全链路追踪</span></li>
+      <li><span class="marker">▸</span><span>内置 Scorers 闭环评测幻觉率与召回精度</span></li>
+    </ul>
+    <div class="quote-strip">用最纯粹的 <span class="hl">TypeScript</span>，构筑高可靠的<span class="hl">生产级 AI 基础设施</span>！</div>
+  </div>
+  <div class="slide-num">10 / 10</div>
+</section>
+
+</div>
+</body>
+</html>
