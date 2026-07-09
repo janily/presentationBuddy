@@ -1,0 +1,1722 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mastra AI Agent 框架入门开发教程</title>
+
+    <!-- Google Fonts: Chakra Petch for Display, Inter for Body, Fira Code for Code/Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=Fira+Code:wght@400;500;700&family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* ===========================================
+           CSS CUSTOM PROPERTIES (THEME)
+           =========================================== */
+        :root {
+            /* Hacker Dark Theme Palette */
+            --bg-primary: #070B12;
+            --bg-secondary: #0D1527;
+            --bg-tertiary: #14203B;
+            --accent-cyan: #00F2FE;
+            --accent-green: #39FF14;
+            --accent-pink: #FF0055;
+            --text-primary: #FFFFFF;
+            --text-secondary: #8A99AD;
+            
+            /* Typography */
+            --font-display: 'Chakra Petch', 'Inter', sans-serif;
+            --font-body: 'Inter', sans-serif;
+            --font-mono: 'Fira Code', 'Courier New', monospace;
+            
+            /* Fixed Stage Settings */
+            --stage-bg: #070B12;
+            --slide-bg: #070B12;
+            --slide-padding: 80px;
+            --content-gap: 40px;
+
+            /* Motion & Transitions */
+            --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+            --duration-normal: 0.6s;
+        }
+
+        /* ===========================================
+           BASE RESET & VIEWPORT HANDLING
+           =========================================== */
+        * { 
+            margin: 0; 
+            padding: 0; 
+            box-sizing: border-box; 
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+            background: var(--stage-bg);
+            font-family: var(--font-body);
+            color: var(--text-primary);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Full-window deck viewport */
+        .deck-viewport {
+            position: fixed;
+            inset: 0;
+            overflow: hidden;
+            background: var(--stage-bg);
+        }
+
+        /* Fixed 16:9 design canvas scaled by JS */
+        .deck-stage {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 1920px;
+            height: 1080px;
+            overflow: hidden;
+            transform-origin: 0 0;
+            background: var(--slide-bg);
+            box-shadow: 0 0 50px rgba(0, 242, 254, 0.15);
+        }
+
+        /* Slides stack inside fixed stage */
+        .slide {
+            position: absolute;
+            inset: 0;
+            width: 1920px;
+            height: 1080px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: var(--slide-padding);
+            visibility: hidden;
+            opacity: 0;
+            pointer-events: none;
+            background: var(--slide-bg);
+            transition: opacity var(--duration-normal) ease-in-out, visibility var(--duration-normal) ease-in-out;
+        }
+
+        .slide.active,
+        .slide.visible {
+            visibility: visible;
+            opacity: 1;
+            pointer-events: auto;
+            z-index: 1;
+        }
+
+        /* ===========================================
+           GLOBAL SLIDE CHROMES & DECORATIVE GRAPHICS
+           =========================================== */
+        .cyber-grid {
+            position: absolute;
+            inset: 0;
+            background-image: 
+                linear-gradient(rgba(0, 242, 254, 0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 242, 254, 0.02) 1px, transparent 1px);
+            background-size: 60px 60px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .glow-orb-cyan {
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(0, 242, 254, 0.08) 0%, transparent 70%);
+            filter: blur(40px);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .glow-orb-pink {
+            position: absolute;
+            width: 500px;
+            height: 500px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255, 0, 85, 0.06) 0%, transparent 70%);
+            filter: blur(40px);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* Top & Bottom Header/Footer Info inside slides */
+        .slide-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            border-bottom: 1px solid rgba(0, 242, 254, 0.15);
+            padding-bottom: 20px;
+            z-index: 10;
+        }
+
+        .slide-header .logo-text {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 28px;
+            letter-spacing: 2px;
+            color: var(--accent-cyan);
+            text-shadow: 0 0 10px rgba(0, 242, 254, 0.5);
+        }
+
+        .slide-header .breadcrumb {
+            font-family: var(--font-mono);
+            font-size: 16px;
+            color: var(--text-secondary);
+        }
+
+        .slide-header .breadcrumb span {
+            color: var(--accent-green);
+        }
+
+        .slide-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            border-top: 1px solid rgba(0, 242, 254, 0.1);
+            padding-top: 20px;
+            font-family: var(--font-mono);
+            font-size: 14px;
+            color: var(--text-secondary);
+            z-index: 10;
+        }
+
+        .slide-content-wrapper {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 40px 0;
+            z-index: 10;
+        }
+
+        /* ===========================================
+           TYPOGRAPHY & UTILITIES
+           =========================================== */
+        h1, h2, h3 {
+            font-family: var(--font-display);
+            font-weight: 700;
+        }
+
+        .slide-title {
+            font-size: 56px;
+            line-height: 1.2;
+            margin-bottom: 40px;
+            background: linear-gradient(90deg, var(--text-primary) 50%, var(--accent-cyan) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 30px rgba(0, 242, 254, 0.1);
+        }
+
+        /* ===========================================
+           ANIMATIONS (Trigger on .visible)
+           =========================================== */
+        .reveal {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity var(--duration-normal) var(--ease-out-expo),
+                        transform var(--duration-normal) var(--ease-out-expo);
+        }
+
+        .slide.visible .reveal {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Sequential Delays */
+        .delay-1 { transition-delay: 0.1s; }
+        .delay-2 { transition-delay: 0.2s; }
+        .delay-3 { transition-delay: 0.3s; }
+        .delay-4 { transition-delay: 0.4s; }
+        .delay-5 { transition-delay: 0.5s; }
+
+        /* ===========================================
+           UI CONTROLS & BREADCRUMBS OUTSIDE STAGE
+           =========================================== */
+        .deck-controls {
+            position: fixed;
+            bottom: 30px;
+            right: 40px;
+            display: flex;
+            gap: 15px;
+            z-index: 9999;
+        }
+
+        .ctrl-btn {
+            background: rgba(13, 21, 39, 0.8);
+            border: 1px solid rgba(0, 242, 254, 0.3);
+            color: var(--accent-cyan);
+            font-family: var(--font-mono);
+            font-size: 16px;
+            padding: 10px 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+            backdrop-filter: blur(5px);
+            border-radius: 4px;
+        }
+
+        .ctrl-btn:hover {
+            background: var(--accent-cyan);
+            color: var(--bg-primary);
+            box-shadow: 0 0 15px rgba(0, 242, 254, 0.6);
+            border-color: var(--accent-cyan);
+        }
+
+        .progress-indicator {
+            position: fixed;
+            bottom: 30px;
+            left: 40px;
+            font-family: var(--font-mono);
+            font-size: 16px;
+            color: var(--text-secondary);
+            z-index: 9999;
+            background: rgba(13, 21, 39, 0.6);
+            padding: 8px 16px;
+            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .progress-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-green));
+            transition: width 0.3s ease;
+            z-index: 9999;
+        }
+
+        /* ===========================================
+           INLINE EDITING SYSTEM
+           =========================================== */
+        .edit-hotzone {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 80px;
+            height: 80px;
+            z-index: 10000;
+            cursor: pointer;
+        }
+
+        .edit-toggle {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: #FF0055;
+            border: none;
+            color: #fff;
+            padding: 10px 16px;
+            font-family: var(--font-mono);
+            font-weight: bold;
+            font-size: 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease, transform 0.2s;
+            z-index: 10001;
+            box-shadow: 0 0 15px rgba(255, 0, 85, 0.5);
+        }
+
+        .edit-toggle.show,
+        .edit-toggle.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .edit-toggle:hover {
+            transform: scale(1.05);
+        }
+
+        [contenteditable="true"] {
+            outline: 2px dashed var(--accent-cyan) !important;
+            background: rgba(0, 242, 254, 0.05);
+            padding: 4px;
+            border-radius: 4px;
+        }
+
+        /* ===========================================
+           MODERN EDITOR / CODE BLOCKS DESIGN
+           =========================================== */
+        .code-window {
+            background: #080D18;
+            border: 1px solid rgba(0, 242, 254, 0.15);
+            border-radius: 12px;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.6);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            height: 100%;
+        }
+
+        .code-header {
+            background: #0B1324;
+            padding: 14px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(0, 242, 254, 0.1);
+        }
+
+        .code-dots {
+            display: flex;
+            gap: 8px;
+        }
+
+        .code-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+        .dot-red { background: #FF5F56; }
+        .dot-yellow { background: #FFBD2E; }
+        .dot-green { background: #27C93F; }
+
+        .code-title {
+            color: var(--text-secondary);
+            font-family: var(--font-mono);
+            font-size: 14px;
+        }
+
+        .code-content {
+            padding: 24px;
+            font-family: var(--font-mono);
+            font-size: 20px;
+            line-height: 1.6;
+            overflow-y: auto;
+            color: #E2E8F0;
+        }
+
+        /* Custom syntax highlights for hacker/dark code styling */
+        .hl-keyword { color: #FF0055; font-weight: 600; }
+        .hl-string { color: var(--accent-green); }
+        .hl-comment { color: #52637A; font-style: italic; }
+        .hl-type { color: var(--accent-cyan); }
+        .hl-fn { color: #E9D8A6; }
+        .hl-num { color: #FF9F1C; }
+
+        .code-highlight-block {
+            background: rgba(0, 242, 254, 0.08);
+            border-left: 4px solid var(--accent-cyan);
+            margin: 4px 0;
+            padding-left: 8px;
+        }
+
+        /* ===========================================
+           SLIDE-SPECIFIC DESIGNS
+           =========================================== */
+
+        /* --- Slide 1 --- */
+        .title-slide-layout {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: flex-start;
+            height: 100%;
+            max-width: 1200px;
+        }
+
+        .main-hero-title {
+            font-size: 80px;
+            font-family: var(--font-display);
+            font-weight: 700;
+            line-height: 1.1;
+            margin-bottom: 24px;
+            background: linear-gradient(135deg, #FFF, var(--accent-cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 40px rgba(0, 242, 254, 0.25);
+        }
+
+        .terminal-cli-badge {
+            background: rgba(57, 255, 20, 0.1);
+            border: 1px solid var(--accent-green);
+            color: var(--accent-green);
+            font-family: var(--font-mono);
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-size: 18px;
+            margin-bottom: 30px;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .terminal-cli-cursor {
+            width: 10px;
+            height: 20px;
+            background: var(--accent-green);
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            50% { opacity: 0; }
+        }
+
+        .intro-features {
+            display: flex;
+            gap: 40px;
+            margin-top: 50px;
+            width: 100%;
+        }
+
+        .intro-feature-card {
+            background: rgba(13, 21, 39, 0.6);
+            border-left: 4px solid var(--accent-cyan);
+            padding: 20px 24px;
+            border-radius: 0 8px 8px 0;
+            flex: 1;
+        }
+
+        .intro-feature-card h4 {
+            color: var(--accent-cyan);
+            font-size: 20px;
+            margin-bottom: 8px;
+        }
+
+        .intro-feature-card p {
+            color: var(--text-secondary);
+            font-size: 16px;
+            line-height: 1.4;
+        }
+
+        /* --- Slide 2 --- */
+        .vs-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            height: 100%;
+        }
+
+        .vs-card {
+            background: rgba(13, 21, 39, 0.5);
+            border-radius: 12px;
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            height: 100%;
+        }
+
+        .vs-card.pain {
+            border: 1px solid rgba(255, 0, 85, 0.3);
+            box-shadow: 0 0 30px rgba(255, 0, 85, 0.05);
+        }
+
+        .vs-card.solution {
+            border: 1px solid rgba(57, 255, 20, 0.3);
+            box-shadow: 0 0 30px rgba(57, 255, 20, 0.05);
+        }
+
+        .vs-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .vs-badge {
+            font-family: var(--font-mono);
+            font-size: 14px;
+            padding: 6px 14px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+
+        .vs-card.pain .vs-badge {
+            background: rgba(255, 0, 85, 0.15);
+            color: var(--accent-pink);
+            border: 1px solid var(--accent-pink);
+        }
+
+        .vs-card.solution .vs-badge {
+            background: rgba(57, 255, 20, 0.15);
+            color: var(--accent-green);
+            border: 1px solid var(--accent-green);
+        }
+
+        .vs-title {
+            font-size: 28px;
+            font-weight: 600;
+        }
+
+        .vs-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .vs-list li {
+            font-size: 20px;
+            line-height: 1.5;
+            padding-left: 30px;
+            position: relative;
+        }
+
+        .vs-card.pain .vs-list li::before {
+            content: "✕";
+            position: absolute;
+            left: 0;
+            color: var(--accent-pink);
+            font-weight: bold;
+        }
+
+        .vs-card.solution .vs-list li::before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: var(--accent-green);
+            font-weight: bold;
+        }
+
+        .vs-list span {
+            display: block;
+            font-size: 16px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        /* --- Slide 3 --- */
+        .pillar-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            gap: 30px;
+            height: 100%;
+        }
+
+        .pillar-card {
+            background: rgba(20, 32, 59, 0.4);
+            border: 1px solid rgba(0, 242, 254, 0.1);
+            border-radius: 12px;
+            padding: 30px;
+            display: flex;
+            gap: 24px;
+            transition: all 0.3s ease;
+        }
+
+        .pillar-card:hover {
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 20px rgba(0, 242, 254, 0.15);
+            background: rgba(20, 32, 59, 0.6);
+        }
+
+        .pillar-icon-box {
+            background: rgba(0, 242, 254, 0.05);
+            border: 1px solid rgba(0, 242, 254, 0.2);
+            border-radius: 8px;
+            width: 70px;
+            height: 70px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-shrink: 0;
+            color: var(--accent-cyan);
+        }
+
+        .pillar-info h3 {
+            font-size: 24px;
+            color: #FFF;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .pillar-info h3 span {
+            font-family: var(--font-mono);
+            font-size: 14px;
+            color: var(--accent-cyan);
+            background: rgba(0, 242, 254, 0.1);
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        .pillar-info p {
+            color: var(--text-secondary);
+            font-size: 18px;
+            line-height: 1.5;
+        }
+
+        /* --- Slide 4 --- */
+        .onboard-split {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            height: 100%;
+        }
+
+        .terminal-block {
+            background: #05080F;
+            border: 1px solid rgba(0, 242, 254, 0.2);
+            border-radius: 8px;
+            padding: 24px;
+            font-family: var(--font-mono);
+            font-size: 18px;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+
+        .terminal-prompt {
+            color: var(--accent-green);
+            margin-right: 10px;
+        }
+
+        .terminal-output {
+            color: var(--text-secondary);
+            font-size: 15px;
+            margin-top: 10px;
+            padding-left: 20px;
+            border-left: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .studio-preview {
+            background: linear-gradient(145deg, #0A0F1D, #16223F);
+            border: 1px solid rgba(0, 242, 254, 0.2);
+            border-radius: 12px;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            position: relative;
+        }
+
+        .studio-preview::after {
+            content: "LOCAL STUDIO";
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            background: var(--accent-cyan);
+            color: var(--bg-primary);
+            font-weight: bold;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        .studio-feature {
+            background: rgba(7, 11, 18, 0.6);
+            border: 1px solid rgba(0, 242, 254, 0.1);
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .studio-feature.highlight {
+            border-color: var(--accent-green);
+        }
+
+        .studio-feature h4 {
+            color: #FFF;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .studio-feature p {
+            color: var(--text-secondary);
+            font-size: 15px;
+        }
+
+        /* --- Slide 5 & 6 & 7 Layouts --- */
+        .code-split-layout {
+            display: grid;
+            grid-template-columns: 65% 35%;
+            gap: 40px;
+            height: 100%;
+        }
+
+        .code-explanation-card {
+            background: rgba(13, 21, 39, 0.5);
+            border: 1px solid rgba(0, 242, 254, 0.15);
+            border-radius: 12px;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            height: 100%;
+        }
+
+        .explain-step {
+            margin-bottom: 24px;
+        }
+
+        .explain-step h4 {
+            font-size: 20px;
+            color: var(--accent-cyan);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .explain-step h4 span {
+            background: rgba(0, 242, 254, 0.15);
+            color: var(--accent-cyan);
+            width: 28px;
+            height: 28px;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 50%;
+            font-size: 14px;
+            font-family: var(--font-mono);
+        }
+
+        .explain-step p {
+            color: var(--text-secondary);
+            font-size: 16px;
+            line-height: 1.5;
+            padding-left: 38px;
+        }
+
+        /* Slide 6 custom connection arrow */
+        .tool-connector-svg {
+            position: absolute;
+            top: 50%;
+            left: 63%;
+            transform: translateY(-50%);
+            width: 100px;
+            height: 80px;
+            z-index: 100;
+            pointer-events: none;
+        }
+
+        /* Slide 7 Workflows Visualizer */
+        .workflow-visualizer {
+            background: #05080F;
+            border: 1px solid rgba(0, 242, 254, 0.15);
+            border-radius: 12px;
+            padding: 30px;
+            position: relative;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .workflow-nodes {
+            display: flex;
+            flex-direction: column;
+            gap: 40px;
+            align-items: center;
+            width: 100%;
+        }
+
+        .node-row {
+            display: flex;
+            justify-content: space-around;
+            width: 100%;
+            position: relative;
+        }
+
+        .workflow-node {
+            background: rgba(13, 21, 39, 0.9);
+            border: 1px solid rgba(0, 242, 254, 0.3);
+            border-radius: 8px;
+            padding: 16px 24px;
+            font-family: var(--font-mono);
+            font-size: 16px;
+            color: #FFF;
+            text-align: center;
+            box-shadow: 0 0 15px rgba(0, 242, 254, 0.1);
+            position: relative;
+            z-index: 5;
+        }
+
+        .workflow-node.active {
+            border-color: var(--accent-green);
+            box-shadow: 0 0 20px rgba(57, 255, 20, 0.25);
+        }
+
+        .workflow-node.branch {
+            border-color: var(--accent-pink);
+            box-shadow: 0 0 20px rgba(255, 0, 85, 0.25);
+        }
+
+        /* --- Slide 8: Perspective deep grid --- */
+        .perspective-grid-container {
+            position: absolute;
+            inset: 0;
+            perspective: 500px;
+            overflow: hidden;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .perspective-grid {
+            position: absolute;
+            width: 200%;
+            height: 200%;
+            top: -50%;
+            left: -50%;
+            background-image: 
+                linear-gradient(rgba(0, 242, 254, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 242, 254, 0.05) 1px, transparent 1px);
+            background-size: 50px 50px;
+            transform: rotateX(60deg);
+            transform-origin: center top;
+            animation: grid-scroll 20s linear infinite;
+        }
+
+        @keyframes grid-scroll {
+            0% { transform: rotateX(60deg) translateY(0); }
+            100% { transform: rotateX(60deg) translateY(50px); }
+        }
+
+        .deep-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            text-align: center;
+            gap: 40px;
+        }
+
+        .deep-command {
+            font-size: 40px;
+            font-family: var(--font-mono);
+            background: #0D1527;
+            border: 2px solid var(--accent-cyan);
+            color: var(--accent-green);
+            padding: 20px 40px;
+            border-radius: 12px;
+            box-shadow: 0 0 35px rgba(0, 242, 254, 0.4);
+            letter-spacing: 1px;
+            margin-bottom: 20px;
+        }
+
+        .deep-cards {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            width: 100%;
+            max-width: 1000px;
+        }
+
+        .deep-card {
+            background: rgba(13, 21, 39, 0.85);
+            border: 1px solid rgba(0, 242, 254, 0.2);
+            padding: 30px;
+            border-radius: 12px;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .deep-card:hover {
+            border-color: var(--accent-cyan);
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0, 242, 254, 0.25);
+        }
+
+        .deep-card h3 {
+            color: var(--accent-cyan);
+            font-size: 24px;
+            margin-bottom: 12px;
+        }
+
+        .deep-card p {
+            color: var(--text-secondary);
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- DECK PROGRESS BAR -->
+    <div class="progress-bar" id="progressBar"></div>
+
+    <div class="deck-viewport">
+        <main class="deck-stage" id="deckStage">
+
+            <!-- ===========================================
+               SLIDE 1: INTRO & LANDING
+               =========================================== -->
+            <section class="slide active visible">
+                <div class="cyber-grid"></div>
+                <div class="glow-orb-cyan" style="top: -100px; left: -100px;"></div>
+                
+                <div class="slide-header">
+                    <div class="logo-text">MASTRA.AI</div>
+                    <div class="breadcrumb">TS AI FRAMEWORK / <span>INTRO</span></div>
+                </div>
+
+                <div class="slide-content-wrapper">
+                    <div class="title-slide-layout">
+                        <div class="terminal-cli-badge reveal">
+                            <span>$</span> npx mastra@latest init
+                            <div class="terminal-cli-cursor"></div>
+                        </div>
+                        <h1 class="main-hero-title reveal delay-1">Mastra: 开启 TypeScript<br>原生 AI Agent 时代</h1>
+                        <p class="reveal delay-2" style="font-size: 24px; color: var(--text-secondary); max-width: 800px; line-height: 1.5; margin-bottom: 40px;">
+                            告别 Python 与繁琐的跨语言服务。在纯 TS 生态下极速构建企业级、高确定性的智能体应用与生产级 Workflow。
+                        </p>
+
+                        <div class="intro-features reveal delay-3">
+                            <div class="intro-feature-card">
+                                <h4>TypeScript-First</h4>
+                                <p>100% 纯粹的 JS/TS 开发生态，无缝衔接主流 Web 架构</p>
+                            </div>
+                            <div class="intro-feature-card">
+                                <h4>编译期 + 运行时类型安全</h4>
+                                <p>基于 Zod 对 LLM 提示词、输入输出与 Tools 参数强约束</p>
+                            </div>
+                            <div class="intro-feature-card">
+                                <h4>开箱即用 Studio</h4>
+                                <p>内置调试 UI、Trace 日志与 Chat 环境，调试效率翻倍</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="slide-footer">
+                    <div>10分钟极速上手实战指南</div>
+                    <div>PAGE 01 / 08</div>
+                </div>
+            </section>
+
+            <!-- ===========================================
+               SLIDE 2: WHY MASTRA?
+               =========================================== -->
+            <section class="slide">
+                <div class="cyber-grid"></div>
+                
+                <div class="slide-header">
+                    <div class="logo-text">MASTRA.AI</div>
+                    <div class="breadcrumb">WHY MASTRA / <span>ADVANTAGES</span></div>
+                </div>
+
+                <div class="slide-content-wrapper">
+                    <h2 class="slide-title reveal">为什么选择 Mastra？重塑 TS AI 开发范式</h2>
+                    
+                    <div class="vs-grid">
+                        <!-- Pain points -->
+                        <div class="vs-card pain reveal delay-1">
+                            <div>
+                                <div class="vs-header">
+                                    <div class="vs-badge">TRADITIONAL</div>
+                                    <div class="vs-title">传统 AI 框架的工程痛点</div>
+                                </div>
+                                <ul class="vs-list">
+                                    <li>Python 垄断痛点
+                                        <span>构建 TS 架构项目仍需额外维护 Python 微服务，链路冗长</span>
+                                    </li>
+                                    <li>LangChain.js 过于冗重
+                                        <span>历史包袱多，API 繁琐，多层抽象常常阻碍底层逻辑控制</span>
+                                    </li>
+                                    <li>类型安全形同虚设
+                                        <span>LLM 调用传参容易出错，缺乏开箱即用的运行时严格类型保障</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- Mastra Solutions -->
+                        <div class="vs-card solution reveal delay-2">
+                            <div>
+                                <div class="vs-header">
+                                    <div class="vs-badge">MASTRA SOLUTION</div>
+                                    <div class="vs-title">Mastra 的现代化解决方案</div>
+                                </div>
+                                <ul class="vs-list">
+                                    <li>直接嵌入 Web 架构
+                                        <span>直接嵌入 NestJS, Next.js 或 Express，无需启动复杂微服务</span>
+                                    </li>
+                                    <li>端到端强类型校验
+                                        <span>底层基于 Zod 实现编译期与运行时的参数双重校验，杜绝意外调用</span>
+                                    </li>
+                                    <li>为 Agentic 量身定制
+                                        <span>极简现代化 API，原生对 RAG、Tools 调度和工作流提供完美支持</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="slide-footer">
+                    <div>极客暗黑科技风 &middot; 精准降维打击</div>
+                    <div>PAGE 02 / 08</div>
+                </div>
+            </section>
+
+            <!-- ===========================================
+               SLIDE 3: FOUR PILLARS
+               =========================================== -->
+            <section class="slide">
+                <div class="cyber-grid"></div>
+                <div class="glow-orb-pink" style="bottom: -100px; right: -100px;"></div>
+
+                <div class="slide-header">
+                    <div class="logo-text">MASTRA.AI</div>
+                    <div class="breadcrumb">ARCHITECTURE / <span>FOUR PILLARS</span></div>
+                </div>
+
+                <div class="slide-content-wrapper">
+                    <h2 class="slide-title reveal">Mastra 的核心四大支柱</h2>
+
+                    <div class="pillar-grid">
+                        <!-- Pillar 1 -->
+                        <div class="pillar-card reveal delay-1">
+                            <div class="pillar-icon-box">
+                                <svg width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                                </svg>
+                            </div>
+                            <div class="pillar-info">
+                                <h3>Agents <span>智能体决策核心</span></h3>
+                                <p>具备独立 System Prompt、能够自主分析并选择注册工具（Tools）进行迭代推理的核心大脑单元。</p>
+                            </div>
+                        </div>
+
+                        <!-- Pillar 2 -->
+                        <div class="pillar-card reveal delay-2">
+                            <div class="pillar-icon-box">
+                                <svg width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                            </div>
+                            <div class="pillar-info">
+                                <h3>Tools <span>强类型原子工具</span></h3>
+                                <p>使用 Zod 声明精准入参规格（Input Schema），可被 Agent 自主执行的任何 JavaScript / TypeScript 异步函数。</p>
+                            </div>
+                        </div>
+
+                        <!-- Pillar 3 -->
+                        <div class="pillar-card reveal delay-3">
+                            <div class="pillar-icon-box">
+                                <svg width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                </svg>
+                            </div>
+                            <div class="pillar-info">
+                                <h3>Workflows <span>确定性工作流</span></h3>
+                                <p>以图（Graph）或链式结构运作的流程控制器。用于在确定性业务流程中约束 AI 边界，规避幻觉失控。</p>
+                            </div>
+                        </div>
+
+                        <!-- Pillar 4 -->
+                        <div class="pillar-card reveal delay-4">
+                            <div class="pillar-icon-box">
+                                <svg width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 4a2 2 0 114 0v1a2 2 0 01-2 2H3m2 0h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V9a2 2 0 012-2z" />
+                                </svg>
+                            </div>
+                            <div class="pillar-info">
+                                <h3>MCP <span>标准多源集成机制</span></h3>
+                                <p>全面对接 Model Context Protocol (MCP) 标准，使 Agent 能即插即用集成外部文件系统、第三方 API 与 SaaS 生态。</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="slide-footer">
+                    <div>结构化积木式架构 &middot; 极佳上手体验</div>
+                    <div>PAGE 03 / 08</div>
+                </div>
+            </section>
+
+            <!-- ===========================================
+               SLIDE 4: GETTING STARTED (5 MINS)
+               =========================================== -->
+            <section class="slide">
+                <div class="cyber-grid"></div>
+
+                <div class="slide-header">
+                    <div class="logo-text">MASTRA.AI</div>
+                    <div class="breadcrumb">ONBOARDING / <span>QUICK START</span></div>
+                </div>
+
+                <div class="slide-content-wrapper">
+                    <h2 class="slide-title reveal">5分钟极速上手：从零初始化项目</h2>
+
+                    <div class="onboard-split">
+                        <!-- Left terminal -->
+                        <div class="reveal delay-1" style="display: flex; flex-direction: column; justify-content: center;">
+                            <div class="terminal-block">
+                                <div><span class="terminal-prompt">~</span>npx mastra@latest init</div>
+                                <div class="terminal-output">
+                                    Installing dependencies...<br>
+                                    Creating mastra.config.ts...<br>
+                                    Created ./src/mastra/index.ts<br>
+                                    <span style="color: var(--accent-green)">✔ Success! Mastra project initialized.</span>
+                                </div>
+                            </div>
+
+                            <div class="terminal-block" style="background: #090E18;">
+                                <div><span class="terminal-prompt">~</span>cat .env</div>
+                                <div class="terminal-output">
+                                    OPENAI_API_KEY=your_sk_key_here<br>
+                                    ANTHROPIC_API_KEY=your_claude_key_here
+                                </div>
+                            </div>
+
+                            <div class="terminal-block" style="margin-bottom: 0;">
+                                <div><span class="terminal-prompt">~</span>npx mastra dev</div>
+                                <div class="terminal-output">
+                                    Mastra Studio is running at: <span style="color: var(--accent-cyan)">http://localhost:3000</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right preview mock -->
+                        <div class="studio-preview reveal delay-2">
+                            <div>
+                                <h3 style="color: var(--accent-cyan); font-size: 24px; margin-bottom: 20px;">可视化调试控制台 (Studio)</h3>
+                                
+                                <div class="studio-feature highlight">
+                                    <h4>
+                                        <span style="color: var(--accent-green)">●</span> Chat Playground
+                                    </h4>
+                                    <p>在本地直接与你刚刚在代码中定义的 Agent 聊天调试，实时评估指令理解程度与推理质量。</p>
+                                </div>
+
+                                <div class="studio-feature">
+                                    <h4>
+                                        <span style="color: var(--accent-cyan)">●</span> Telemetry & Traces (链路追踪)
+                                    </h4>
+                                    <p>精准展示每次 LLM 调用时消耗的 Token 数、每步 Tool 调用的耗时以及最终拼接的 Prompt 视图。</p>
+                                </div>
+
+                                <div class="studio-feature" style="margin-bottom: 0;">
+                                    <h4>
+                                        <span style="color: var(--accent-pink)">●</span> Workflow Visualizer
+                                    </h4>
+                                    <p>直观查看你定义的多步骤 Workflows 拓扑拓扑关系图和每次运行的具体日志流转。</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="slide-footer">
+                    <div>1分钟极简开发命令 &middot; 工具开箱即用</div>
+                    <div>PAGE 04 / 08</div>
+                </div>
+            </section>
+
+            <!-- ===========================================
+               SLIDE 5: PRACTICAL 1 - FIRST AGENT
+               =========================================== -->
+            <section class="slide">
+                <div class="cyber-grid"></div>
+
+                <div class="slide-header">
+                    <div class="logo-text">MASTRA.AI</div>
+                    <div class="breadcrumb">PRACTICAL 1 / <span>FIRST AGENT</span></div>
+                </div>
+
+                <div class="slide-content-wrapper">
+                    <h2 class="slide-title reveal">实战 1：编写你的第一个 AI Agent</h2>
+
+                    <div class="code-split-layout">
+                        <!-- Code panel left -->
+                        <div class="code-window reveal delay-1">
+                            <div class="code-header">
+                                <div class="code-dots">
+                                    <div class="code-dot dot-red"></div>
+                                    <div class="code-dot dot-yellow"></div>
+                                    <div class="code-dot dot-green"></div>
+                                </div>
+                                <div class="code-title">src/mastra/agent.ts</div>
+                            </div>
+                            <div class="code-content">
+<span class="hl-keyword">import</span> { Agent } <span class="hl-keyword">from</span> <span class="hl-string">'@mastra/core'</span>;
+<span class="hl-keyword">import</span> { openai } <span class="hl-keyword">from</span> <span class="hl-string">'@ai-sdk/openai'</span>;
+
+<span class="hl-keyword">export const</span> <span class="hl-type">chefAgent</span> = <span class="hl-keyword">new</span> <span class="hl-fn">Agent</span>({
+  <span class="hl-highlight-block">name: <span class="hl-string">'Professional Chef'</span>,
+  instructions: <span class="hl-string">'You are a professional chef. Help users create detailed recipes.'</span>,
+  model: <span class="hl-fn">openai</span>(<span class="hl-string">'gpt-4o'</span>),</span>
+});
+
+<span class="hl-comment">// 在路由或服务中发起请求</span>
+<span class="hl-keyword">const</span> <span class="hl-type">response</span> = <span class="hl-keyword">await</span> <span class="hl-type">chefAgent</span>.<span class="hl-fn">generate</span>(<span class="hl-string">'如何做一碗正宗的担担面？'</span>);
+<span class="hl-type">console</span>.<span class="hl-fn">log</span>(<span class="hl-type">response</span>.text);
+                            </div>
+                        </div>
+
+                        <!-- Explanations right -->
+                        <div class="code-explanation-card reveal delay-2">
+                            <div>
+                                <h3 style="color: #FFF; font-size: 24px; margin-bottom: 24px;">核心机制拆解</h3>
+
+                                <div class="explain-step">
+                                    <h4><span>1</span> 独立 System Prompt</h4>
+                                    <p>通过 instructions 直接对智能体设定背景人设与行为准则，限定角色边界。</p>
+                                </div>
+
+                                <div class="explain-step">
+                                    <h4><span>2</span> 统一的 AI SDK 模型接入</h4>
+                                    <p>原生整合 `@ai-sdk/openai` 等业内标准，多厂商模型更换仅需一行修改。</p>
+                                </div>
+
+                                <div class="explain-step" style="margin-bottom: 0;">
+                                    <h4><span>3</span> 简洁调用方法</h4>
+                                    <p>提供 `.generate()` 获取结果，亦支持 `.stream()` 用于前端打字机效果。</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="slide-footer">
+                    <div>100% 现代 TypeScript 规范语法 &middot; 开箱即用</div>
+                    <div>PAGE 05 / 08</div>
+                </div>
+            </section>
+
+            <!-- ===========================================
+               SLIDE 6: PRACTICAL 2 - TOOLS
+               =========================================== -->
+            <section class="slide">
+                <div class="cyber-grid"></div>
+
+                <div class="slide-header">
+                    <div class="logo-text">MASTRA.AI</div>
+                    <div class="breadcrumb">PRACTICAL 2 / <span>CUSTOM TOOLS</span></div>
+                </div>
+
+                <div class="slide-content-wrapper">
+                    <h2 class="slide-title reveal">实战 2：赋能 Agent：自定义并绑定 Tool</h2>
+
+                    <!-- Glowing SVG connecting arrow -->
+                    <svg class="tool-connector-svg" viewBox="0 0 100 80" fill="none">
+                        <path d="M5,40 Q50,10 95,40" stroke="#00F2FE" stroke-width="3" stroke-dasharray="6 4" />
+                        <polygon points="95,40 85,32 87,45" fill="#00F2FE" />
+                    </svg>
+
+                    <div class="code-split-layout">
+                        <!-- Code Panel Left: Create Tool -->
+                        <div class="code-window reveal delay-1">
+                            <div class="code-header">
+                                <div class="code-dots">
+                                    <div class="code-dot dot-red"></div>
+                                    <div class="code-dot dot-yellow"></div>
+                                    <div class="code-dot dot-green"></div>
+                                </div>
+                                <div class="code-title">1. 定义工具 (tools.ts)</div>
+                            </div>
+                            <div class="code-content" style="font-size: 17px;">
+<span class="hl-keyword">import</span> { createTool } <span class="hl-keyword">from</span> <span class="hl-string">'@mastra/core'</span>;
+<span class="hl-keyword">import</span> { z } <span class="hl-keyword">from</span> <span class="hl-string">'zod'</span>;
+
+<span class="hl-keyword">export const</span> <span class="hl-type">getWeather</span> = <span class="hl-fn">createTool</span>({
+  id: <span class="hl-string">'get-weather'</span>,
+  description: <span class="hl-string">'Get current weather of a city'</span>,
+  <span class="hl-highlight-block">inputSchema: z.object({
+    city: z.string().describe('The city name'),
+  }),</span>
+  execute: <span class="hl-keyword">async</span> ({ <span class="hl-type">context</span> }) => {
+    <span class="hl-comment">// 原子异步执行逻辑</span>
+    <span class="hl-keyword">return</span> <span class="hl-keyword">await</span> <span class="hl-fn">fetchWeatherApi</span>(<span class="hl-type">context</span>.city);
+  }
+});
+                            </div>
+                        </div>
+
+                        <!-- Code Panel Right: Bind to Agent -->
+                        <div class="code-window reveal delay-2">
+                            <div class="code-header">
+                                <div class="code-dots">
+                                    <div class="code-dot dot-red"></div>
+                                    <div class="code-dot dot-yellow"></div>
+                                    <div class="code-dot dot-green"></div>
+                                </div>
+                                <div class="code-title">2. 绑定工具 (agent.ts)</div>
+                            </div>
+                            <div class="code-content" style="font-size: 17px;">
+<span class="hl-keyword">import</span> { chefAgent } <span class="hl-keyword">from</span> <span class="hl-string">'./agent'</span>;
+<span class="hl-keyword">import</span> { getWeather } <span class="hl-keyword">from</span> <span class="hl-string">'./tools'</span>;
+
+<span class="hl-keyword">export const</span> <span class="hl-type">weatherChefAgent</span> = <span class="hl-keyword">new</span> <span class="hl-fn">Agent</span>({
+  name: <span class="hl-string">'Weather Chef'</span>,
+  instructions: <span class="hl-string">'Custom recipes based on current weather.'</span>,
+  model: <span class="hl-fn">openai</span>(<span class="hl-string">'gpt-4o'</span>),
+  <span class="hl-highlight-block">tools: { getWeather },</span> <span class="hl-comment">// 一键绑定</span>
+});
+
+<span class="hl-comment">// Agent 会识别出需要先调用该工具获取天气数据，再作答</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="slide-footer">
+                    <div>基于 Zod 模式架构设计 &middot; 运行时与编译期强安全保障</div>
+                    <div>PAGE 06 / 08</div>
+                </div>
+            </section>
+
+            <!-- ===========================================
+               SLIDE 7: ADVANCED WORKFLOWS
+               =========================================== -->
+            <section class="slide">
+                <div class="cyber-grid"></div>
+
+                <div class="slide-header">
+                    <div class="logo-text">MASTRA.AI</div>
+                    <div class="breadcrumb">ADVANCED / <span>WORKFLOWS</span></div>
+                </div>
+
+                <div class="slide-content-wrapper">
+                    <h2 class="slide-title reveal">进阶之道：用 Workflows 掌控复杂逻辑</h2>
+
+                    <div class="vs-grid">
+                        <!-- Left Node Graphic -->
+                        <div class="workflow-visualizer reveal delay-1">
+                            <div class="workflow-nodes">
+                                <div class="workflow-node active">
+                                    [ Step A ] : 用户请求输入 (Trigger)
+                                </div>
+                                
+                                <svg width="20" height="30" viewBox="0 0 20 30" fill="none">
+                                    <path d="M10,0 L10,25 M5,20 L10,25 L15,20" stroke="#39FF14" stroke-width="2" />
+                                </svg>
+
+                                <div class="node-row">
+                                    <div class="workflow-node branch" style="border-color: var(--accent-cyan);">
+                                        [ Step B1 ] : LLM 标签提取
+                                    </div>
+                                    <div class="workflow-node branch">
+                                        [ Step B2 ] : 数据库查询
+                                    </div>
+                                </div>
+
+                                <svg width="200" height="30" viewBox="0 0 200 30" fill="none">
+                                    <path d="M50,0 Q100,25 100,25" stroke="#FF0055" stroke-width="2" stroke-dasharray="3 3" />
+                                    <path d="M150,0 Q100,25 100,25" stroke="#FF0055" stroke-width="2" stroke-dasharray="3 3" />
+                                </svg>
+
+                                <div class="workflow-node active" style="border-color: var(--accent-green);">
+                                    [ Step C ] : 最终报告聚合及邮件发送
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right API Explanations -->
+                        <div class="code-explanation-card reveal delay-2">
+                            <div>
+                                <h3 style="color: #FFF; font-size: 24px; margin-bottom: 24px;">为什么放弃 Agentic Loop 拥抱 Workflow？</h3>
+
+                                <div class="explain-step">
+                                    <h4><span>1</span> 确定性高，杜绝死循环</h4>
+                                    <p>当业务执行链路非常严苛（如：退款申请审核），无需让 LLM 盲目猜测 Tool 的调用顺序，而是直接使用链式拓扑控制执行边界。</p>
+                                </div>
+
+                                <div class="explain-step">
+                                    <h4><span>2</span> 链式与分支控制 API</h4>
+                                    <p>Mastra 提供了直观的链式逻辑：`.then()` 顺序流转、`.parallel()` 并行控制、以及 `.branch()` 逻辑判断，流程编排极其灵活舒适。</p>
+                                </div>
+
+                                <div class="explain-step" style="margin-bottom: 0;">
+                                    <h4><span>3</span> 生产级故障恢复保障</h4>
+                                    <p>节点内置完美状态持久化、自动重试机制、调试链路追踪等工程指标，支持人机协同确认机制（Human-in-the-loop）。</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="slide-footer">
+                    <div>全栈可预测性调度 &middot; 实现复杂企业应用闭环</div>
+                    <div>PAGE 07 / 08</div>
+                </div>
+            </section>
+
+            <!-- ===========================================
+               SLIDE 8: SUMMARY & NEXT STEPS
+               =========================================== -->
+            <section class="slide">
+                <div class="perspective-grid-container">
+                    <div class="perspective-grid"></div>
+                </div>
+
+                <div class="slide-header">
+                    <div class="logo-text">MASTRA.AI</div>
+                    <div class="breadcrumb">SUMMARY / <span>FUTURE IS NOW</span></div>
+                </div>
+
+                <div class="slide-content-wrapper">
+                    <div class="deep-container">
+                        <h2 class="slide-title reveal" style="margin-bottom: 0;">拥抱 TypeScript AI 生态，即刻启航</h2>
+                        <p class="reveal delay-1" style="font-size: 20px; color: var(--text-secondary); max-width: 800px; line-height: 1.5;">
+                            Mastra 彻底拉低了 Web 开发者构建原生、强类型安全 AI 应用的门槛。
+                        </p>
+
+                        <div class="deep-command reveal delay-2">
+                            npx mastra@latest init
+                        </div>
+
+                        <div class="deep-cards reveal delay-3">
+                            <div class="deep-card">
+                                <h3>探索官方文档</h3>
+                                <p>访问 docs.mastra.ai 获取关于 向量检索 (RAG)、多 Agent 协同和智能体自评估（Evals）的最新进阶教程。</p>
+                            </div>
+
+                            <div class="deep-card">
+                                <h3>加入全球极客社区</h3>
+                                <p>加入官方 Discord / GitHub 开源社区，与全球 Web 与 AI 工程师一起，携手推动 TypeScript AI 生态的大繁荣。</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="slide-footer">
+                    <div>TS 原生 AI 生产力新起点 &middot; 创造无限可能</div>
+                    <div>PAGE 08 / 08</div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- VIEWPORT CONTROLS -->
+    <div class="deck-controls">
+        <button class="ctrl-btn" id="prevBtn">PREV</button>
+        <button class="ctrl-btn" id="nextBtn">NEXT</button>
+    </div>
+    <div class="progress-indicator" id="progressIndicator">01 / 08</div>
+
+    <!-- INLINE EDITING UTILITY -->
+    <div class="edit-hotzone"></div>
+    <button class="edit-toggle" id="editToggle" title="Edit mode (E)">✏️ 进入编辑模式</button>
+
+    <script>
+        /* ===========================================
+           SLIDE PRESENTATION CONTROLLER
+           =========================================== */
+        class SlidePresentation {
+            constructor() {
+                this.slides = document.querySelectorAll('.slide');
+                this.currentSlide = 0;
+                this.stage = document.getElementById('deckStage');
+                this.progressBar = document.getElementById('progressBar');
+                this.progressIndicator = document.getElementById('progressIndicator');
+                
+                this.setupStageScale();
+                this.setupKeyboardNav();
+                this.setupTouchNav();
+                this.setupMouseWheelNav();
+                this.setupControls();
+                this.showSlide(0);
+            }
+
+            setupStageScale() {
+                const scale = () => {
+                    const factor = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+                    const x = (window.innerWidth - 1920 * factor) / 2;
+                    const y = (window.innerHeight - 1080 * factor) / 2;
+                    this.stage.style.transform = `translate(${x}px, ${y}px) scale(${factor})`;
+                };
+                scale();
+                window.addEventListener('resize', scale);
+            }
+
+            setupKeyboardNav() {
+                document.addEventListener('keydown', (e) => {
+                    if (e.target.getAttribute('contenteditable')) return; // Ignore when editing text
+                    
+                    if (e.key === 'ArrowRight' || e.key === 'Space' || e.key === 'PageDown') {
+                        this.next();
+                    } else if (e.key === 'ArrowLeft' || e.key === 'Backspace' || e.key === 'PageUp') {
+                        this.prev();
+                    } else if (e.key === 'Home') {
+                        this.showSlide(0);
+                    } else if (e.key === 'End') {
+                        this.showSlide(this.slides.length - 1);
+                    }
+                });
+            }
+
+            setupTouchNav() {
+                let startX = 0;
+                let startY = 0;
+                document.addEventListener('touchstart', (e) => {
+                    startX = e.touches[0].clientX;
+                    startY = e.touches[0].clientY;
+                }, false);
+
+                document.addEventListener('touchend', (e) => {
+                    if (!startX || !startY) return;
+                    let endX = e.changedTouches[0].clientX;
+                    let endY = e.changedTouches[0].clientY;
+
+                    let diffX = startX - endX;
+                    let diffY = startY - endY;
+
+                    if (Math.abs(diffX) > Math.abs(diffY)) {
+                        if (diffX > 50) this.next();
+                        else if (diffX < -50) this.prev();
+                    }
+                    startX = 0;
+                    startY = 0;
+                }, false);
+            }
+
+            setupMouseWheelNav() {
+                let lastScrollTime = 0;
+                document.addEventListener('wheel', (e) => {
+                    if (e.target.getAttribute('contenteditable')) return;
+                    const now = Date.now();
+                    if (now - lastScrollTime < 1000) return; // Debounce wheel
+                    
+                    if (e.deltaY > 50) {
+                        this.next();
+                        lastScrollTime = now;
+                    } else if (e.deltaY < -50) {
+                        this.prev();
+                        lastScrollTime = now;
+                    }
+                });
+            }
+
+            setupControls() {
+                document.getElementById('prevBtn').addEventListener('click', () => this.prev());
+                document.getElementById('nextBtn').addEventListener('click', () => this.next());
+            }
+
+            next() {
+                if (this.currentSlide < this.slides.length - 1) {
+                    this.showSlide(this.currentSlide + 1);
+                }
+            }
+
+            prev() {
+                if (this.currentSlide > 0) {
+                    this.showSlide(this.currentSlide - 1);
+                }
+            }
+
+            showSlide(index) {
+                this.currentSlide = Math.max(0, Math.min(index, this.slides.length - 1));
+                this.slides.forEach((slide, i) => {
+                    slide.classList.toggle('active', i === this.currentSlide);
+                    // Slight timeout to guarantee DOM cycle registers active class for transition
+                    setTimeout(() => {
+                        slide.classList.toggle('visible', i === this.currentSlide);
+                    }, 20);
+                });
+
+                // Update Progress bars & numbers
+                const progressPct = ((this.currentSlide + 1) / this.slides.length) * 100;
+                this.progressBar.style.width = `${progressPct}%`;
+                
+                const slideNumStr = String(this.currentSlide + 1).padStart(2, '0');
+                const totalNumStr = String(this.slides.length).padStart(2, '0');
+                this.progressIndicator.textContent = `${slideNumStr} / ${totalNumStr}`;
+            }
+        }
+
+        /* ===========================================
+           INLINE PRESENTATION WRITER SYSTEM
+           =========================================== */
+        class SlideEditor {
+            constructor() {
+                this.isActive = false;
+                this.toggleBtn = document.getElementById('editToggle');
+                this.hotzone = document.querySelector('.edit-hotzone');
+                this.hideTimeout = null;
+
+                this.setupHoverControls();
+                this.setupDirectClick();
+                this.setupKeyboardShortcut();
+                this.loadSavedContent();
+            }
+
+            setupHoverControls() {
+                this.hotzone.addEventListener('mouseenter', () => {
+                    clearTimeout(this.hideTimeout);
+                    this.toggleBtn.classList.add('show');
+                });
+                this.hotzone.addEventListener('mouseleave', () => {
+                    this.hideTimeout = setTimeout(() => {
+                        if (!this.isActive) this.toggleBtn.classList.remove('show');
+                    }, 400);
+                });
+
+                this.toggleBtn.addEventListener('mouseenter', () => clearTimeout(this.hideTimeout));
+                this.toggleBtn.addEventListener('mouseleave', () => {
+                    this.hideTimeout = setTimeout(() => {
+                        if (!this.isActive) this.toggleBtn.classList.remove('show');
+                    }, 400);
+                });
+            }
+
+            setupDirectClick() {
+                this.toggleBtn.addEventListener('click', () => this.toggleEditMode());
+                this.hotzone.addEventListener('click', () => this.toggleEditMode());
+            }
+
+            setupKeyboardShortcut() {
+                document.addEventListener('keydown', (e) => {
+                    if ((e.key === 'e' || e.key === 'E') && !e.target.getAttribute('contenteditable')) {
+                        e.preventDefault();
+                        this.toggleEditMode();
+                    }
+                });
+            }
+
+            toggleEditMode() {
+                this.isActive = !this.isActive;
+                this.toggleBtn.classList.toggle('active', this.isActive);
+                this.toggleBtn.textContent = this.isActive ? "💾 保存修改并退出" : "✏️ 进入编辑模式";
+                
+                // Toggle editable elements inside current slide content
+                const editables = document.querySelectorAll('.slide h1, .slide h2, .slide h3, .slide h4, .slide p, .slide li');
+                editables.forEach(el => {
+                    el.setAttribute('contenteditable', this.isActive ? "true" : "false");
+                });
+
+                if (!this.isActive) {
+                    this.saveContent();
+                }
+            }
+
+            saveContent() {
+                const updatedData = [];
+                const editables = document.querySelectorAll('[contenteditable]');
+                editables.forEach((el, index) => {
+                    updatedData.push({
+                        index: index,
+                        html: el.innerHTML
+                    });
+                });
+                localStorage.setItem('mastra_presentation_content', JSON.stringify(updatedData));
+            }
+
+            loadSavedContent() {
+                const saved = localStorage.getItem('mastra_presentation_content');
+                if (saved) {
+                    const data = JSON.parse(saved);
+                    const editables = document.querySelectorAll('.slide h1, .slide h2, .slide h3, .slide h4, .slide p, .slide li');
+                    data.forEach(item => {
+                        if (editables[item.index]) {
+                            editables[item.index].innerHTML = item.html;
+                        }
+                    });
+                }
+            }
+        }
+
+        // Initialize both Presentation Flow and Editor Systems
+        const presentation = new SlidePresentation();
+        const editor = new SlideEditor();
+    </script>
+</body>
+</html>

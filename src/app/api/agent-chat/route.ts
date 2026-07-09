@@ -1,11 +1,5 @@
 ﻿import { mastra } from "@/src/mastra";
 import { briefDecisionSchema } from "@/src/mastra/agents/presentation-brief-conversation-agent";
-import {
-  isFrontendSlidesAgentConfigured,
-  isFrontendSlidesRequired,
-  startOrContinueFrontendSlidesSession,
-} from "@/src/utils/frontend-slides-agent-runner";
-import { saveHtmlToFile } from "@/src/utils/save-html-to-file";
 import type { ModelMessage } from "ai";
 import { NextResponse } from "next/server";
 import z from "zod";
@@ -20,6 +14,8 @@ const chatMessageSchema = z.object({
 const agentChatRequestSchema = z.object({
   messages: z.array(chatMessageSchema).min(1),
   hasGeneratedDeck: z.boolean().optional(),
+  // Backward-compatible request fields from the former Claude Agent SDK session path.
+  // Mastra owns agent state after the migration, so these are intentionally ignored.
   frontendSlidesSessionId: z.string().optional(),
   frontendSlidesRunId: z.string().optional(),
 });
@@ -172,67 +168,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid agent chat request" }, { status: 400 });
   }
 
-  const { messages, hasGeneratedDeck, frontendSlidesSessionId, frontendSlidesRunId } = validation.data;
+  const { messages, hasGeneratedDeck } = validation.data;
 
   return createNdjsonStreamResponse(async (emit) => {
-    if (isFrontendSlidesAgentConfigured()) {
-      const lastUserMessage = [...messages].reverse().find((message) => message.role === "user");
-
-      if (lastUserMessage) {
-        try {
-          const turn = await startOrContinueFrontendSlidesSession({
-            sessionId: frontendSlidesSessionId,
-            runId: frontendSlidesRunId,
-            userMessage: lastUserMessage.content,
-            onProgress: (message) => emit({ type: "progress", message }),
-          });
-
-          if (turn.kind === "question") {
-            emit({
-              type: "result",
-              payload: {
-                reply: turn.assistantMessage,
-                readyToGenerate: false,
-                brief: null,
-                frontendSlidesSessionId: turn.sessionId,
-                frontendSlidesRunId: turn.runId,
-              },
-            });
-            return;
-          }
-
-          emit({ type: "progress", message: "正在保存演示文稿文件..." });
-          const htmlUrl = await saveHtmlToFile(turn.html, { prefix: "presentation-deck" });
-
-          emit({
-            type: "result",
-            payload: {
-              reply: "已经生成好演示文稿，预览在左侧。想调整哪里，直接告诉我。",
-              readyToGenerate: false,
-              brief: null,
-              frontendSlidesSessionId: turn.sessionId,
-              frontendSlidesRunId: turn.runId,
-              done: true,
-              html: turn.html,
-              htmlUrl,
-              generator: "frontend-slides" as const,
-            },
-          });
-          return;
-        } catch (error) {
-          const message = error instanceof Error ? error.message : "Unknown error";
-          console.error("frontend-slides interactive session failed:", error);
-
-          if (isFrontendSlidesRequired()) {
-            emit({ type: "error", error: `frontend-slides 会话失败：${message}` });
-            return;
-          }
-
-          console.warn("frontend-slides interactive session failed; falling back to the conversational brief agent:", message);
-        }
-      }
-    }
-
     const conversationAgent = mastra.getAgent("presentationBriefConversationAgent");
     const history: ModelMessage[] = messages
       .slice(-MAX_HISTORY_MESSAGES)

@@ -1,13 +1,14 @@
 import { createStep, createWorkflow } from "@mastra/core";
 import z from "zod";
-import { saveHtmlToFile } from "@/src/utils/save-html-to-file";
 import {
-  assertFrontendSlidesDocument,
   assertFrontendSlidesComplete,
-  invokeFrontendSlidesAgent,
-  isFrontendSlidesAgentConfigured,
-  isFrontendSlidesRequired,
-} from "@/src/utils/frontend-slides-agent-runner";
+  assertFrontendSlidesDocument,
+  extractHtmlFromAgentResult,
+  stripHtmlCodeFence,
+} from "@/src/services/frontend-slides/html-validator";
+import { loadFrontendSlidesFinalContext } from "@/src/services/frontend-slides/skill-loader";
+import { buildFrontendSlidesMastraPrompt } from "@/src/services/frontend-slides/prompt-builder";
+import { saveHtmlToFile } from "@/src/utils/save-html-to-file";
 import { mapOutlineToFrontendSlides } from "@/src/utils/outline-to-slides-mapper";
 import { presentationInputSchema, presentationOutlineSchema } from "./presentation-generation-schemas";
 
@@ -95,14 +96,6 @@ function logTimeoutConfiguration() {
   });
 }
 
-function stripHtmlCodeFence(html: string) {
-  return html
-    .trim()
-    .replace(/^```(?:html)?\s*/i, "")
-    .replace(/```$/i, "")
-    .trim();
-}
-
 function parseJsonObject(text: string) {
   const trimmed = text.trim();
   const fencedMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
@@ -166,6 +159,10 @@ function getTextDelta(chunk: unknown) {
     ?? textChunk.payload?.textDelta;
 
   return typeof text === "string" ? text : "";
+}
+
+function isFrontendSlidesRequired() {
+  return process.env.FRONTEND_SLIDES_REQUIRED === "true";
 }
 
 const baseHtmlProgressSteps: HtmlGenerationProgressStep[] = [
@@ -567,69 +564,120 @@ const presentationHtmlGenerationStep = createStep({
     let fallbackReason: string | undefined;
     const frontendSlidesInput = mapOutlineToFrontendSlides(inputData.outline, inputData.style);
 
-    if (isFrontendSlidesAgentConfigured()) {
+    writeHtmlProgress({
+      activeStepId: "load-skill",
+      phase: "html",
+      message: "Loading frontend-slides design instructions...",
+      progress: 24,
+    });
+
+    const frontendSlidesStartedAt = Date.now();
+    try {
+      const frontendSlidesContext = await loadFrontendSlidesFinalContext();
+      const prompt = buildFrontendSlidesMastraPrompt(frontendSlidesInput, frontendSlidesContext);
+
       writeHtmlProgress({
-        activeStepId: "load-skill",
+        activeStepId: "compose",
         phase: "html",
-        message: "Loading frontend-slides design instructions...",
-        progress: 24,
+        message: "Designing slide layouts with Mastra and frontend-slides rules...",
+        progress: 36,
       });
 
-      const frontendSlidesStartedAt = Date.now();
+      const frontendSlidesAgent = mastra.getAgent("frontendSlidesComposerAgent");
+      const stream = await Promise.race([
+        frontendSlidesAgent.stream([
+          {
+            role: "user",
+            content: prompt,
+          },
+        ]),
+        timeoutAfter(
+          FRONTEND_SLIDES_TIMEOUT_MS,
+          `frontend-slides generation did not start within ${Math.round(FRONTEND_SLIDES_TIMEOUT_MS / 1000)} seconds`,
+        ),
+      ]);
+
+      let lastProgressWrite = 0;
+      const reader = stream.fullStream.getReader();
+
       try {
-        const result = await Promise.race([
-          invokeFrontendSlidesAgent(frontendSlidesInput, {
-            onProgress: (progress) => {
-              writeHtmlProgress({
-                activeStepId: progress.stage,
-                phase: progress.stage === "validate" ? "styles" : "html",
-                message: progress.message,
-                progress: progress.stage === "load-skill" ? 30 : progress.stage === "compose" ? 55 : 78,
-              });
-            },
-          }),
-          timeoutAfter(
-            FRONTEND_SLIDES_TIMEOUT_MS,
-            `frontend-slides generation timed out after ${Math.round(FRONTEND_SLIDES_TIMEOUT_MS / 1000)} seconds`,
-          ),
-        ]);
-        html = result.html;
-        writeHtmlProgress({
-          activeStepId: "validate",
-          phase: "styles",
-          message: "Checking slide count and document completeness...",
-          progress: 84,
-          generator: "frontend-slides",
-          generatedCharacters: html.length,
-        });
-        assertFrontendSlidesDocument(html, frontendSlidesInput.slides.length);
-        generator = "frontend-slides";
+        while (Date.now() - frontendSlidesStartedAt <= FRONTEND_SLIDES_TIMEOUT_MS) {
+          const { done, value } = await Promise.race([
+            reader.read(),
+            timeoutAfter(
+              HTML_STREAM_IDLE_TIMEOUT_MS,
+              `frontend-slides generation stream was idle for ${Math.round(HTML_STREAM_IDLE_TIMEOUT_MS / 1000)} seconds`,
+            ),
+          ]);
 
-        console.log("Presentation HTML generation: frontend-slides agent completed", {
-          timestamp: new Date().toISOString(),
-          durationMs: Date.now() - frontendSlidesStartedAt,
-          generatedCharacters: html.length,
-          expectedSlideCount: frontendSlidesInput.slides.length,
-        });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        html = "";
-        fallbackReason = message;
-        console.warn("frontend-slides agent generation failed, falling back to backup HTML agent:", {
-          message,
-          error,
-        });
+          if (done) break;
 
-        if (isFrontendSlidesRequired()) {
-          throw new Error(`frontend-slides generation is required but failed: ${message}`);
+          const textDelta = getTextDelta(value);
+          if (!textDelta) continue;
+
+          html += textDelta;
+
+          if (html.length - lastProgressWrite >= 800) {
+            lastProgressWrite = html.length;
+            writeHtmlProgress({
+              activeStepId: "compose",
+              phase: html.length > 6_000 ? "styles" : "html",
+              message: html.length > 6_000
+                ? "Applying frontend-slides layout, styling, and motion..."
+                : "Writing the presentation HTML document...",
+              progress: Math.min(82, 40 + Math.floor(html.length / 350)),
+              generator: "frontend-slides",
+              generatedCharacters: html.length,
+              stepDetail: `${Math.max(1, Math.round(html.length / 1024))} KB generated`,
+            });
+          }
         }
+      } finally {
+        reader.releaseLock();
       }
-    } else {
-      console.log("Presentation HTML generation: frontend-slides agent is not configured; using backup HTML agent");
-      fallbackReason = "ANTHROPIC_API_KEY is not configured";
+
+      if (Date.now() - frontendSlidesStartedAt > FRONTEND_SLIDES_TIMEOUT_MS) {
+        await stream.fullStream.cancel().catch(() => undefined);
+        throw new Error(`frontend-slides generation timed out after ${Math.round(FRONTEND_SLIDES_TIMEOUT_MS / 1000)} seconds`);
+      }
+
+      if (!html.trim()) {
+        html = await getCompletedStreamText(stream);
+      }
+
+      html = stripHtmlCodeFence(html);
+      if (!/(?:<!doctype html>|<html[\s>])/i.test(html)) {
+        html = extractHtmlFromAgentResult(html);
+      }
+
+      writeHtmlProgress({
+        activeStepId: "validate",
+        phase: "styles",
+        message: "Checking slide count and document completeness...",
+        progress: 84,
+        generator: "frontend-slides",
+        generatedCharacters: html.length,
+      });
+      assertFrontendSlidesDocument(html, frontendSlidesInput.slides.length);
+      generator = "frontend-slides";
+
+      console.log("Presentation HTML generation: frontend-slides Mastra agent completed", {
+        timestamp: new Date().toISOString(),
+        durationMs: Date.now() - frontendSlidesStartedAt,
+        generatedCharacters: html.length,
+        expectedSlideCount: frontendSlidesInput.slides.length,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      html = "";
+      fallbackReason = message;
+      console.warn("frontend-slides Mastra generation failed, falling back to backup HTML agent:", {
+        message,
+        error,
+      });
 
       if (isFrontendSlidesRequired()) {
-        throw new Error("frontend-slides generation is required but ANTHROPIC_API_KEY is not configured");
+        throw new Error(`frontend-slides generation is required but failed: ${message}`);
       }
     }
 
