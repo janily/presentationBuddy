@@ -46,6 +46,41 @@ type AgentChatStreamEvent =
   | { type: "result"; payload: AgentChatResultPayload }
   | { type: "error"; error: string };
 
+function getLastUserMessage(messages: z.infer<typeof chatMessageSchema>[]) {
+  return [...messages].reverse().find((message) => message.role === "user")?.content.trim() ?? "";
+}
+
+function explicitlyConfirmedGeneration(message: string) {
+  return /(^|\s)(开始|开始生成|确认|确认生成|可以|可以生成|直接生成|生成吧|就这样|就按这个|按这个|按这个生成|用这个|用第[一二三四五六七八九十123456789]|选第[一二三四五六七八九十123456789]|go ahead|yes|ok)(\s|。|！|!|$)/i.test(message);
+}
+
+function buildRevisionConfirmationReply(decision: BriefDecision) {
+  const style = decision.brief?.style?.trim();
+
+  if (style) {
+    return `我先不直接生成。你是想把这份演示文稿改成「${style}」这个方向吗？确认后我再开始重生成。`;
+  }
+
+  return "我先不直接生成。你想换成哪类方向？比如：1. 现代清爽 2. 专业深色 3. 更有视觉冲击。你选一个，我确认后再开始生成。";
+}
+
+function buildGenerationConfirmationReply(decision: BriefDecision) {
+  const brief = decision.brief;
+  if (!brief) {
+    return "我先不直接生成。我们先把主题、受众、页数和风格确认清楚，你确认后我再开始。";
+  }
+
+  return [
+    "我先不直接生成，先和你确认一下理解是否正确：",
+    `主题：${brief.topic}`,
+    `受众：${brief.audience}`,
+    `页数：约 ${brief.pageCount} 页`,
+    `风格：${brief.style}`,
+    brief.requirements ? `补充要求：${brief.requirements}` : null,
+    "如果没问题，回复“确认生成”或“开始生成”，我再正式生成。",
+  ].filter(Boolean).join("\n");
+}
+
 function createNdjsonStreamResponse(
   executor: (emit: (event: AgentChatStreamEvent) => void) => Promise<void>,
 ) {
@@ -180,8 +215,8 @@ export async function POST(request: Request) {
 
     if (hasGeneratedDeck) {
       history.unshift({
-        role: "assistant",
-        content: "(context note: a deck has already been generated for this conversation; treat further requests as revisions)",
+        role: "system",
+        content: "A deck has already been generated. Treat new user requests as revision discussion. Do not start generation unless the latest user message explicitly confirms generation or selects a proposed option.",
       });
     }
 
@@ -193,13 +228,28 @@ export async function POST(request: Request) {
         throw new Error("Brief agent returned no structured decision");
       }
 
+      const lastUserMessage = getLastUserMessage(messages);
+      const shouldBlockGeneration = Boolean(
+        decision.readyToGenerate
+        && decision.brief
+        && !explicitlyConfirmedGeneration(lastUserMessage),
+      );
+
       emit({
         type: "result",
-        payload: {
-          reply: decision.reply,
-          readyToGenerate: decision.readyToGenerate && Boolean(decision.brief),
-          brief: decision.brief,
-        },
+        payload: shouldBlockGeneration
+          ? {
+            reply: hasGeneratedDeck
+              ? buildRevisionConfirmationReply(decision)
+              : buildGenerationConfirmationReply(decision),
+            readyToGenerate: false,
+            brief: null,
+          }
+          : {
+            reply: decision.reply,
+            readyToGenerate: decision.readyToGenerate && Boolean(decision.brief),
+            brief: decision.brief,
+          },
       });
     } catch (error) {
       console.error("Presentation brief conversation failed:", error);
