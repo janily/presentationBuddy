@@ -43,6 +43,9 @@ type AgentChatResultPayload = {
 // stream — this is what lets the UI show live activity instead of a silent wait.
 type AgentChatStreamEvent =
   | { type: "progress"; message: string }
+  | { type: "assistant-delta"; delta: string }
+  | { type: "assistant-snapshot"; text: string }
+  | { type: "decision"; payload: AgentChatResultPayload }
   | { type: "result"; payload: AgentChatResultPayload }
   | { type: "error"; error: string };
 
@@ -95,8 +98,16 @@ function createNdjsonStreamResponse(
     },
   });
 
+  let isClosed = false;
+
   const emit = (event: AgentChatStreamEvent) => {
-    controllerRef?.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+    if (isClosed) return;
+
+    try {
+      controllerRef?.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+    } catch {
+      isClosed = true;
+    }
   };
 
   (async () => {
@@ -106,7 +117,10 @@ function createNdjsonStreamResponse(
       console.error("agent-chat stream failed:", error);
       emit({ type: "error", error: error instanceof Error ? error.message : "Unknown error" });
     } finally {
-      controllerRef?.close();
+      if (!isClosed) {
+        isClosed = true;
+        controllerRef?.close();
+      }
     }
   })();
 
@@ -139,21 +153,64 @@ function parseJsonObject(text: string) {
 async function generateBriefDecisionStructured(
   conversationAgent: ConversationAgent,
   history: ModelMessage[],
+  emit: (event: AgentChatStreamEvent) => void,
+  abortSignal: AbortSignal,
+  requestStartedAt: number,
 ): Promise<BriefDecision | undefined> {
-  const result = await conversationAgent.generate(history, {
+  const stream = await conversationAgent.stream(history, {
     structuredOutput: {
       schema: briefDecisionSchema,
     },
+    abortSignal,
   });
 
-  return result.object as BriefDecision | undefined;
+  let streamedReply = "";
+  let firstDeltaAt: number | null = null;
+
+  const partialReader = (async () => {
+    for await (const partial of stream.objectStream) {
+      const reply = typeof partial?.reply === "string" ? partial.reply : "";
+      if (!reply || reply.length <= streamedReply.length) continue;
+
+      const delta = reply.slice(streamedReply.length);
+      streamedReply = reply;
+
+      if (!firstDeltaAt) {
+        firstDeltaAt = Date.now();
+        console.log("agent-chat first assistant delta", {
+          firstDeltaLatencyMs: firstDeltaAt - requestStartedAt,
+        });
+      }
+
+      emit({ type: "assistant-delta", delta });
+    }
+  })();
+
+  try {
+    const decision = await stream.object as BriefDecision | undefined;
+    await partialReader.catch((error) => {
+      console.warn("agent-chat structured partial stream ended with an error:", {
+        message: error instanceof Error ? error.message : String(error),
+      });
+    });
+
+    return decision;
+  } catch (error) {
+    await partialReader.catch(() => undefined);
+    throw error;
+  }
 }
 
 async function generateBriefDecisionFallback(
   conversationAgent: ConversationAgent,
   history: ModelMessage[],
+  emit: (event: AgentChatStreamEvent) => void,
+  abortSignal: AbortSignal,
 ): Promise<BriefDecision> {
-  const result = await conversationAgent.generate([
+  emit({ type: "assistant-snapshot", text: "" });
+  emit({ type: "progress", message: "结构化回复失败，正在重试普通文本解析..." });
+
+  const stream = await conversationAgent.stream([
     ...history,
     {
       role: "user",
@@ -172,9 +229,15 @@ The JSON shape must be:
   }
 }`,
     },
-  ]);
+  ], {
+    abortSignal,
+  });
 
-  const text = typeof result.text === "string" ? result.text : "";
+  let text = "";
+  for await (const delta of stream.textStream) {
+    text += delta;
+  }
+
   const parsed = parseJsonObject(text);
 
   return briefDecisionSchema.parse(parsed);
@@ -183,19 +246,23 @@ The JSON shape must be:
 async function generateBriefDecision(
   conversationAgent: ConversationAgent,
   history: ModelMessage[],
+  emit: (event: AgentChatStreamEvent) => void,
+  abortSignal: AbortSignal,
+  requestStartedAt: number,
 ) {
   try {
-    return await generateBriefDecisionStructured(conversationAgent, history);
+    return await generateBriefDecisionStructured(conversationAgent, history, emit, abortSignal, requestStartedAt);
   } catch (structuredError) {
     console.warn("Presentation brief structured output failed; retrying with JSON text fallback:", {
       message: structuredError instanceof Error ? structuredError.message : String(structuredError),
     });
 
-    return generateBriefDecisionFallback(conversationAgent, history);
+    return generateBriefDecisionFallback(conversationAgent, history, emit, abortSignal);
   }
 }
 
 export async function POST(request: Request) {
+  const requestStartedAt = Date.now();
   const body = await request.json().catch(() => null);
   const validation = agentChatRequestSchema.safeParse(body);
 
@@ -221,8 +288,13 @@ export async function POST(request: Request) {
     }
 
     try {
+      console.log("agent-chat request started", {
+        messageCount: messages.length,
+        hasGeneratedDeck: Boolean(hasGeneratedDeck),
+      });
+
       emit({ type: "progress", message: "正在思考回复..." });
-      const decision = await generateBriefDecision(conversationAgent, history);
+      const decision = await generateBriefDecision(conversationAgent, history, emit, request.signal, requestStartedAt);
 
       if (!decision?.reply) {
         throw new Error("Brief agent returned no structured decision");
@@ -235,23 +307,38 @@ export async function POST(request: Request) {
         && !explicitlyConfirmedGeneration(lastUserMessage),
       );
 
-      emit({
-        type: "result",
-        payload: shouldBlockGeneration
-          ? {
-            reply: hasGeneratedDeck
-              ? buildRevisionConfirmationReply(decision)
-              : buildGenerationConfirmationReply(decision),
-            readyToGenerate: false,
-            brief: null,
-          }
-          : {
-            reply: decision.reply,
-            readyToGenerate: decision.readyToGenerate && Boolean(decision.brief),
-            brief: decision.brief,
-          },
+      const payload: AgentChatResultPayload = shouldBlockGeneration
+        ? {
+          reply: hasGeneratedDeck
+            ? buildRevisionConfirmationReply(decision)
+            : buildGenerationConfirmationReply(decision),
+          readyToGenerate: false,
+          brief: null,
+        }
+        : {
+          reply: decision.reply,
+          readyToGenerate: decision.readyToGenerate && Boolean(decision.brief),
+          brief: decision.brief,
+        };
+
+      emit({ type: "assistant-snapshot", text: payload.reply });
+      emit({ type: "decision", payload });
+      emit({ type: "result", payload });
+
+      console.log("agent-chat final decision emitted", {
+        durationMs: Date.now() - requestStartedAt,
+        readyToGenerate: payload.readyToGenerate,
+        hasBrief: Boolean(payload.brief),
+        blockedForConfirmation: shouldBlockGeneration,
       });
     } catch (error) {
+      if (request.signal.aborted) {
+        console.log("agent-chat request aborted", {
+          durationMs: Date.now() - requestStartedAt,
+        });
+        return;
+      }
+
       console.error("Presentation brief conversation failed:", error);
       const message = error instanceof Error ? error.message : "Unknown error";
       emit({ type: "error", error: `对话模型调用失败：${message}` });

@@ -1,9 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePresentationWorkflow } from "@/src/hooks/use-presentation-workflow";
 import type { HtmlGenerationStepData, PresentationOutlineData } from "@/src/types/presentation-workflow";
 import AgentPanel, { type AgentMessage } from "./agent-panel";
+import {
+  dispatchAgentChatStreamEvent,
+  parseAgentChatStreamLine,
+  type AgentChatResponse,
+  type AgentChatStreamCallbacks,
+} from "./agent-chat-stream";
 import PresentationPreviewPane from "./presentation-preview-pane";
 import PresentationWorkspace from "./presentation-workspace";
 import { emptyOutline, toApprovedOutline, toSlideItem, type PresentationBrief, type SlideOutlineItem } from "./presentation-outline-utils";
@@ -11,45 +17,7 @@ import { deriveStudioPhase, type StudioErrorSource, type StudioPhase } from "./u
 
 type PreviewPaneStep = "brief" | "outlining" | "review" | "generating" | "preview";
 
-type AgentBriefData = {
-  topic: string;
-  audience: string;
-  pageCount: number;
-  style: string;
-  requirements?: string;
-};
-
-type AgentChatResponse = {
-  reply?: string;
-  readyToGenerate?: boolean;
-  brief?: AgentBriefData | null;
-  error?: string;
-  frontendSlidesSessionId?: string;
-  frontendSlidesRunId?: string;
-  done?: boolean;
-  html?: string;
-  htmlUrl?: string;
-  generator?: "frontend-slides" | "backup";
-  fallbackReason?: string;
-};
-
-// One line of the /api/agent-chat NDJSON stream. Mirrors the server-side
-// AgentChatStreamEvent type in src/app/api/agent-chat/route.ts.
-type AgentChatStreamEvent =
-  | { type: "progress"; message: string }
-  | { type: "result"; payload: AgentChatResponse }
-  | { type: "error"; error: string };
-
-function parseStreamLine(line: string): AgentChatStreamEvent | null {
-  const trimmed = line.trim();
-  if (!trimmed) return null;
-
-  try {
-    return JSON.parse(trimmed) as AgentChatStreamEvent;
-  } catch {
-    return null;
-  }
-}
+type AgentBriefData = NonNullable<AgentChatResponse["brief"]>;
 
 const getErrorMessage = (error: Error | undefined, fallback: string) => {
   if (!error?.message) return fallback;
@@ -87,7 +55,10 @@ function toPreviewStep(phase: StudioPhase): PreviewPaneStep {
 function textHistory(messages: AgentMessage[]) {
   return messages
     .filter((message): message is Extract<AgentMessage, { role: "assistant" | "user" }> => {
-      return (message.role === "assistant" || message.role === "user") && (message.kind === undefined || message.kind === "text");
+      return (message.role === "assistant" || message.role === "user")
+        && (message.kind === undefined || message.kind === "text")
+        && !message.isStreaming
+        && message.content.trim().length > 0;
     })
     .map(({ role, content }) => ({ role, content }));
 }
@@ -117,6 +88,7 @@ export default function PresentationStudio() {
   const [frontendSlidesSession, setFrontendSlidesSession] = useState<{ sessionId?: string; runId?: string }>({});
   const [interactiveResult, setInteractiveResult] = useState<HtmlGenerationStepData | null>(null);
   const [agentProgressMessage, setAgentProgressMessage] = useState<string | null>(null);
+  const agentChatAbortRef = useRef<AbortController | null>(null);
 
   const workflowOutline = useMemo(() => {
     return outlineStep?.data?.outline ?? suspenseData?.outline ?? null;
@@ -233,11 +205,12 @@ export default function PresentationStudio() {
   const sendToAgentChat = useCallback(async (
     history: AgentMessage[],
     hasGeneratedDeck: boolean,
-    onProgress: (message: string) => void,
+    callbacks: AgentChatStreamCallbacks,
   ) => {
     const response = await fetch("/api/agent-chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal: callbacks.signal,
       body: JSON.stringify({
         messages: textHistory(history),
         hasGeneratedDeck,
@@ -251,15 +224,21 @@ export default function PresentationStudio() {
       throw new Error(data.error || `Agent chat failed (HTTP ${response.status})`);
     }
 
-    // The response is NDJSON: one JSON object per line. "progress" lines can
-    // arrive any number of times before the single terminal "result"/"error"
-    // line closes the stream, so the UI can show live activity instead of a
-    // silent multi-minute wait.
+    // The response is NDJSON. Assistant delta lines update the visible message
+    // while the final decision/result line remains the source of truth for
+    // generation side effects.
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
-    let result: AgentChatResponse | null = null;
-    let streamError: string | null = null;
+    const streamState: { result?: AgentChatResponse; error?: string } = {};
+    const handleEvent = (line: string) => {
+      const event = parseAgentChatStreamLine(line);
+      if (!event) return;
+
+      const dispatchResult = dispatchAgentChatStreamEvent(event, callbacks);
+      if (dispatchResult.result) streamState.result = dispatchResult.result;
+      if (dispatchResult.error) streamState.error = dispatchResult.error;
+    };
 
     while (true) {
       const { done, value } = await reader.read();
@@ -270,27 +249,16 @@ export default function PresentationStudio() {
       buffer = lines.pop() ?? "";
 
       for (const line of lines) {
-        const event = parseStreamLine(line);
-        if (!event) continue;
-
-        if (event.type === "progress") {
-          onProgress(event.message);
-        } else if (event.type === "result") {
-          result = event.payload;
-        } else if (event.type === "error") {
-          streamError = event.error;
-        }
+        handleEvent(line);
       }
     }
 
-    const trailingEvent = parseStreamLine(buffer);
-    if (trailingEvent?.type === "result") result = trailingEvent.payload;
-    if (trailingEvent?.type === "error") streamError = trailingEvent.error;
+    handleEvent(buffer);
 
-    if (streamError) throw new Error(streamError);
-    if (!result?.reply) throw new Error("Agent chat stream ended without a result");
+    if (streamState.error) throw new Error(streamState.error);
+    if (!streamState.result?.reply) throw new Error("Agent chat stream ended without a result");
 
-    return result;
+    return streamState.result;
   }, [frontendSlidesSession.runId, frontendSlidesSession.sessionId]);
 
   const handleAgentSend = useCallback(async (message: string, options: { force?: boolean } = {}) => {
@@ -306,16 +274,37 @@ export default function PresentationStudio() {
     }
 
     const history = [...chatMessages, userMessage];
+    const assistantMessageId = makeId();
+    const abortController = new AbortController();
 
+    agentChatAbortRef.current?.abort();
+    agentChatAbortRef.current = abortController;
     setHtmlWatchdogError(null);
-    setChatMessages(history);
+    setChatMessages([
+      ...history,
+      { id: assistantMessageId, role: "assistant", kind: "text", content: "", isStreaming: true },
+    ]);
     setIsAgentReplying(true);
     setAgentProgressMessage(null);
 
-    try {
-      const data = await sendToAgentChat(history, Boolean(generatedHtml), setAgentProgressMessage);
+    const updateAssistantMessage = (contentUpdater: (content: string) => string, isStreaming = true) => {
+      setChatMessages((current) => current.map((item) => (
+        item.id === assistantMessageId && item.role === "assistant" && (item.kind === undefined || item.kind === "text")
+          ? { ...item, content: contentUpdater(item.content), isStreaming }
+          : item
+      )));
+    };
 
-      setChatMessages((current) => [...current, { id: makeId(), role: "assistant", kind: "text", content: data.reply! }]);
+    try {
+      const data = await sendToAgentChat(history, Boolean(generatedHtml), {
+        signal: abortController.signal,
+        onProgress: setAgentProgressMessage,
+        onAssistantDelta: (delta) => updateAssistantMessage((content) => `${content}${delta}`),
+        onAssistantSnapshot: (text) => updateAssistantMessage(() => text),
+        onDecision: (payload) => updateAssistantMessage(() => payload.reply ?? "", false),
+      });
+
+      updateAssistantMessage(() => data.reply!, false);
 
       if (data.frontendSlidesSessionId || data.frontendSlidesRunId) {
         setFrontendSlidesSession({ sessionId: data.frontendSlidesSessionId, runId: data.frontendSlidesRunId });
@@ -334,14 +323,19 @@ export default function PresentationStudio() {
         startGenerationFromBrief(data.brief);
       }
     } catch (error) {
+      if (abortController.signal.aborted) return;
+
       const detail = error instanceof Error ? error.message : String(error);
-      setChatMessages((current) => [
-        ...current,
-        { id: makeId(), role: "assistant", kind: "text", content: `遇到了点问题：${detail}\n\n请稍后重试；如果反复出现，请检查模型或 API Key 配置。` },
-      ]);
+      updateAssistantMessage(
+        () => `遇到了一点问题：${detail}\n\n请稍后重试；如果反复出现，请检查模型或 API Key 配置。`,
+        false,
+      );
     } finally {
-      setIsAgentReplying(false);
-      setAgentProgressMessage(null);
+      if (agentChatAbortRef.current === abortController) {
+        agentChatAbortRef.current = null;
+        setIsAgentReplying(false);
+        setAgentProgressMessage(null);
+      }
     }
   }, [chatMessages, generatedHtml, phase, sendToAgentChat, startGenerationFromBrief]);
 
@@ -352,6 +346,8 @@ export default function PresentationStudio() {
   }, [approveOutline, baseOutline, canApproveOutline, outline, selectedSlides.length]);
 
   const handleStartOver = useCallback(() => {
+    agentChatAbortRef.current?.abort();
+    agentChatAbortRef.current = null;
     resetWorkflow();
     setHtmlWatchdogError(null);
     setBrief(null);
@@ -362,6 +358,12 @@ export default function PresentationStudio() {
     setInteractiveResult(null);
     setAgentProgressMessage(null);
   }, [resetWorkflow]);
+
+  useEffect(() => {
+    return () => {
+      agentChatAbortRef.current?.abort();
+    };
+  }, []);
 
   const handleRetry = useCallback((kind: StudioErrorSource) => {
     clearError();

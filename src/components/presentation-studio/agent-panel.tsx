@@ -5,7 +5,7 @@ import { AlertTriangle, FileText, RefreshCcw, RotateCcw, Send, Sparkles } from "
 import type { StudioErrorSource, StudioPhase } from "./use-studio-phase";
 
 export type AgentMessage =
-  | { id: string; role: "assistant" | "user"; kind?: "text"; content: string }
+  | { id: string; role: "assistant" | "user"; kind?: "text"; content: string; isStreaming?: boolean }
   | { id: string; role: "system"; kind: "outline-review"; slideCount: number; canGenerate: boolean; disabledReason?: string | null }
   | { id: string; role: "system"; kind: "complete"; slideCount: number; htmlUrl?: string; generator?: "frontend-slides" | "backup"; fallbackReason?: string }
   | { id: string; role: "system"; kind: "error"; message: string; retryKind: StudioErrorSource }
@@ -300,10 +300,15 @@ export default function AgentPanel({
               );
             }
 
+            const isStreamingText = message.role === "assistant" && message.isStreaming;
+            const hasVisibleContent = message.content.trim().length > 0;
+
             return (
               <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
                 <div className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-6 ${message.role === "user" ? "bg-[var(--accent-terracotta)] text-white" : "border border-[var(--border-light)] bg-[var(--bg-card)] text-[var(--text-secondary)]"}`}>
-                  {message.content}
+                  {hasVisibleContent ? message.content : null}
+                  {isStreamingText && !hasVisibleContent ? <TypingDots /> : null}
+                  {isStreamingText && hasVisibleContent ? <span className="ml-1 inline-block h-4 w-1 animate-pulse rounded bg-[var(--text-muted)] align-[-2px]" /> : null}
                 </div>
               </div>
             );
@@ -311,7 +316,7 @@ export default function AgentPanel({
 
           {statusText ? <StatusRow text={statusText} /> : null}
 
-          {isSending ? (
+          {isSending && !messages.some((message) => message.role === "assistant" && message.kind === "text" && message.isStreaming) ? (
             <div className="flex justify-start">
               <div className="flex items-center gap-2 rounded-2xl border border-[var(--border-light)] bg-[var(--bg-card)] px-4 py-3">
                 <TypingDots />
