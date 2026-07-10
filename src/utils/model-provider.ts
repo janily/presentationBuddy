@@ -28,11 +28,19 @@ function normalizeProviderName(value: string | undefined): ModelProviderName {
     return "openai-compatible";
   }
 
+  if (provider === "grsai") {
+    return "openai-compatible";
+  }
+
   if (provider === "openai") {
     return "openai";
   }
 
-  return "openrouter";
+  if (provider === "openrouter") {
+    return "openrouter";
+  }
+
+  throw new Error(`Unsupported model provider: ${value}`);
 }
 
 function getProviderApiKey(provider: ModelProviderName) {
@@ -83,12 +91,31 @@ export function getConfiguredModel(
   defaultModel: string,
   providerEnvValue?: string,
 ): MastraProviderModelConfig {
-  const provider = normalizeProviderName(providerEnvValue);
+  const requestedProvider = providerEnvValue?.trim() || process.env.MODEL_PROVIDER;
+  const provider = normalizeProviderName(requestedProvider);
   const model = getModelId(modelEnvValue, defaultModel, provider);
-
-  return {
-    id: `${getMastraProviderId(provider)}/${model}`,
-    url: getProviderBaseUrl(provider),
+  const url = getProviderBaseUrl(provider);
+  const configuredModel = {
+    id: `${getMastraProviderId(provider)}/${model}` as const,
+    url,
     apiKey: getProviderApiKey(provider),
   };
+
+  if (process.env.NODE_ENV !== "test") {
+    let baseUrlHost: string | undefined;
+    try {
+      baseUrlHost = url ? new URL(url).host : undefined;
+    } catch {
+      baseUrlHost = "invalid-url";
+    }
+
+    console.info("model.configuration_resolved", {
+      requestedProvider: requestedProvider || DEFAULT_PROVIDER,
+      resolvedProvider: provider,
+      modelId: configuredModel.id,
+      baseUrlHost,
+    });
+  }
+
+  return configuredModel;
 }

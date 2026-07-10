@@ -1,5 +1,20 @@
 import z from "zod";
 
+export const artifactOperationSchema = z.object({
+  operationId: z.string().trim().min(1, "Operation ID is required"),
+  deckId: z.string().trim().min(1, "Deck ID is required"),
+  baseVersion: z.number().int().min(0),
+  targetVersion: z.number().int().positive(),
+}).superRefine((artifact, context) => {
+  if (artifact.targetVersion !== artifact.baseVersion + 1) {
+    context.addIssue({
+      code: "custom",
+      path: ["targetVersion"],
+      message: "Target version must advance the base version by one",
+    });
+  }
+});
+
 export const presentationInputSchema = z.object({
   topic: z.string().trim().min(1, "Topic is required"),
   audience: z.string().optional(),
@@ -11,6 +26,7 @@ export const presentationInputSchema = z.object({
     .optional(),
   style: z.string().optional(),
   requirements: z.string().optional(),
+  artifact: artifactOperationSchema.optional(),
 });
 
 export const slideOutlineSchema = z.object({
@@ -27,4 +43,20 @@ export const presentationOutlineSchema = z.object({
   sections: z.array(z.string()),
   slides: z.array(slideOutlineSchema).min(1, "Outline must contain at least one slide"),
   designGuidance: z.array(z.string()),
+});
+
+export const revisionSpecSchema = z.object({
+  kind: z.enum(["style", "palette", "content", "structure", "mixed"]),
+  instruction: z.string().trim().min(1, "Revision instruction is required"),
+  targetSlides: z.array(z.number().int().positive()).optional(),
+  style: z.string().trim().min(1).optional(),
+  palette: z.array(z.string().trim().min(1)).min(1).optional(),
+  requiresOutlineReview: z.boolean(),
+});
+
+export const presentationRevisionRequestSchema = z.object({
+  presentationBrief: presentationInputSchema,
+  approvedOutline: presentationOutlineSchema,
+  revision: revisionSpecSchema,
+  artifact: artifactOperationSchema,
 });

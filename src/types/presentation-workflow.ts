@@ -23,6 +23,37 @@ export type PresentationBriefData = {
   pageCount: number;
   style: string;
   requirements?: string;
+  artifact?: ArtifactOperation;
+};
+
+export type RevisionKind = "style" | "palette" | "content" | "structure" | "mixed";
+
+export type RevisionSpec = {
+  kind: RevisionKind;
+  instruction: string;
+  targetSlides?: number[];
+  style?: string;
+  palette?: string[];
+  requiresOutlineReview: boolean;
+};
+
+export type ArtifactOperation = {
+  operationId: string;
+  deckId: string;
+  baseVersion: number;
+  targetVersion: number;
+};
+
+export type DeckArtifact = {
+  deckId: string;
+  version: number;
+  operationId: string;
+  brief: PresentationBriefData;
+  approvedOutline: PresentationOutlineData;
+  html: string;
+  htmlUrl?: string;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type AgentRequestData = {
@@ -58,6 +89,18 @@ export type HtmlGenerationStepData = {
   steps?: HtmlGenerationProgressStep[];
   htmlUrl?: string;
   html?: string;
+  artifact?: {
+    operationId: string;
+    deckId: string;
+    version: number;
+  };
+};
+
+export type PresentationRevisionRequestData = {
+  presentationBrief: PresentationBriefData;
+  approvedOutline: PresentationOutlineData;
+  revision: RevisionSpec;
+  artifact: ArtifactOperation;
 };
 
 export type HtmlGenerationProgressStep = {
@@ -77,6 +120,7 @@ export type MyUIMessage = UIMessage<
     workflow: WorkflowDataPart;
     presentationOutline: OutlineStepData;
     presentationHtml: HtmlGenerationStepData;
+    presentationRevision: PresentationRevisionRequestData;
     outlineSuggestions: OutlineStepData;
     generatedPresentation: HtmlGenerationStepData;
   }

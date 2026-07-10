@@ -1,6 +1,15 @@
 ﻿import { mastra } from "@/src/mastra";
 import { briefDecisionSchema } from "@/src/mastra/agents/presentation-brief-conversation-agent";
-import type { ModelMessage } from "ai";
+import {
+  presentationInputSchema,
+  presentationOutlineSchema,
+} from "@/src/mastra/workflows/presentation-generation-schemas";
+import {
+  createUIMessageStream,
+  createUIMessageStreamResponse,
+  type ModelMessage,
+} from "ai";
+import type { AgentChatUIMessage } from "@/src/types/agent-chat";
 import { NextResponse } from "next/server";
 import z from "zod";
 
@@ -14,14 +23,18 @@ const chatMessageSchema = z.object({
 const agentChatRequestSchema = z.object({
   messages: z.array(chatMessageSchema).min(1),
   hasGeneratedDeck: z.boolean().optional(),
-  // Backward-compatible request fields from the former Claude Agent SDK session path.
-  // Mastra owns agent state after the migration, so these are intentionally ignored.
-  frontendSlidesSessionId: z.string().optional(),
-  frontendSlidesRunId: z.string().optional(),
+  operationId: z.string().trim().min(1).optional(),
+  deckContext: z.object({
+    presentationBrief: presentationInputSchema,
+    approvedOutline: presentationOutlineSchema,
+  }).optional(),
 });
 
 // Keep the request bounded; the agent only needs recent turns to stay coherent.
 const MAX_HISTORY_MESSAGES = 20;
+const AGENT_CHAT_TOTAL_TIMEOUT_MS = 30_000;
+const AGENT_CHAT_SLOW_STATUS_MS = 3_000;
+const AGENT_CHAT_VERY_SLOW_STATUS_MS = 8_000;
 
 type BriefDecision = z.infer<typeof briefDecisionSchema>;
 type ConversationAgent = ReturnType<typeof mastra.getAgent>;
@@ -30,27 +43,38 @@ type AgentChatResultPayload = {
   reply: string;
   readyToGenerate: boolean;
   brief: BriefDecision["brief"] | null;
-  frontendSlidesSessionId?: string;
-  frontendSlidesRunId?: string;
-  done?: boolean;
-  html?: string;
-  htmlUrl?: string;
-  generator?: "frontend-slides";
 };
 
-// NDJSON stream event: one JSON object per line. "progress" lines can arrive any
-// number of times before the single terminal "result" or "error" line closes the
-// stream — this is what lets the UI show live activity instead of a silent wait.
 type AgentChatStreamEvent =
   | { type: "progress"; message: string }
   | { type: "assistant-delta"; delta: string }
   | { type: "assistant-snapshot"; text: string }
   | { type: "decision"; payload: AgentChatResultPayload }
-  | { type: "result"; payload: AgentChatResultPayload }
   | { type: "error"; error: string };
 
 function getLastUserMessage(messages: z.infer<typeof chatMessageSchema>[]) {
   return [...messages].reverse().find((message) => message.role === "user")?.content.trim() ?? "";
+}
+
+function createRequestDeadline(parentSignal: AbortSignal) {
+  const controller = new AbortController();
+  let timedOut = false;
+  const forwardAbort = () => controller.abort(parentSignal.reason);
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    controller.abort(new Error("Agent chat timed out"));
+  }, AGENT_CHAT_TOTAL_TIMEOUT_MS);
+
+  parentSignal.addEventListener("abort", forwardAbort, { once: true });
+
+  return {
+    signal: controller.signal,
+    didTimeOut: () => timedOut,
+    cleanup: () => {
+      clearTimeout(timeout);
+      parentSignal.removeEventListener("abort", forwardAbort);
+    },
+  };
 }
 
 function explicitlyConfirmedGeneration(message: string) {
@@ -84,53 +108,61 @@ function buildGenerationConfirmationReply(decision: BriefDecision) {
   ].filter(Boolean).join("\n");
 }
 
-function createNdjsonStreamResponse(
+function createAgentChatStreamResponse(
+  operationId: string,
   executor: (emit: (event: AgentChatStreamEvent) => void) => Promise<void>,
 ) {
-  const encoder = new TextEncoder();
-  // ReadableStream's `start` callback runs synchronously during construction, so
-  // controllerRef is always assigned before the IIFE below reads it.
-  let controllerRef: ReadableStreamDefaultController<Uint8Array> | undefined;
+  const textPartId = `assistant-${operationId}`;
+  const stream = createUIMessageStream<AgentChatUIMessage>({
+    execute: async ({ writer }) => {
+      let textStarted = false;
+      const emit = (event: AgentChatStreamEvent) => {
+        switch (event.type) {
+          case "progress":
+            writer.write({
+              type: "data-agentStatus",
+              data: { operationId, message: event.message },
+              transient: true,
+            });
+            break;
+          case "assistant-delta":
+            if (!textStarted) {
+              textStarted = true;
+              writer.write({ type: "text-start", id: textPartId });
+            }
+            writer.write({ type: "text-delta", id: textPartId, delta: event.delta });
+            break;
+          case "assistant-snapshot":
+            writer.write({
+              type: "data-assistantSnapshot",
+              data: { operationId, text: event.text },
+            });
+            break;
+          case "decision":
+            writer.write({
+              type: "data-agentDecision",
+              data: { operationId, payload: event.payload },
+            });
+            break;
+          case "error":
+            writer.write({ type: "error", errorText: event.error });
+            break;
+        }
+      };
 
-  const stream = new ReadableStream<Uint8Array>({
-    start(controller) {
-      controllerRef = controller;
-    },
-  });
-
-  let isClosed = false;
-
-  const emit = (event: AgentChatStreamEvent) => {
-    if (isClosed) return;
-
-    try {
-      controllerRef?.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
-    } catch {
-      isClosed = true;
-    }
-  };
-
-  (async () => {
-    try {
-      await executor(emit);
-    } catch (error) {
-      console.error("agent-chat stream failed:", error);
-      emit({ type: "error", error: error instanceof Error ? error.message : "Unknown error" });
-    } finally {
-      if (!isClosed) {
-        isClosed = true;
-        controllerRef?.close();
+      try {
+        await executor(emit);
+      } finally {
+        if (textStarted) writer.write({ type: "text-end", id: textPartId });
       }
-    }
-  })();
-
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "application/x-ndjson; charset=utf-8",
-      "Cache-Control": "no-cache, no-transform",
-      "X-Content-Type-Options": "nosniff",
+    },
+    onError: (error) => {
+      console.error("agent-chat UI stream failed:", error);
+      return error instanceof Error ? error.message : "Unknown error";
     },
   });
+
+  return createUIMessageStreamResponse({ stream });
 }
 
 function parseJsonObject(text: string) {
@@ -156,6 +188,7 @@ async function generateBriefDecisionStructured(
   emit: (event: AgentChatStreamEvent) => void,
   abortSignal: AbortSignal,
   requestStartedAt: number,
+  operationId: string,
 ): Promise<BriefDecision | undefined> {
   const stream = await conversationAgent.stream(history, {
     structuredOutput: {
@@ -177,7 +210,8 @@ async function generateBriefDecisionStructured(
 
       if (!firstDeltaAt) {
         firstDeltaAt = Date.now();
-        console.log("agent-chat first assistant delta", {
+        console.log("agent_chat.first_model_delta", {
+          operationId,
           firstDeltaLatencyMs: firstDeltaAt - requestStartedAt,
         });
       }
@@ -206,9 +240,11 @@ async function generateBriefDecisionFallback(
   history: ModelMessage[],
   emit: (event: AgentChatStreamEvent) => void,
   abortSignal: AbortSignal,
+  operationId: string,
 ): Promise<BriefDecision> {
   emit({ type: "assistant-snapshot", text: "" });
   emit({ type: "progress", message: "结构化回复失败，正在重试普通文本解析..." });
+  console.warn("agent_chat.fallback_started", { operationId });
 
   const stream = await conversationAgent.stream([
     ...history,
@@ -249,15 +285,30 @@ async function generateBriefDecision(
   emit: (event: AgentChatStreamEvent) => void,
   abortSignal: AbortSignal,
   requestStartedAt: number,
+  operationId: string,
 ) {
   try {
-    return await generateBriefDecisionStructured(conversationAgent, history, emit, abortSignal, requestStartedAt);
+    const decision = await generateBriefDecisionStructured(
+      conversationAgent,
+      history,
+      emit,
+      abortSignal,
+      requestStartedAt,
+      operationId,
+    );
+    console.log("agent_chat.structured_completed", {
+      operationId,
+      durationMs: Date.now() - requestStartedAt,
+    });
+    return decision;
   } catch (structuredError) {
+    if (abortSignal.aborted) throw structuredError;
+
     console.warn("Presentation brief structured output failed; retrying with JSON text fallback:", {
       message: structuredError instanceof Error ? structuredError.message : String(structuredError),
     });
 
-    return generateBriefDecisionFallback(conversationAgent, history, emit, abortSignal);
+    return generateBriefDecisionFallback(conversationAgent, history, emit, abortSignal, operationId);
   }
 }
 
@@ -270,9 +321,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid agent chat request" }, { status: 400 });
   }
 
-  const { messages, hasGeneratedDeck } = validation.data;
+  const { messages, hasGeneratedDeck, deckContext } = validation.data;
+  const operationId = validation.data.operationId ?? crypto.randomUUID();
 
-  return createNdjsonStreamResponse(async (emit) => {
+  return createAgentChatStreamResponse(operationId, async (emit) => {
+    const deadline = createRequestDeadline(request.signal);
+    const slowStatusTimer = setTimeout(() => {
+      emit({ type: "progress", message: "仍在组织回复，已等待 3 秒…" });
+    }, AGENT_CHAT_SLOW_STATUS_MS);
+    const verySlowStatusTimer = setTimeout(() => {
+      emit({ type: "progress", message: "模型响应较慢，可取消后重试。" });
+    }, AGENT_CHAT_VERY_SLOW_STATUS_MS);
     const conversationAgent = mastra.getAgent("presentationBriefConversationAgent");
     const history: ModelMessage[] = messages
       .slice(-MAX_HISTORY_MESSAGES)
@@ -283,18 +342,31 @@ export async function POST(request: Request) {
     if (hasGeneratedDeck) {
       history.unshift({
         role: "system",
-        content: "A deck has already been generated. Treat new user requests as revision discussion. Do not start generation unless the latest user message explicitly confirms generation or selects a proposed option.",
+        content: `A deck has already been generated. Treat new user requests as revision discussion. Do not start generation unless the latest user message explicitly confirms generation or selects a proposed option.${deckContext ? `\n\nCurrent deck context:\n${JSON.stringify(deckContext)}` : ""}`,
       });
     }
 
     try {
-      console.log("agent-chat request started", {
+      console.log("agent_chat.request_received", {
+        operationId,
         messageCount: messages.length,
         hasGeneratedDeck: Boolean(hasGeneratedDeck),
       });
 
       emit({ type: "progress", message: "正在思考回复..." });
-      const decision = await generateBriefDecision(conversationAgent, history, emit, request.signal, requestStartedAt);
+      console.log("agent_chat.first_event_written", {
+        operationId,
+        durationMs: Date.now() - requestStartedAt,
+      });
+      console.log("agent_chat.provider_call_started", { operationId });
+      const decision = await generateBriefDecision(
+        conversationAgent,
+        history,
+        emit,
+        deadline.signal,
+        requestStartedAt,
+        operationId,
+      );
 
       if (!decision?.reply) {
         throw new Error("Brief agent returned no structured decision");
@@ -323,9 +395,9 @@ export async function POST(request: Request) {
 
       emit({ type: "assistant-snapshot", text: payload.reply });
       emit({ type: "decision", payload });
-      emit({ type: "result", payload });
 
-      console.log("agent-chat final decision emitted", {
+      console.log("agent_chat.decision_emitted", {
+        operationId,
         durationMs: Date.now() - requestStartedAt,
         readyToGenerate: payload.readyToGenerate,
         hasBrief: Boolean(payload.brief),
@@ -333,7 +405,17 @@ export async function POST(request: Request) {
       });
     } catch (error) {
       if (request.signal.aborted) {
-        console.log("agent-chat request aborted", {
+        console.log("agent_chat.request_aborted", {
+          operationId,
+          durationMs: Date.now() - requestStartedAt,
+        });
+        return;
+      }
+
+      if (deadline.didTimeOut()) {
+        emit({ type: "error", error: "对话响应超时，请重试。" });
+        console.warn("agent_chat.request_timed_out", {
+          operationId,
           durationMs: Date.now() - requestStartedAt,
         });
         return;
@@ -342,6 +424,14 @@ export async function POST(request: Request) {
       console.error("Presentation brief conversation failed:", error);
       const message = error instanceof Error ? error.message : "Unknown error";
       emit({ type: "error", error: `对话模型调用失败：${message}` });
+    } finally {
+      clearTimeout(slowStatusTimer);
+      clearTimeout(verySlowStatusTimer);
+      deadline.cleanup();
+      console.log("agent_chat.stream_closed", {
+        operationId,
+        durationMs: Date.now() - requestStartedAt,
+      });
     }
   });
 }

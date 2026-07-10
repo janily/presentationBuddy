@@ -125,4 +125,65 @@ describe("analyze request validation", () => {
       expect(formatValidationErrors(result.error).map((field) => field.field)).toEqual(["workflowRunId", "approvedOutline"]);
     }
   });
+
+  it("validates a versioned style revision separately from start and resume", () => {
+    const result = validatePresentationWorkflowRequest({
+      revisionRequest: {
+        presentationBrief: {
+          topic: "AI agents",
+          audience: "Developers",
+          pageCount: 4,
+          style: "Modern",
+        },
+        approvedOutline: outline,
+        revision: {
+          kind: "style",
+          instruction: "Use a professional dark visual system",
+          style: "Professional dark",
+          requiresOutlineReview: false,
+        },
+        artifact: {
+          operationId: "operation-2",
+          deckId: "deck-1",
+          baseVersion: 1,
+          targetVersion: 2,
+        },
+      },
+    });
+
+    expect(result).toMatchObject({ success: true, action: "revise" });
+    if (result.success && result.action === "revise") {
+      expect(result.data.artifact.targetVersion).toBe(2);
+      expect(result.data.revision.kind).toBe("style");
+      expect(result.data.approvedOutline).toEqual(outline);
+    }
+  });
+
+  it("rejects revision versions that do not advance the base version by one", () => {
+    const result = validatePresentationWorkflowRequest({
+      revisionRequest: {
+        presentationBrief: { topic: "AI agents", pageCount: 4 },
+        approvedOutline: outline,
+        revision: {
+          kind: "palette",
+          instruction: "Use a different palette",
+          requiresOutlineReview: false,
+        },
+        artifact: {
+          operationId: "operation-3",
+          deckId: "deck-1",
+          baseVersion: 1,
+          targetVersion: 3,
+        },
+      },
+    });
+
+    expect(result).toMatchObject({ success: false, action: "revise" });
+    if (!result.success) {
+      expect(formatValidationErrors(result.error)).toContainEqual({
+        field: "artifact.targetVersion",
+        message: "Target version must advance the base version by one",
+      });
+    }
+  });
 });

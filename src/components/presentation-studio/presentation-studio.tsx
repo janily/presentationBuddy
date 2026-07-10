@@ -1,15 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { DefaultChatTransport } from "ai";
 import { usePresentationWorkflow } from "@/src/hooks/use-presentation-workflow";
-import type { HtmlGenerationStepData, PresentationOutlineData } from "@/src/types/presentation-workflow";
+import type {
+  ArtifactOperation,
+  HtmlGenerationStepData,
+  PresentationBriefData,
+  PresentationOutlineData,
+  RevisionSpec,
+} from "@/src/types/presentation-workflow";
 import AgentPanel, { type AgentMessage } from "./agent-panel";
-import {
-  dispatchAgentChatStreamEvent,
-  parseAgentChatStreamLine,
-  type AgentChatResponse,
-  type AgentChatStreamCallbacks,
-} from "./agent-chat-stream";
+import { getQuickActionDefinition, type AgentQuickActionChoice, type AgentQuickCommand } from "./agent-quick-actions";
+import { appendCompletionMessage } from "./agent-message-model";
+import { dispatchAgentChatUIChunk, type AgentChatStreamCallbacks } from "./agent-chat-ui-stream";
+import { isStructureChangingRevision } from "./revision-routing";
+import type { AgentChatResponse, AgentChatUIChunk, AgentChatUIMessage } from "@/src/types/agent-chat";
 import PresentationPreviewPane from "./presentation-preview-pane";
 import PresentationWorkspace from "./presentation-workspace";
 import { emptyOutline, toApprovedOutline, toSlideItem, type PresentationBrief, type SlideOutlineItem } from "./presentation-outline-utils";
@@ -63,9 +69,21 @@ function textHistory(messages: AgentMessage[]) {
     .map(({ role, content }) => ({ role, content }));
 }
 
+function toBriefData(brief: PresentationBrief, artifact?: ArtifactOperation): PresentationBriefData {
+  return {
+    topic: brief.topic,
+    audience: brief.audience,
+    pageCount: brief.slideCount,
+    style: brief.style,
+    requirements: brief.requirements,
+    artifact,
+  };
+}
+
 export default function PresentationStudio() {
   const {
     sendAgentRequest,
+    sendRevision,
     approveOutline,
     suspenseData,
     outlineStep,
@@ -85,10 +103,25 @@ export default function PresentationStudio() {
   const [chatMessages, setChatMessages] = useState<AgentMessage[]>([]);
   const [isAgentReplying, setIsAgentReplying] = useState(false);
   const [queuedGenerationMessage, setQueuedGenerationMessage] = useState<string | null>(null);
-  const [frontendSlidesSession, setFrontendSlidesSession] = useState<{ sessionId?: string; runId?: string }>({});
-  const [interactiveResult, setInteractiveResult] = useState<HtmlGenerationStepData | null>(null);
   const [agentProgressMessage, setAgentProgressMessage] = useState<string | null>(null);
+  const [activeArtifact, setActiveArtifact] = useState<{
+    deckId: string;
+    version: number;
+    html: string;
+    htmlUrl?: string;
+    brief: PresentationBrief;
+    outline: PresentationOutlineData;
+  } | null>(null);
+  const [pendingArtifact, setPendingArtifact] = useState<{
+    operation: ArtifactOperation;
+    brief: PresentationBrief;
+    outline: PresentationOutlineData;
+    revision?: RevisionSpec;
+    mode: "generation" | "revision";
+  } | null>(null);
   const agentChatAbortRef = useRef<AbortController | null>(null);
+  const deckIdRef = useRef(`deck-${makeId()}`);
+  const publishedArtifactKeyRef = useRef<string | null>(null);
 
   const workflowOutline = useMemo(() => {
     return outlineStep?.data?.outline ?? suspenseData?.outline ?? null;
@@ -108,11 +141,48 @@ export default function PresentationStudio() {
   }, [baseOutline, workflowOutline]);
 
   const selectedSlides = useMemo(() => outline.filter((item) => item.selected), [outline]);
-  const activeHtmlGenerationStepData = interactiveResult ?? htmlGenerationStep?.data;
-  const generatedHtml = activeHtmlGenerationStepData?.html ?? "";
-  const generatedHtmlUrl = activeHtmlGenerationStepData?.htmlUrl;
+  const activeHtmlGenerationStepData = useMemo<HtmlGenerationStepData | undefined>(() => {
+    const workflowData = htmlGenerationStep?.data;
 
+    if (activeArtifact && pendingArtifact) {
+      if (workflowData?.artifact?.operationId === pendingArtifact.operation.operationId) {
+        return workflowData;
+      }
 
+      if (pendingArtifact.mode === "generation") return undefined;
+
+      return {
+        status: "in-progress",
+        phase: "structure",
+        message: "正在启动版本修改…",
+        progress: 5,
+        lastUpdatedAt: Date.now(),
+        artifact: {
+          operationId: pendingArtifact.operation.operationId,
+          deckId: pendingArtifact.operation.deckId,
+          version: pendingArtifact.operation.targetVersion,
+        },
+      };
+    }
+
+    if (workflowData) return workflowData;
+    if (!activeArtifact) return undefined;
+
+    return {
+      status: "completed",
+      html: activeArtifact.html,
+      htmlUrl: activeArtifact.htmlUrl,
+      progress: 100,
+      artifact: {
+        operationId: activeArtifact.deckId,
+        deckId: activeArtifact.deckId,
+        version: activeArtifact.version,
+      },
+    };
+  }, [activeArtifact, htmlGenerationStep?.data, pendingArtifact]);
+  const generatedHtml = activeHtmlGenerationStepData?.status === "completed"
+    ? activeHtmlGenerationStepData.html ?? activeArtifact?.html ?? ""
+    : activeArtifact?.html ?? activeHtmlGenerationStepData?.html ?? "";
   const workflowError = useMemo((): { kind: StudioErrorSource; message: string } | null => {
     if (htmlWatchdogError) {
       return {
@@ -162,7 +232,7 @@ export default function PresentationStudio() {
   }), [activeHtmlGenerationStepData, generatedHtml, outline.length, status, suspenseData?.outline, workflowError]);
 
   const phase = phaseState.phase;
-  const previewStep = toPreviewStep(phase);
+  const previewStep = phase === "error" && activeArtifact ? "preview" : toPreviewStep(phase);
   const generateDisabledReason = !activeRunId ? (approvalError ?? "正在等待工作流会话 ID 后才能生成 HTML。") : approvalError;
 
   useEffect(() => {
@@ -179,7 +249,36 @@ export default function PresentationStudio() {
     return () => window.clearTimeout(timeout);
   }, [htmlGenerationStep?.data?.lastUpdatedAt, htmlGenerationStep?.data?.status, stop]);
 
-  const startGenerationFromBrief = useCallback((agentBrief: AgentBriefData) => {
+  const beginRevision = useCallback((revision: RevisionSpec) => {
+    const baselineOutline = activeArtifact?.outline ?? baseOutline;
+    const baselineBrief = activeArtifact?.brief ?? brief;
+    if (!baselineOutline || !baselineBrief || revision.requiresOutlineReview) return false;
+
+    const baseVersion = activeArtifact?.version ?? activeHtmlGenerationStepData?.artifact?.version ?? 0;
+    const operation: ArtifactOperation = {
+      operationId: `operation-${makeId()}`,
+      deckId: activeArtifact?.deckId ?? activeHtmlGenerationStepData?.artifact?.deckId ?? deckIdRef.current,
+      baseVersion,
+      targetVersion: baseVersion + 1,
+    };
+    const revisedBrief: PresentationBrief = {
+      ...baselineBrief,
+      style: revision.style ?? baselineBrief.style,
+      requirements: [baselineBrief.requirements, revision.instruction].filter(Boolean).join("\n\n"),
+    };
+
+    setHtmlWatchdogError(null);
+    setPendingArtifact({ operation, brief: revisedBrief, outline: baselineOutline, revision, mode: "revision" });
+    sendRevision({
+      presentationBrief: toBriefData(revisedBrief),
+      approvedOutline: baselineOutline,
+      revision,
+      artifact: operation,
+    });
+    return true;
+  }, [activeArtifact, activeHtmlGenerationStepData?.artifact?.deckId, activeHtmlGenerationStepData?.artifact?.version, baseOutline, brief, sendRevision]);
+
+  const startGenerationFromBrief = useCallback((agentBrief: AgentBriefData, revisionMessage?: string) => {
     const nextBrief: PresentationBrief = {
       topic: agentBrief.topic,
       audience: agentBrief.audience,
@@ -188,78 +287,102 @@ export default function PresentationStudio() {
       requirements: agentBrief.requirements?.trim() ?? "",
     };
 
-    if (brief) {
-      resetWorkflow();
+    if (activeArtifact && baseOutline) {
+      if (
+        nextBrief.slideCount !== activeArtifact.outline.slides.length
+        || (revisionMessage ? isStructureChangingRevision(revisionMessage) : false)
+      ) {
+        const operation: ArtifactOperation = {
+          operationId: `operation-${makeId()}`,
+          deckId: activeArtifact.deckId,
+          baseVersion: activeArtifact.version,
+          targetVersion: activeArtifact.version + 1,
+        };
+
+        setPendingArtifact({
+          operation,
+          brief: nextBrief,
+          outline: emptyOutline(nextBrief),
+          mode: "generation",
+        });
+        sendAgentRequest(nextBrief.requirements || nextBrief.topic, {
+          ...toBriefData(nextBrief, operation),
+        });
+        return;
+      }
+
+      beginRevision({
+        kind: "mixed",
+        instruction: nextBrief.requirements || `Apply the requested style: ${nextBrief.style}`,
+        style: nextBrief.style,
+        requiresOutlineReview: false,
+      });
+      return;
     }
+
+    const operation: ArtifactOperation = {
+      operationId: `operation-${makeId()}`,
+      deckId: deckIdRef.current,
+      baseVersion: 0,
+      targetVersion: 1,
+    };
 
     setHtmlWatchdogError(null);
     setBrief(nextBrief);
-    sendAgentRequest(nextBrief.requirements || nextBrief.topic, {
-      topic: nextBrief.topic,
-      audience: nextBrief.audience,
-      pageCount: nextBrief.slideCount,
-      style: nextBrief.style,
+    setPendingArtifact({
+      operation,
+      brief: nextBrief,
+      outline: emptyOutline(nextBrief),
+      mode: "generation",
     });
-  }, [brief, resetWorkflow, sendAgentRequest]);
+    sendAgentRequest(nextBrief.requirements || nextBrief.topic, {
+      ...toBriefData(nextBrief, operation),
+    });
+  }, [activeArtifact, baseOutline, beginRevision, sendAgentRequest]);
 
   const sendToAgentChat = useCallback(async (
     history: AgentMessage[],
     hasGeneratedDeck: boolean,
     callbacks: AgentChatStreamCallbacks,
   ) => {
-    const response = await fetch("/api/agent-chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      signal: callbacks.signal,
-      body: JSON.stringify({
+    const operationId = `operation-${makeId()}`;
+    const transport = new DefaultChatTransport<AgentChatUIMessage>({
+      api: "/api/agent-chat",
+      prepareSendMessagesRequest: () => ({
+        body: {
         messages: textHistory(history),
         hasGeneratedDeck,
-        frontendSlidesSessionId: frontendSlidesSession.sessionId,
-        frontendSlidesRunId: frontendSlidesSession.runId,
+          operationId,
+        deckContext: activeArtifact ? {
+          presentationBrief: toBriefData(activeArtifact.brief),
+          approvedOutline: activeArtifact.outline,
+        } : undefined,
+        },
       }),
     });
-
-    if (!response.ok || !response.body) {
-      const data = await response.json().catch(() => ({})) as AgentChatResponse;
-      throw new Error(data.error || `Agent chat failed (HTTP ${response.status})`);
-    }
-
-    // The response is NDJSON. Assistant delta lines update the visible message
-    // while the final decision/result line remains the source of truth for
-    // generation side effects.
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
+    const stream = await transport.sendMessages({
+      trigger: "submit-message",
+      chatId: operationId,
+      messageId: undefined,
+      messages: [],
+      abortSignal: callbacks.signal,
+    });
+    const reader = stream.getReader();
     const streamState: { result?: AgentChatResponse; error?: string } = {};
-    const handleEvent = (line: string) => {
-      const event = parseAgentChatStreamLine(line);
-      if (!event) return;
-
-      const dispatchResult = dispatchAgentChatStreamEvent(event, callbacks);
-      if (dispatchResult.result) streamState.result = dispatchResult.result;
-      if (dispatchResult.error) streamState.error = dispatchResult.error;
-    };
 
     while (true) {
-      const { done, value } = await reader.read();
+      const { done, value: chunk } = await reader.read();
       if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
-
-      for (const line of lines) {
-        handleEvent(line);
-      }
+      const dispatchResult = dispatchAgentChatUIChunk(chunk as AgentChatUIChunk, callbacks);
+      if (dispatchResult.result) streamState.result = dispatchResult.result;
+      if (dispatchResult.error) streamState.error = dispatchResult.error;
     }
-
-    handleEvent(buffer);
 
     if (streamState.error) throw new Error(streamState.error);
     if (!streamState.result?.reply) throw new Error("Agent chat stream ended without a result");
 
     return streamState.result;
-  }, [frontendSlidesSession.runId, frontendSlidesSession.sessionId]);
+  }, [activeArtifact]);
 
   const handleAgentSend = useCallback(async (message: string, options: { force?: boolean } = {}) => {
     const userMessage: AgentMessage = { id: makeId(), role: "user", kind: "text", content: message };
@@ -285,7 +408,13 @@ export default function PresentationStudio() {
       { id: assistantMessageId, role: "assistant", kind: "text", content: "", isStreaming: true },
     ]);
     setIsAgentReplying(true);
-    setAgentProgressMessage(null);
+    setAgentProgressMessage("正在理解你的要求…");
+    const slowTimer = window.setTimeout(() => {
+      setAgentProgressMessage("仍在组织回复，已等待 3 秒…");
+    }, 3_000);
+    const verySlowTimer = window.setTimeout(() => {
+      setAgentProgressMessage("模型响应较慢，可取消后重试。");
+    }, 8_000);
 
     const updateAssistantMessage = (contentUpdater: (content: string) => string, isStreaming = true) => {
       setChatMessages((current) => current.map((item) => (
@@ -299,28 +428,21 @@ export default function PresentationStudio() {
       const data = await sendToAgentChat(history, Boolean(generatedHtml), {
         signal: abortController.signal,
         onProgress: setAgentProgressMessage,
-        onAssistantDelta: (delta) => updateAssistantMessage((content) => `${content}${delta}`),
-        onAssistantSnapshot: (text) => updateAssistantMessage(() => text),
+        onAssistantDelta: (delta) => {
+          setAgentProgressMessage(null);
+          updateAssistantMessage((content) => `${content}${delta}`);
+        },
+        onAssistantSnapshot: (text) => {
+          if (text) setAgentProgressMessage(null);
+          updateAssistantMessage(() => text);
+        },
         onDecision: (payload) => updateAssistantMessage(() => payload.reply ?? "", false),
       });
 
       updateAssistantMessage(() => data.reply!, false);
 
-      if (data.frontendSlidesSessionId || data.frontendSlidesRunId) {
-        setFrontendSlidesSession({ sessionId: data.frontendSlidesSessionId, runId: data.frontendSlidesRunId });
-      }
-
-      if (data.done && data.html) {
-        setInteractiveResult({
-          status: "completed",
-          html: data.html,
-          htmlUrl: data.htmlUrl,
-          generator: data.generator,
-          fallbackReason: data.fallbackReason,
-          lastUpdatedAt: Date.now(),
-        });
-      } else if (data.readyToGenerate && data.brief) {
-        startGenerationFromBrief(data.brief);
+      if (data.readyToGenerate && data.brief) {
+        startGenerationFromBrief(data.brief, message);
       }
     } catch (error) {
       if (abortController.signal.aborted) return;
@@ -331,6 +453,8 @@ export default function PresentationStudio() {
         false,
       );
     } finally {
+      window.clearTimeout(slowTimer);
+      window.clearTimeout(verySlowTimer);
       if (agentChatAbortRef.current === abortController) {
         agentChatAbortRef.current = null;
         setIsAgentReplying(false);
@@ -338,6 +462,96 @@ export default function PresentationStudio() {
       }
     }
   }, [chatMessages, generatedHtml, phase, sendToAgentChat, startGenerationFromBrief]);
+
+  const handleQuickAction = useCallback((command: AgentQuickCommand) => {
+    if (phase === "generating" || isAgentReplying) return;
+    const action = getQuickActionDefinition(command);
+
+    setChatMessages((current) => [
+      ...current,
+      { id: makeId(), role: "user", kind: "text", content: action.userText },
+      { id: `quick-choice-${makeId()}`, role: "system", kind: "quick-choice", action },
+    ]);
+  }, [isAgentReplying, phase]);
+
+  const handleApplyRevision = useCallback((choice: AgentQuickActionChoice) => {
+    if (phase === "generating") return;
+
+    const started = beginRevision(choice.revision);
+    setChatMessages((current) => [
+      ...current,
+      { id: makeId(), role: "user", kind: "text", content: choice.label },
+      {
+        id: makeId(),
+        role: "assistant",
+        kind: "text",
+        content: started
+          ? `已选择「${choice.label}」，正在基于当前版本生成新版本。`
+          : "当前版本缺少可复用的大纲，请先重新生成演示文稿。",
+      },
+    ]);
+  }, [beginRevision, phase]);
+
+  const handleCancelCurrentOperation = useCallback(() => {
+    if (agentChatAbortRef.current) {
+      agentChatAbortRef.current.abort();
+      agentChatAbortRef.current = null;
+      setIsAgentReplying(false);
+      setAgentProgressMessage(null);
+      setChatMessages((current) => current.map((message) => (
+        message.role === "assistant" && message.kind === "text" && message.isStreaming
+          ? { ...message, content: message.content || "已取消当前请求。", isStreaming: false }
+          : message
+      )));
+      return;
+    }
+
+    if (phase === "generating") {
+      resetWorkflow();
+      setPendingArtifact(null);
+      setHtmlWatchdogError(null);
+      setChatMessages((current) => [
+        ...current,
+        { id: makeId(), role: "assistant", kind: "text", content: "已取消生成，当前预览保持不变。" },
+      ]);
+    }
+  }, [phase, resetWorkflow]);
+
+  useEffect(() => {
+    const data = htmlGenerationStep?.data;
+    if (data?.status !== "completed" || !data.html) return;
+
+    const artifactKey = data.artifact
+      ? `${data.artifact.deckId}:${data.artifact.version}`
+      : data.htmlUrl ?? `html-${data.generatedCharacters ?? data.html.length}`;
+    if (publishedArtifactKeyRef.current === artifactKey) return;
+    publishedArtifactKeyRef.current = artifactKey;
+
+    const completedBrief = pendingArtifact?.brief ?? brief;
+    const completedOutline = pendingArtifact?.outline.slides.length
+      ? pendingArtifact.outline
+      : baseOutline;
+    if (completedBrief && completedOutline) {
+      setActiveArtifact({
+        deckId: data.artifact?.deckId ?? deckIdRef.current,
+        version: data.artifact?.version ?? activeArtifact?.version ?? 1,
+        html: data.html,
+        htmlUrl: data.htmlUrl,
+        brief: completedBrief,
+        outline: completedOutline,
+      });
+      setBrief(completedBrief);
+    }
+
+    setPendingArtifact(null);
+    setChatMessages((current) => appendCompletionMessage(current, {
+      artifactId: artifactKey,
+      slideCount: completedOutline?.slides.length ?? selectedSlides.length ?? outline.length,
+      htmlUrl: data.htmlUrl,
+      generator: data.generator,
+      fallbackReason: data.fallbackReason,
+    }));
+  }, [activeArtifact?.version, baseOutline, brief, htmlGenerationStep?.data, outline.length, pendingArtifact, selectedSlides.length]);
 
   const handleGenerate = useCallback(() => {
     if (!baseOutline || selectedSlides.length === 0 || !canApproveOutline) return;
@@ -354,9 +568,11 @@ export default function PresentationStudio() {
     setChatMessages([]);
     setIsAgentReplying(false);
     setQueuedGenerationMessage(null);
-    setFrontendSlidesSession({});
-    setInteractiveResult(null);
     setAgentProgressMessage(null);
+    setActiveArtifact(null);
+    setPendingArtifact(null);
+    deckIdRef.current = `deck-${makeId()}`;
+    publishedArtifactKeyRef.current = null;
   }, [resetWorkflow]);
 
   useEffect(() => {
@@ -370,12 +586,22 @@ export default function PresentationStudio() {
     setHtmlWatchdogError(null);
 
     if (kind === "html") {
+      if (pendingArtifact?.revision) {
+        sendRevision({
+          presentationBrief: toBriefData(pendingArtifact.brief),
+          approvedOutline: pendingArtifact.outline,
+          revision: pendingArtifact.revision,
+          artifact: pendingArtifact.operation,
+        });
+        return;
+      }
+
       handleGenerate();
       return;
     }
 
     setBrief(null);
-  }, [clearError, handleGenerate]);
+  }, [clearError, handleGenerate, pendingArtifact, sendRevision]);
 
   const markGenerationRequestQueued = useCallback((messageId: string) => {
     setChatMessages((current) => current.map((message) => (
@@ -434,25 +660,10 @@ export default function PresentationStudio() {
       });
     }
 
-    if (phase === "previewing") {
-      messages.push({
-        id: "complete-card",
-        role: "system",
-        kind: "complete",
-        slideCount: selectedSlides.length || outline.length,
-        htmlUrl: generatedHtmlUrl,
-        generator: activeHtmlGenerationStepData?.generator,
-        fallbackReason: activeHtmlGenerationStepData?.fallbackReason,
-      });
-    }
-
     return messages;
   }, [
-    activeHtmlGenerationStepData?.fallbackReason,
-    activeHtmlGenerationStepData?.generator,
     canApproveOutline,
     generateDisabledReason,
-    generatedHtmlUrl,
     outline.length,
     phase,
     selectedSlides.length,
@@ -468,6 +679,9 @@ export default function PresentationStudio() {
       isSending={isAgentReplying}
       progressMessage={agentProgressMessage}
       onSend={handleAgentSend}
+      onQuickAction={handleQuickAction}
+      onApplyRevision={handleApplyRevision}
+      onCancel={handleCancelCurrentOperation}
       onGenerate={handleGenerate}
       onRetry={handleRetry}
       onQueueAfterGeneration={handleQueueAfterGeneration}
@@ -478,7 +692,7 @@ export default function PresentationStudio() {
 
   return (
     <PresentationWorkspace
-      previewContent={<PresentationPreviewPane currentStep={previewStep} generatedHtml={generatedHtml} outline={outline} outlineGeneration={outlineStep?.data} htmlGeneration={activeHtmlGenerationStepData} />}
+      previewContent={<PresentationPreviewPane currentStep={previewStep} generatedHtml={generatedHtml} outline={outline} outlineGeneration={outlineStep?.data} htmlGeneration={activeHtmlGenerationStepData} preservePreviewDuringGeneration={Boolean(activeArtifact && pendingArtifact)} />}
       agentContent={agentContent}
     />
   );

@@ -1,15 +1,12 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, FileText, RefreshCcw, RotateCcw, Send, Sparkles } from "lucide-react";
+import { AlertTriangle, FileText, RefreshCcw, RotateCcw, Send, Sparkles, Square } from "lucide-react";
 import type { StudioErrorSource, StudioPhase } from "./use-studio-phase";
+import type { AgentMessage } from "./agent-message-model";
+import type { AgentQuickActionChoice, AgentQuickCommand } from "./agent-quick-actions";
 
-export type AgentMessage =
-  | { id: string; role: "assistant" | "user"; kind?: "text"; content: string; isStreaming?: boolean }
-  | { id: string; role: "system"; kind: "outline-review"; slideCount: number; canGenerate: boolean; disabledReason?: string | null }
-  | { id: string; role: "system"; kind: "complete"; slideCount: number; htmlUrl?: string; generator?: "frontend-slides" | "backup"; fallbackReason?: string }
-  | { id: string; role: "system"; kind: "error"; message: string; retryKind: StudioErrorSource }
-  | { id: string; role: "system"; kind: "generation-request"; message: string; queued?: boolean };
+export type { AgentMessage } from "./agent-message-model";
 
 interface AgentPanelProps {
   messages: AgentMessage[];
@@ -17,6 +14,9 @@ interface AgentPanelProps {
   isSending: boolean;
   progressMessage?: string | null;
   onSend: (message: string) => void;
+  onQuickAction: (command: AgentQuickCommand) => void;
+  onApplyRevision: (choice: AgentQuickActionChoice) => void;
+  onCancel: () => void;
   onGenerate: () => void;
   onRetry: (kind: StudioErrorSource) => void;
   onQueueAfterGeneration: (messageId: string, message: string) => void;
@@ -24,7 +24,13 @@ interface AgentPanelProps {
   onStartOver: () => void;
 }
 
-const phaseCopy: Record<StudioPhase, { placeholder: string; prompts: string[] }> = {
+type SuggestedPrompt = {
+  label: string;
+  message?: string;
+  command?: AgentQuickCommand;
+};
+
+const phaseCopy: Record<StudioPhase, { placeholder: string; prompts: SuggestedPrompt[] }> = {
   briefing: {
     placeholder: "描述你想要的演示文稿…",
     prompts: [],
@@ -35,7 +41,11 @@ const phaseCopy: Record<StudioPhase, { placeholder: string; prompts: string[] }>
   },
   reviewing: {
     placeholder: "想调整大纲？直接说…",
-    prompts: ["增加一页客户案例", "语气更正式一些", "删掉第 3 页"],
+    prompts: [
+      { label: "增加一页客户案例", message: "增加一页客户案例" },
+      { label: "语气更正式一些", message: "语气更正式一些" },
+      { label: "删掉第 3 页", message: "删掉第 3 页" },
+    ],
   },
   generating: {
     placeholder: "有新想法？生成完成后帮你处理…",
@@ -43,7 +53,11 @@ const phaseCopy: Record<StudioPhase, { placeholder: string; prompts: string[] }>
   },
   previewing: {
     placeholder: "告诉我这份演示文稿要改哪里…",
-    prompts: ["整体更简洁", "换一种视觉风格", "修改配色"],
+    prompts: [
+      { label: "整体更简洁", command: "make-concise" },
+      { label: "换一种视觉风格", command: "change-style" },
+      { label: "修改配色", command: "change-palette" },
+    ],
   },
   error: {
     placeholder: "补充说明后再重试…",
@@ -71,12 +85,23 @@ function TypingDots() {
   );
 }
 
-function StatusRow({ text }: { text: string }) {
+function StatusRow({ text, onCancel }: { text: string; onCancel?: () => void }) {
   return (
     <div className="flex justify-start">
       <div className="flex items-center gap-2 rounded-2xl border border-[var(--border-light)] bg-[var(--bg-card)] px-4 py-3">
         <TypingDots />
         <span className="text-sm text-[var(--text-muted)]">{text}</span>
+        {onCancel ? (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="ml-1 flex h-7 w-7 items-center justify-center rounded-lg text-[var(--text-muted)] transition hover:bg-white hover:text-[var(--accent-terracotta)]"
+            aria-label="取消生成"
+            title="取消生成"
+          >
+            <Square className="h-3.5 w-3.5" />
+          </button>
+        ) : null}
       </div>
     </div>
   );
@@ -133,6 +158,44 @@ function OutlineReviewCard({
             </button>
           </div>
           {message.disabledReason ? <p className="mt-2 text-xs text-[var(--accent-terracotta)]">{message.disabledReason}</p> : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function QuickChoiceCard({
+  message,
+  onApplyRevision,
+}: {
+  message: Extract<AgentMessage, { kind: "quick-choice" }>;
+  onApplyRevision: (choice: AgentQuickActionChoice) => void;
+}) {
+  return (
+    <div className="flex justify-start">
+      <div className="max-w-[92%] border border-[var(--border-light)] bg-[var(--bg-card)] px-4 py-3 text-sm text-[var(--text-secondary)]">
+        <p className="leading-6">{message.action.assistantText}</p>
+        <div className="mt-3 grid gap-2">
+          {message.action.choices.map((choice) => (
+            <button
+              key={choice.id}
+              type="button"
+              onClick={() => onApplyRevision(choice)}
+              className="flex w-full items-center gap-3 rounded-lg border border-[var(--border-light)] bg-white px-3 py-3 text-left transition hover:border-[var(--accent-terracotta)]"
+            >
+              {choice.swatches ? (
+                <span className="flex shrink-0 overflow-hidden rounded border border-black/10" aria-hidden="true">
+                  {choice.swatches.map((color) => (
+                    <span key={color} className="h-7 w-3" style={{ backgroundColor: color }} />
+                  ))}
+                </span>
+              ) : null}
+              <span className="min-w-0">
+                <span className="block font-semibold text-[var(--text-primary)]">{choice.label}</span>
+                <span className="mt-0.5 block text-xs leading-5 text-[var(--text-muted)]">{choice.description}</span>
+              </span>
+            </button>
+          ))}
         </div>
       </div>
     </div>
@@ -213,6 +276,9 @@ export default function AgentPanel({
   isSending,
   progressMessage,
   onSend,
+  onQuickAction,
+  onApplyRevision,
+  onCancel,
   onGenerate,
   onRetry,
   onQueueAfterGeneration,
@@ -227,11 +293,19 @@ export default function AgentPanel({
   const prompts = useMemo(() => phaseConfig.prompts, [phaseConfig.prompts]);
   const isEmpty = phase === "briefing" && messages.length === 0;
   const statusText = phase === "outlining" ? "正在生成大纲…" : phase === "generating" ? "正在生成演示文稿…" : null;
+  const lastMessageFingerprint = useMemo(() => {
+    const lastMessage = messages.at(-1);
+    if (!lastMessage) return "";
+    if (lastMessage.role === "assistant" || lastMessage.role === "user") {
+      return `${lastMessage.id}:${lastMessage.content}`;
+    }
+    return lastMessage.id;
+  }, [messages]);
 
   useEffect(() => {
     if (!isPinnedToBottom) return;
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages.length, isSending, isPinnedToBottom]);
+  }, [messages.length, lastMessageFingerprint, progressMessage, isSending, isPinnedToBottom]);
 
   const handleScroll = () => {
     const element = scrollRef.current;
@@ -277,6 +351,10 @@ export default function AgentPanel({
       ) : (
         <div ref={scrollRef} onScroll={handleScroll} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-5">
           {messages.map((message) => {
+            if (message.kind === "quick-choice") {
+              return <QuickChoiceCard key={message.id} message={message} onApplyRevision={onApplyRevision} />;
+            }
+
             if (message.kind === "outline-review") {
               return <OutlineReviewCard key={message.id} message={message} onGenerate={onGenerate} />;
             }
@@ -307,14 +385,19 @@ export default function AgentPanel({
               <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
                 <div className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-6 ${message.role === "user" ? "bg-[var(--accent-terracotta)] text-white" : "border border-[var(--border-light)] bg-[var(--bg-card)] text-[var(--text-secondary)]"}`}>
                   {hasVisibleContent ? message.content : null}
-                  {isStreamingText && !hasVisibleContent ? <TypingDots /> : null}
+                  {isStreamingText && !hasVisibleContent ? (
+                    <div className="flex items-center gap-2">
+                      <TypingDots />
+                      {progressMessage ? <span className="text-[var(--text-muted)]">{progressMessage}</span> : null}
+                    </div>
+                  ) : null}
                   {isStreamingText && hasVisibleContent ? <span className="ml-1 inline-block h-4 w-1 animate-pulse rounded bg-[var(--text-muted)] align-[-2px]" /> : null}
                 </div>
               </div>
             );
           })}
 
-          {statusText ? <StatusRow text={statusText} /> : null}
+          {statusText ? <StatusRow text={statusText} onCancel={phase === "generating" ? onCancel : undefined} /> : null}
 
           {isSending && !messages.some((message) => message.role === "assistant" && message.kind === "text" && message.isStreaming) ? (
             <div className="flex justify-start">
@@ -334,13 +417,13 @@ export default function AgentPanel({
           <div className="flex flex-wrap gap-2">
             {prompts.map((prompt) => (
               <button
-                key={prompt}
+                key={prompt.command ?? prompt.message ?? prompt.label}
                 type="button"
-                onClick={() => sendPrompt(prompt)}
+                onClick={() => prompt.command ? onQuickAction(prompt.command) : sendPrompt(prompt.message ?? prompt.label)}
                 disabled={isSending}
                 className="rounded-full border border-[var(--border-light)] bg-[var(--bg-card)] px-3 py-2 text-xs font-medium text-[var(--text-secondary)] transition hover:border-[var(--accent-terracotta)] hover:text-[var(--accent-terracotta)] disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {prompt}
+                {prompt.label}
               </button>
             ))}
           </div>
@@ -361,14 +444,26 @@ export default function AgentPanel({
             placeholder={phaseConfig.placeholder}
             className="input min-h-20 flex-1 resize-none"
           />
-          <button
-            type="submit"
-            disabled={!canSend}
-            className="self-end rounded-xl bg-[var(--accent-terracotta)] p-3 text-white shadow-md transition hover:bg-[var(--accent-terracotta-light)] disabled:cursor-not-allowed disabled:opacity-50"
-            aria-label="发送演示文稿请求"
-          >
-            <Send className={`h-5 w-5 ${isSending ? "animate-pulse" : ""}`} />
-          </button>
+          {isSending ? (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="self-end rounded-xl border border-[var(--border-light)] bg-white p-3 text-[var(--text-secondary)] transition hover:border-[var(--accent-terracotta)] hover:text-[var(--accent-terracotta)]"
+              aria-label="取消当前请求"
+              title="取消当前请求"
+            >
+              <Square className="h-5 w-5" />
+            </button>
+          ) : (
+            <button
+              type="submit"
+              disabled={!canSend}
+              className="self-end rounded-xl bg-[var(--accent-terracotta)] p-3 text-white shadow-md transition hover:bg-[var(--accent-terracotta-light)] disabled:cursor-not-allowed disabled:opacity-50"
+              aria-label="发送演示文稿请求"
+            >
+              <Send className="h-5 w-5" />
+            </button>
+          )}
         </form>
         <p className="text-xs text-[var(--text-muted)]">Enter 发送 · Shift+Enter 换行</p>
       </div>

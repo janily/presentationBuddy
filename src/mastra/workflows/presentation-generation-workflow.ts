@@ -9,6 +9,7 @@ import {
 import { loadFrontendSlidesFinalContext } from "@/src/services/frontend-slides/skill-loader";
 import { buildFrontendSlidesMastraPrompt } from "@/src/services/frontend-slides/prompt-builder";
 import { saveHtmlToFile } from "@/src/utils/save-html-to-file";
+import { savePresentationArtifact } from "@/src/services/presentation-artifacts/artifact-store";
 import { mapOutlineToFrontendSlides } from "@/src/utils/outline-to-slides-mapper";
 import { presentationInputSchema, presentationOutlineSchema } from "./presentation-generation-schemas";
 
@@ -56,6 +57,11 @@ type PresentationHtmlStepData = {
   steps?: HtmlGenerationProgressStep[];
   html?: string;
   htmlUrl?: string;
+  artifact?: {
+    operationId: string;
+    deckId: string;
+    version: number;
+  };
 };
 
 type HtmlGenerationProgressStepId = "prepare" | "load-skill" | "compose" | "validate" | "fallback" | "save";
@@ -310,7 +316,7 @@ export const presentationOutlineSuggestionStep = createStep({
   resumeSchema: z.object({
     approvedOutline: presentationOutlineSchema,
   }),
-  execute: async ({ inputData, suspend, resumeData, mastra, writer }) => {
+  execute: async ({ inputData, suspend, resumeData, mastra, writer, abortSignal }) => {
     logTimeoutConfiguration();
 
     const { approvedOutline } = resumeData ?? {};
@@ -405,6 +411,7 @@ export const presentationOutlineSuggestionStep = createStep({
           structuredOutput: {
             schema: presentationOutlineSchema,
           },
+          abortSignal,
         },
       );
 
@@ -471,12 +478,15 @@ export const presentationOutlineSuggestionStep = createStep({
         },
       });
 
-      const fallbackResult = await outlineAgent.generate([
-        {
-          role: "user",
-          content: buildOutlineJsonFallbackPrompt(inputData),
-        },
-      ]);
+      const fallbackResult = await outlineAgent.generate(
+        [
+          {
+            role: "user",
+            content: buildOutlineJsonFallbackPrompt(inputData),
+          },
+        ],
+        { abortSignal },
+      );
       const fallbackText = typeof fallbackResult.text === "string" ? fallbackResult.text : "";
       outline = presentationOutlineSchema.parse(parseJsonObject(fallbackText));
       assertOutlineHasSlides(outline, inputData.pageCount);
@@ -511,7 +521,7 @@ export const presentationOutlineSuggestionStep = createStep({
   },
 });
 
-const presentationHtmlGenerationStep = createStep({
+export const presentationHtmlGenerationStep = createStep({
   id: "presentation-html-generation-step",
   inputSchema: presentationInputSchema.extend({
     outline: presentationOutlineSchema,
@@ -522,7 +532,7 @@ const presentationHtmlGenerationStep = createStep({
     generator: z.enum(["frontend-slides", "backup"]).optional(),
     fallbackReason: z.string().optional(),
   }),
-  execute: async ({ inputData, mastra, writer }) => {
+  execute: async ({ inputData, mastra, writer, abortSignal }) => {
     logTimeoutConfiguration();
 
     const stepStartedAt = Date.now();
@@ -543,6 +553,11 @@ const presentationHtmlGenerationStep = createStep({
         data: {
           status: "in-progress",
           ...rest,
+          artifact: inputData.artifact ? {
+            operationId: inputData.artifact.operationId,
+            deckId: inputData.artifact.deckId,
+            version: inputData.artifact.targetVersion,
+          } : undefined,
           lastUpdatedAt: Date.now(),
           steps: updateHtmlProgressSteps(activeStepId, stepDetail, {
             includeFallback: includeFallbackStep,
@@ -585,12 +600,15 @@ const presentationHtmlGenerationStep = createStep({
 
       const frontendSlidesAgent = mastra.getAgent("frontendSlidesComposerAgent");
       const stream = await Promise.race([
-        frontendSlidesAgent.stream([
-          {
-            role: "user",
-            content: prompt,
-          },
-        ]),
+        frontendSlidesAgent.stream(
+          [
+            {
+              role: "user",
+              content: prompt,
+            },
+          ],
+          { abortSignal },
+        ),
         timeoutAfter(
           FRONTEND_SLIDES_TIMEOUT_MS,
           `frontend-slides generation did not start within ${Math.round(FRONTEND_SLIDES_TIMEOUT_MS / 1000)} seconds`,
@@ -704,16 +722,19 @@ const presentationHtmlGenerationStep = createStep({
       });
 
       const stream = await Promise.race([
-        generationAgent.stream([
-          {
-            role: "user",
-            content: `Generate a standalone HTML presentation from this approved outline and original request. Return only the complete HTML document, starting with <!doctype html> or <html>, and do not wrap it in Markdown fences:\n${JSON.stringify(
-              inputData,
-              null,
-              2,
-            )}`,
-          },
-        ]),
+        generationAgent.stream(
+          [
+            {
+              role: "user",
+              content: `Generate a standalone HTML presentation from this approved outline and original request. Return only the complete HTML document, starting with <!doctype html> or <html>, and do not wrap it in Markdown fences:\n${JSON.stringify(
+                inputData,
+                null,
+                2,
+              )}`,
+            },
+          ],
+          { abortSignal },
+        ),
         timeoutAfter(HTML_GENERATION_TIMEOUT_MS, `HTML generation did not start within ${Math.round(HTML_GENERATION_TIMEOUT_MS / 1000)} seconds`),
       ]);
 
@@ -820,6 +841,22 @@ const presentationHtmlGenerationStep = createStep({
       htmlUrl,
     });
 
+    if (inputData.artifact) {
+      savePresentationArtifact({
+        operation: inputData.artifact,
+        brief: {
+          topic: inputData.topic,
+          audience: inputData.audience ?? "General audience",
+          pageCount: inputData.pageCount ?? inputData.outline.slides.length,
+          style: inputData.style ?? "Polished modern presentation",
+          requirements: inputData.requirements,
+        },
+        approvedOutline: inputData.outline,
+        html,
+        htmlUrl,
+      });
+    }
+
     safeWrite(writer, {
       type: "data-presentationHtml",
       data: {
@@ -837,6 +874,11 @@ const presentationHtmlGenerationStep = createStep({
         }),
         html,
         htmlUrl,
+        artifact: inputData.artifact ? {
+          operationId: inputData.artifact.operationId,
+          deckId: inputData.artifact.deckId,
+          version: inputData.artifact.targetVersion,
+        } : undefined,
       } satisfies PresentationHtmlStepData,
     });
 

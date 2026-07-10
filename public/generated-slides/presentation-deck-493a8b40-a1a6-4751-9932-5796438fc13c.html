@@ -1,0 +1,1175 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mastra AI Agent 开发入门：开启 TypeScript 原生智能体时代</title>
+
+    <!-- Google Fonts for Distinctive Tech Feel -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* ===========================================
+           CSS CUSTOM PROPERTIES (THEME)
+           =========================================== */
+        :root {
+            /* Colors: Deep tech theme */
+            --bg-primary: #0B0F19;
+            --bg-secondary: #131B2E;
+            --accent-blue: #00D2FF;
+            --accent-purple: #8A2BE2;
+            --accent-glow-blue: rgba(0, 210, 255, 0.15);
+            --accent-glow-purple: rgba(138, 43, 226, 0.15);
+            --text-primary: #F8FAFC;
+            --text-secondary: #94A3B8;
+            --accent-red: #FF4B4B;
+            --accent-green: #00E676;
+            
+            /* Typography */
+            --font-display: 'Space Grotesk', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+            
+            --slide-padding: 80px;
+            --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+            --duration-normal: 0.8s;
+        }
+
+        /* ===========================================
+           BASE STYLES & viewport-base.css INTEGRATION
+           =========================================== */
+        * { 
+            margin: 0; 
+            padding: 0; 
+            box-sizing: border-box; 
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: var(--font-display);
+        }
+
+        /* Full-window deck viewport */
+        .deck-viewport {
+            position: fixed;
+            inset: 0;
+            overflow: hidden;
+            background: var(--bg-primary);
+        }
+
+        /* Fixed 16:9 design canvas */
+        .deck-stage {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 1920px;
+            height: 1080px;
+            overflow: hidden;
+            transform-origin: 0 0;
+            background: var(--bg-primary);
+            background-image: 
+                radial-gradient(circle at 10% 20%, var(--accent-glow-purple) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, var(--accent-glow-blue) 0%, transparent 45%),
+                linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+            background-size: 100% 100%, 100% 100%, 60px 60px, 60px 60px;
+        }
+
+        /* Slide Switching Engine */
+        .slide {
+            position: absolute;
+            inset: 0;
+            width: 1920px;
+            height: 1080px;
+            overflow: hidden;
+            display: block;
+            visibility: hidden;
+            opacity: 0;
+            pointer-events: none;
+            background: transparent;
+            padding: var(--slide-padding);
+        }
+
+        .slide.active,
+        .slide.visible {
+            visibility: visible;
+            opacity: 1;
+            pointer-events: auto;
+            z-index: 1;
+        }
+
+        /* Keep media & objects bounding */
+        img, video, canvas, svg {
+            max-width: 100%;
+            max-height: 100%;
+        }
+
+        /* Keyboard navigation UI outside of stage */
+        .deck-controls {
+            position: fixed;
+            bottom: 30px;
+            right: 40px;
+            display: flex;
+            gap: 15px;
+            z-index: 10000;
+        }
+        .control-btn {
+            background: rgba(19, 27, 46, 0.8);
+            border: 1px solid rgba(0, 210, 255, 0.2);
+            color: var(--text-primary);
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: var(--font-display);
+            font-size: 16px;
+            transition: all 0.3s;
+            backdrop-filter: blur(10px);
+        }
+        .control-btn:hover {
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 15px var(--accent-glow-blue);
+            transform: translateY(-2px);
+        }
+        
+        /* Bottom progress indicator */
+        .deck-progress {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--accent-purple), var(--accent-blue));
+            z-index: 10000;
+            transition: width 0.3s ease;
+        }
+
+        /* ===========================================
+           TRANSITIONS & ANIMATIONS (Micro-motion)
+           =========================================== */
+        .reveal {
+            opacity: 0;
+            transform: translateY(40px);
+            transition: opacity var(--duration-normal) var(--ease-out-expo),
+                        transform var(--duration-normal) var(--ease-out-expo),
+                        filter var(--duration-normal) var(--ease-out-expo);
+            filter: blur(5px);
+        }
+
+        .slide.visible .reveal {
+            opacity: 1;
+            transform: translateY(0);
+            filter: blur(0);
+        }
+
+        /* Stagger timings */
+        .reveal-1 { transition-delay: 0.1s; }
+        .reveal-2 { transition-delay: 0.2s; }
+        .reveal-3 { transition-delay: 0.35s; }
+        .reveal-4 { transition-delay: 0.5s; }
+        .reveal-5 { transition-delay: 0.65s; }
+
+        /* ===========================================
+           REUSABLE COMPONENT STYLE CLASSES
+           =========================================== */
+        /* Code blocks */
+        .code-container {
+            background: rgba(10, 15, 25, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            font-family: var(--font-mono);
+            font-size: 20px;
+            line-height: 1.6;
+            padding: 30px;
+            overflow: hidden;
+            box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.5);
+            position: relative;
+        }
+        .code-container::before {
+            content: " ";
+            position: absolute;
+            top: 15px;
+            left: 20px;
+            width: 12px;
+            height: 12px;
+            background: #ff5f56;
+            border-radius: 50%;
+            box-shadow: 20px 0 0 #ffbd2e, 40px 0 0 #27c93f;
+        }
+        .code-title {
+            position: absolute;
+            top: 10px;
+            right: 25px;
+            color: var(--text-secondary);
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .code-content {
+            margin-top: 15px;
+        }
+        .keyword { color: #ff79c6; }
+        .string { color: #f1fa8c; }
+        .function { color: #50fa7b; }
+        .comment { color: #6272a4; }
+        .type { color: #8be9fd; }
+        .number { color: #bd93f9; }
+
+        /* Tech Cards */
+        .tech-card {
+            background: rgba(19, 27, 46, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 40px;
+            position: relative;
+            transition: all 0.4s var(--ease-out-expo);
+        }
+        .tech-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 16px;
+            padding: 1px;
+            background: linear-gradient(135deg, rgba(0, 210, 255, 0.2), rgba(138, 43, 226, 0.2));
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            pointer-events: none;
+        }
+        .tech-card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(0, 210, 255, 0.3);
+            box-shadow: 0 15px 35px rgba(0, 210, 255, 0.08);
+        }
+
+        /* Layout utilities */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            height: calc(100% - 150px);
+            align-items: center;
+        }
+        .grid-3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 40px;
+            height: calc(100% - 150px);
+            align-items: center;
+        }
+
+        /* Title styling rules */
+        .slide-header {
+            margin-bottom: 50px;
+        }
+        .slide-title {
+            font-size: 56px;
+            font-weight: 700;
+            letter-spacing: -1.5px;
+            color: var(--text-primary);
+        }
+        .slide-title span {
+            background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .slide-subtitle {
+            font-size: 22px;
+            color: var(--text-secondary);
+            margin-top: 10px;
+            font-family: var(--font-mono);
+        }
+
+        /* Inline Editor styling (JS based) */
+        .edit-hotzone {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 80px;
+            height: 80px;
+            z-index: 10000;
+            cursor: pointer;
+        }
+        .edit-toggle {
+            position: fixed;
+            top: 25px;
+            left: 25px;
+            background: rgba(19, 27, 46, 0.9);
+            border: 1px solid var(--accent-blue);
+            color: var(--text-primary);
+            padding: 10px;
+            border-radius: 50%;
+            width: 45px;
+            height: 45px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+            z-index: 10001;
+            cursor: pointer;
+            box-shadow: 0 0 15px var(--accent-glow-blue);
+        }
+        .edit-toggle.show,
+        .edit-toggle.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        [contenteditable="true"] {
+            outline: 2px dashed var(--accent-blue) !important;
+            background: rgba(0, 210, 255, 0.05);
+            border-radius: 4px;
+            padding: 2px 6px;
+        }
+
+        /* List styling */
+        .bullet-list {
+            list-style: none;
+        }
+        .bullet-list li {
+            position: relative;
+            padding-left: 35px;
+            margin-bottom: 30px;
+            font-size: 24px;
+            line-height: 1.5;
+            color: var(--text-secondary);
+        }
+        .bullet-list li strong {
+            color: var(--text-primary);
+        }
+        .bullet-list li::before {
+            content: "→";
+            position: absolute;
+            left: 0;
+            color: var(--accent-blue);
+            font-weight: bold;
+        }
+
+        /* Icon Wrapper styles */
+        .tech-icon {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 25px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 12px;
+            background: rgba(0, 210, 255, 0.08);
+            border: 1px solid rgba(0, 210, 255, 0.2);
+            color: var(--accent-blue);
+        }
+        .icon-purple {
+            background: rgba(138, 43, 226, 0.08);
+            border-color: rgba(138, 43, 226, 0.2);
+            color: var(--accent-purple);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="deck-viewport">
+        <!-- The scaled 1920x1080 stage -->
+        <main class="deck-stage" id="deckStage">
+
+            <!-- === SLIDE 1: Title Slide === -->
+            <section class="slide title-slide active" id="slide1">
+                <div style="display: flex; flex-direction: column; justify-content: center; height: 100%; position: relative;">
+                    <!-- Visual glow mesh specific to title -->
+                    <div style="position: absolute; width: 600px; height: 600px; background: radial-gradient(circle, rgba(138,43,226,0.2) 0%, transparent 70%); top: 10%; left: 35%; filter: blur(50px); pointer-events: none;"></div>
+                    
+                    <div class="reveal reveal-1" style="margin-bottom: 20px;">
+                        <span style="font-family: var(--font-mono); color: var(--accent-blue); font-size: 24px; letter-spacing: 4px; text-transform: uppercase;">Mastra AI Framework</span>
+                    </div>
+                    
+                    <h1 class="reveal reveal-2" style="font-size: 96px; font-weight: 700; line-height: 1.1; margin-bottom: 30px; letter-spacing: -2px;">
+                        用 TypeScript 构建<br>
+                        <span style="background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">下一代智能体</span>
+                    </h1>
+                    
+                    <p class="reveal reveal-3" style="font-size: 32px; color: var(--text-secondary); max-width: 900px; line-height: 1.6; margin-bottom: 60px;">
+                        告别 Python 独占。利用首个生产级 TypeScript 原生 Agent 开发框架，构建高可靠、强类型、微秒级响应的 AI 应用系统。
+                    </p>
+
+                    <div class="reveal reveal-4" style="display: flex; gap: 30px; align-items: center;">
+                        <div class="code-container" style="padding: 15px 30px; font-size: 22px; border-color: rgba(0, 210, 255, 0.3);">
+                            <span class="keyword">npm</span> <span class="string">create mastra@latest</span>
+                        </div>
+                        <span style="color: var(--text-secondary); font-size: 20px; font-family: var(--font-mono);">
+                            ← 极速初始化 Mastra 工程骨架
+                        </span>
+                    </div>
+
+                    <!-- Tech specs watermark at footer -->
+                    <div style="position: absolute; bottom: 0; left: 0; width: 100%; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 25px;">
+                        <span style="font-family: var(--font-mono); color: var(--text-secondary); font-size: 16px;">V1.0.0 RELEASE</span>
+                        <span style="font-family: var(--font-mono); color: var(--text-secondary); font-size: 16px;">Mastra Developer Kit</span>
+                        <span style="font-family: var(--font-mono); color: var(--accent-blue); font-size: 16px;">TS Native Agent Era</span>
+                    </div>
+                </div>
+            </section>
+
+
+            <!-- === SLIDE 2: Why TS Native? === -->
+            <section class="slide" id="slide2">
+                <div class="slide-header">
+                    <h2 class="slide-title">痛点剖析：<span>为什么选择 TypeScript 原生框架？</span></h2>
+                    <p class="slide-subtitle">The shift from Python friction to TS Native streamline</p>
+                </div>
+
+                <div class="grid-2">
+                    <!-- Left: Python friction -->
+                    <div class="tech-card reveal reveal-1" style="border-color: rgba(255, 75, 75, 0.1); height: 100%; display: flex; flex-direction: column; justify-content: space-between;">
+                        <div>
+                            <div class="tech-icon" style="background: rgba(255, 75, 75, 0.08); border-color: rgba(255, 75, 75, 0.2); color: var(--accent-red);">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="9" x2="15" y2="15"></line><line x1="15" y1="9" x2="9" y2="15"></line></svg>
+                            </div>
+                            <h3 style="font-size: 32px; font-weight: 600; margin-bottom: 25px; color: var(--accent-red);">传统 Python 框架带来的研发摩擦力</h3>
+                            <ul class="bullet-list" style="margin-top: 20px;">
+                                <li style="font-size: 22px; margin-bottom: 20px;"><strong style="color: var(--text-primary);">庞大的上下文切换成本：</strong> 团队需维护两套运行时系统与复杂的 JSON RPC / HTTP 传输层。</li>
+                                <li style="font-size: 22px; margin-bottom: 20px;"><strong style="color: var(--text-primary);">运行时类型黑盒：</strong> Python 难以对 LLM 复杂输出与多变工具链进行强类型契约校验。</li>
+                                <li style="font-size: 22px; margin-bottom: 20px;"><strong style="color: var(--text-primary);">工程化部署噩梦：</strong> 面对冷启动耗时、Docker 容器过重及无服务器架构（Serverless）不友好。</li>
+                            </ul>
+                        </div>
+                        <div style="font-family: var(--font-mono); color: rgba(255, 75, 75, 0.6); font-size: 16px; border-top: 1px dashed rgba(255, 75, 75, 0.2); padding-top: 20px;">
+                            CRITICAL ISSUES: Latency Overhead & Dynamic Type Collapse
+                        </div>
+                    </div>
+
+                    <!-- Right: TS Streamlined -->
+                    <div class="tech-card reveal reveal-2" style="border-color: rgba(0, 210, 255, 0.15); height: 100%; display: flex; flex-direction: column; justify-content: space-between;">
+                        <div>
+                            <div class="tech-icon">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            </div>
+                            <h3 style="font-size: 32px; font-weight: 600; margin-bottom: 25px; color: var(--accent-blue);">Mastra 全栈原生流线型体验</h3>
+                            <ul class="bullet-list" style="margin-top: 20px;">
+                                <li style="font-size: 22px; margin-bottom: 20px;"><strong style="color: var(--text-primary);">零技术栈上下文切换：</strong> 完美无缝嵌入 React, Next.js, Remix 及 Node.js 后端生态。</li>
+                                <li style="font-size: 22px; margin-bottom: 20px;"><strong style="color: var(--text-primary);">端到端天然类型安全：</strong> 结合 Zod 运行时契约，在编译阶段和运行时全面封堵接口错误。</li>
+                                <li style="font-size: 22px; margin-bottom: 20px;"><strong style="color: var(--text-primary);">极致轻量，微秒部署：</strong> 微型打包体积，直接部署于 Vercel, Cloudflare Workers 等极速算力。</li>
+                            </ul>
+                        </div>
+                        <div style="font-family: var(--font-mono); color: var(--accent-blue); font-size: 16px; border-top: 1px dashed rgba(0, 210, 255, 0.2); padding-top: 20px;">
+                            ADVANTAGE: Integrated System, Unified Language, 10x Performance
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+
+            <!-- === SLIDE 3: Core Architecture === -->
+            <section class="slide" id="slide3">
+                <div class="slide-header">
+                    <h2 class="slide-title">Mastra 核心架构：<span>三大能力基石</span></h2>
+                    <p class="slide-subtitle">The foundational ecosystem mapping intelligence inside Mastra</p>
+                </div>
+
+                <div class="grid-3">
+                    <!-- Column 1: Agents -->
+                    <div class="tech-card reveal reveal-1" style="height: 100%; display: flex; flex-direction: column; justify-content: space-between;">
+                        <div>
+                            <div class="tech-icon">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                            </div>
+                            <h3 style="font-size: 32px; font-weight: 700; margin-bottom: 20px;">Agents</h3>
+                            <h4 style="font-family: var(--font-mono); color: var(--accent-blue); font-size: 18px; margin-bottom: 25px;">自主推理决策大脑</h4>
+                            <p style="font-size: 20px; line-height: 1.6; color: var(--text-secondary);">
+                                运行 "推理 - 规划 - 行动" (ReAct) 的智能内核。能够挂载无限工具（Tools），感知持久化上下文，根据实时环境变化进行动态逻辑分支和回溯决策。
+                            </p>
+                        </div>
+                        <div style="font-family: var(--font-mono); font-size: 14px; color: var(--text-secondary); background: rgba(0,0,0,0.2); padding: 12px 18px; border-radius: 8px;">
+                            import { Agent } from '@mastra/core'
+                        </div>
+                    </div>
+
+                    <!-- Column 2: Tools -->
+                    <div class="tech-card reveal reveal-2" style="height: 100%; display: flex; flex-direction: column; justify-content: space-between;">
+                        <div>
+                            <div class="tech-icon icon-purple">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
+                            </div>
+                            <h3 style="font-size: 32px; font-weight: 700; margin-bottom: 20px;">Tools</h3>
+                            <h4 style="font-family: var(--font-mono); color: var(--accent-purple); font-size: 18px; margin-bottom: 25px;">强类型执行武器库</h4>
+                            <p style="font-size: 20px; line-height: 1.6; color: var(--text-secondary);">
+                                基于 Zod 输入验证定义的强类型业务函数。为 LLM 决策树暴露严格的输入参数 schema 规约，确保每次智能体底层业务 API 调用数据流坚如磐石。
+                            </p>
+                        </div>
+                        <div style="font-family: var(--font-mono); font-size: 14px; color: var(--text-secondary); background: rgba(0,0,0,0.2); padding: 12px 18px; border-radius: 8px;">
+                            import { createTool } from '@mastra/core'
+                        </div>
+                    </div>
+
+                    <!-- Column 3: Workflows -->
+                    <div class="tech-card reveal reveal-3" style="height: 100%; display: flex; flex-direction: column; justify-content: space-between;">
+                        <div>
+                            <div class="tech-icon">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
+                            </div>
+                            <h3 style="font-size: 32px; font-weight: 700; margin-bottom: 20px;">Workflows</h3>
+                            <h4 style="font-family: var(--font-mono); color: var(--accent-blue); font-size: 18px; margin-bottom: 25px;">确定性图结构工作流</h4>
+                            <p style="font-size: 20px; line-height: 1.6; color: var(--text-secondary);">
+                                采用确定性流程编排驱动复杂链路。通过流式 API 进行条件分支、并行调用、循环重试，融合人工介入节点（Human-in-the-loop）来规避幻觉失控风险。
+                            </p>
+                        </div>
+                        <div style="font-family: var(--font-mono); font-size: 14px; color: var(--text-secondary); background: rgba(0,0,0,0.2); padding: 12px 18px; border-radius: 8px;">
+                            import { Workflow } from '@mastra/core'
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+
+            <!-- === SLIDE 4: Quickstart === -->
+            <section class="slide" id="slide4">
+                <div class="slide-header">
+                    <h2 class="slide-title">快速上手：<span>3 分钟构建你的 Mastra 工程</span></h2>
+                    <p class="slide-subtitle">Minimal setup, clean structures, absolute control</p>
+                </div>
+
+                <div class="grid-2" style="align-items: stretch;">
+                    <!-- Left: Code & Terminal -->
+                    <div class="reveal reveal-1" style="display: flex; flex-direction: column; justify-content: space-between; height: 100%;">
+                        <div style="margin-bottom: 30px;">
+                            <h3 style="font-size: 30px; font-weight: 600; margin-bottom: 20px;">1. 一键交互式脚手架初始化</h3>
+                            <p style="font-size: 20px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 20px;">
+                                执行以下命令，Mastra 极速生成完全基于 TypeScript 配置文件的现代 Agent 根骨架，零多余文件。
+                            </p>
+                        </div>
+                        <div class="code-container" style="flex-grow: 1; display: flex; flex-direction: column; justify-content: center; min-height: 400px;">
+                            <div class="code-title">Terminal Console</div>
+                            <div class="code-content" style="font-size: 18px;">
+                                <p><span class="comment"># 启动高星交互式脚手架</span></p>
+                                <p><span class="keyword">npm</span> create mastra@latest</p>
+                                <br>
+                                <p><span class="comment"># 按照交互提示选择你喜爱的选项：</span></p>
+                                <p><span class="comment">? </span>Where should we create your project? <span class="string">./my-mastra-agent</span></p>
+                                <p><span class="comment">? </span>Would you like to install packages? <span class="string">Yes</span></p>
+                                <p><span class="comment">? </span>Configure local telemetry tracing? <span class="string">Yes (In-Memory)</span></p>
+                                <br>
+                                <p><span class="comment"># 进入工程，即刻启动开发服务器</span></p>
+                                <p><span class="keyword">cd</span> my-mastra-agent && <span class="keyword">npm</span> run dev</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Directory Layout -->
+                    <div class="tech-card reveal reveal-2" style="height: 100%; display: flex; flex-direction: column; justify-content: space-between;">
+                        <div>
+                            <h3 style="font-size: 30px; font-weight: 600; margin-bottom: 20px;">2. 标准规范目录树解构</h3>
+                            <p style="font-size: 20px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 30px;">
+                                Mastra 将框架核心层、自主智能体、安全工具链、流水线工作流集中于 <span style="font-family: var(--font-mono); color: var(--accent-blue);">src/mastra/</span> 目录，工程职责完美隔离。
+                            </p>
+                            
+                            <!-- Custom Visual Tree Layout -->
+                            <div style="background: rgba(0,0,0,0.3); border-radius: 12px; padding: 25px 35px; font-family: var(--font-mono); font-size: 20px; line-height: 1.8; color: var(--text-secondary);">
+                                <div>📂 my-mastra-agent/</div>
+                                <div>├── 📂 src/</div>
+                                <div style="color: var(--accent-blue); font-weight: bold;">│   └── 📂 mastra/ <span style="color: var(--text-secondary); font-weight: normal; font-size: 16px;">— 核心工作目录</span></div>
+                                <div style="color: var(--accent-blue);">│       ├── 📂 agents/ <span style="color: var(--text-secondary); font-weight: normal; font-size: 16px;">— 决策智能体定义 (e.g., researcher.ts)</span></div>
+                                <div style="color: var(--accent-purple);">│       ├── 📂 tools/ <span style="color: var(--text-secondary); font-weight: normal; font-size: 16px;">— Zod 安全业务工具集</span></div>
+                                <div>│       ├── 📂 workflows/ <span style="color: var(--text-secondary); font-weight: normal; font-size: 16px;">— 状态流程控制流</span></div>
+                                <div style="color: var(--accent-green);">│       └── 📄 index.ts <span style="color: var(--text-secondary); font-weight: normal; font-size: 16px;">— Mastra 入口初始化配置</span></div>
+                                <div>├── 📄 mastra.config.ts <span style="color: var(--text-secondary); font-size: 16px;">— 全局运行级别核心配置文件</span></div>
+                                <div>├── 📄 package.json</div>
+                                <div>└── 📄 tsconfig.json</div>
+                            </div>
+                        </div>
+                        <div style="font-family: var(--font-mono); color: var(--text-secondary); font-size: 16px; border-top: 1px solid rgba(255, 255, 255, 0.05); padding-top: 20px;">
+                            ★ 极简、高度收敛的架构让大型单体工程和微服务重构无比从容。
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+
+            <!-- === SLIDE 5: Strong-typed Tools === -->
+            <section class="slide" id="slide5">
+                <div class="slide-header">
+                    <h2 class="slide-title">强类型 Tools：<span>基于 Zod 的安全接口设计</span></h2>
+                    <p class="slide-subtitle">Declarative schema validation and flawless execution loops</p>
+                </div>
+
+                <div class="grid-2">
+                    <!-- Left: createTool code -->
+                    <div class="reveal reveal-1" style="height: 100%; display: flex; flex-direction: column; justify-content: space-between;">
+                        <div class="code-container" style="flex-grow: 1; min-height: 500px; display: flex; flex-direction: column; justify-content: center;">
+                            <div class="code-title">src/mastra/tools/weather.ts</div>
+                            <div class="code-content" style="font-size: 17px; line-height: 1.45;">
+                                <p><span class="keyword">import</span> { createTool } <span class="keyword">from</span> <span class="string">'@mastra/core'</span>;</p>
+                                <p><span class="keyword">import</span> { z } <span class="keyword">from</span> <span class="string">'zod'</span>;</p>
+                                <br>
+                                <p><span class="keyword">export const</span> <span class="function">weatherTool</span> = <span class="function">createTool</span>({</p>
+                                <p>&nbsp;&nbsp;id: <span class="string">'get-weather'</span>,</p>
+                                <p>&nbsp;&nbsp;description: <span class="string">'获取指定城市的实时天气数据'</span>,</p>
+                                <p>&nbsp;&nbsp;inputSchema: z.<span class="function">object</span>({</p>
+                                <p>&nbsp;&nbsp;&nbsp;&nbsp;city: z.<span class="function">string</span>().<span class="function">describe</span>(<span class="string">'城市名称，如: 北京'</span>),</p>
+                                <p>&nbsp;&nbsp;&nbsp;&nbsp;unit: z.<span class="function">enum</span>([<span class="string">'C'</span>, <span class="string">'F'</span>]).<span class="function">optional</span>()</p>
+                                <p>&nbsp;&nbsp;}),</p>
+                                <p>&nbsp;&nbsp;execute: <span class="keyword">async</span> ({ input, context }) => {</p>
+                                <p>&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">// 此时 input 经过 Zod 强校验，天然具备严格 IDE 自动推导提示</span></p>
+                                <p>&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">const</span> { city, unit = <span class="string">'C'</span> } = input;</p>
+                                <p>&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">const</span> data = <span class="keyword">await</span> <span class="function">fetchWeather</span>(city);</p>
+                                <p>&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">return</span> { temp: data.temp, unit };</p>
+                                <p>&nbsp;&nbsp;}</p>
+                                <p>});</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Visual Tool Pipeline Diagram -->
+                    <div class="tech-card reveal reveal-2" style="height: 100%; display: flex; flex-direction: column; justify-content: space-between;">
+                        <div>
+                            <h3 style="font-size: 32px; font-weight: 600; margin-bottom: 30px; color: var(--accent-blue);">工具契约运行时双重屏障</h3>
+                            <p style="font-size: 20px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 40px;">
+                                AI 智能体产生的大部分运行时错误源于“对参数的野蛮理解”（例如模型生成非标准格式、字符串包裹错误）。Mastra 借助 Zod 在执行前筑起第一道城墙。
+                            </p>
+
+                            <!-- Process flowchart with CSS -->
+                            <div style="display: flex; flex-direction: column; gap: 20px;">
+                                <div style="display: flex; align-items: center; gap: 20px;">
+                                    <div style="width: 50px; height: 50px; background: rgba(0, 210, 255, 0.1); border: 1px solid var(--accent-blue); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-family: var(--font-mono); color: var(--accent-blue);">01</div>
+                                    <div style="flex-grow: 1; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); padding: 15px 20px; border-radius: 12px;">
+                                        <div style="font-size: 18px; font-weight: 600; margin-bottom: 3px;">LLM 结构化参数输出</div>
+                                        <div style="font-size: 15px; color: var(--text-secondary);">LLM 读取描述，自动生成 JSON 输入。</div>
+                                    </div>
+                                </div>
+
+                                <div style="display: flex; align-items: center; gap: 20px;">
+                                    <div style="width: 50px; height: 50px; background: rgba(138, 43, 226, 0.1); border: 1px solid var(--accent-purple); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-family: var(--font-mono); color: var(--accent-purple);">02</div>
+                                    <div style="flex-grow: 1; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); padding: 15px 20px; border-radius: 12px; border-left: 3px solid var(--accent-purple);">
+                                        <div style="font-size: 18px; font-weight: 600; margin-bottom: 3px; display: flex; justify-content: space-between;">
+                                            <span>Zod 强约束动态校验</span>
+                                            <span style="color: var(--accent-green); font-size: 14px; font-family: var(--font-mono);">Type Safe ✓</span>
+                                        </div>
+                                        <div style="font-size: 15px; color: var(--text-secondary);">严格限制类型范围，错误调用自动阻断或重试。</div>
+                                    </div>
+                                </div>
+
+                                <div style="display: flex; align-items: center; gap: 20px;">
+                                    <div style="width: 50px; height: 50px; background: rgba(0, 230, 118, 0.1); border: 1px solid var(--accent-green); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-family: var(--font-mono); color: var(--accent-green);">03</div>
+                                    <div style="flex-grow: 1; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); padding: 15px 20px; border-radius: 12px;">
+                                        <div style="font-size: 18px; font-weight: 600; margin-bottom: 3px;">Node.js 高性能执行逻辑</div>
+                                        <div style="font-size: 15px; color: var(--text-secondary);">安全进入 execute，直接获取带类型保障的参数值。</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="font-family: var(--font-mono); color: var(--text-secondary); font-size: 16px; border-top: 1px solid rgba(255, 255, 255, 0.05); padding-top: 20px;">
+                            ★ 自定义 Tracing 系统将自动记录每一次 Tool 的输入与耗时评估。
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+
+            <!-- === SLIDE 6: Declarative Agent === -->
+            <section class="slide" id="slide6">
+                <div class="slide-header">
+                    <h2 class="slide-title">Agent 声明式开发：<span>让 LLM 获得自主决策力</span></h2>
+                    <p class="slide-subtitle">Assemble agents with models, system guidelines, and safe tools</p>
+                </div>
+
+                <div class="grid-2">
+                    <!-- Left Column: Code configuration of Agent -->
+                    <div class="reveal reveal-1" style="height: 100%; display: flex; flex-direction: column; justify-content: space-between;">
+                        <div class="code-container" style="flex-grow: 1; min-height: 500px; display: flex; flex-direction: column; justify-content: center;">
+                            <div class="code-title">src/mastra/agents/index.ts</div>
+                            <div class="code-content" style="font-size: 16px; line-height: 1.4;">
+                                <p><span class="keyword">import</span> { Agent } <span class="keyword">from</span> <span class="string">'@mastra/core'</span>;</p>
+                                <p><span class="keyword">import</span> { weatherTool } <span class="keyword">from</span> <span class="string">'../tools/weather'</span>;</p>
+                                <br>
+                                <p><span class="keyword">export const</span> <span class="function">weatherAgent</span> = <span class="keyword">new</span> <span class="type">Agent</span>({</p>
+                                <p>&nbsp;&nbsp;name: <span class="string">'Weather Agent'</span>,</p>
+                                <p>&nbsp;&nbsp;instructions: <span class="string">'你是一个聪明的天气管家。'</span> +</p>
+                                <p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">'请务必使用天气工具查询实时温度后，'</span> +</p>
+                                <p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">'给用户提供最贴心的穿衣与出行规划建议。'</span>,</p>
+                                <p>&nbsp;&nbsp;model: {</p>
+                                <p>&nbsp;&nbsp;&nbsp;&nbsp;provider: <span class="string">'OPENAI'</span>,</p>
+                                <p>&nbsp;&nbsp;&nbsp;&nbsp;name: <span class="string">'gpt-4o'</span>,</p>
+                                <p>&nbsp;&nbsp;&nbsp;&nbsp;toolChoice: <span class="string">'auto'</span>,</p>
+                                <p>&nbsp;&nbsp;},</p>
+                                <p>&nbsp;&nbsp;tools: {</p>
+                                <p>&nbsp;&nbsp;&nbsp;&nbsp;getWeather: weatherTool</p>
+                                <p>&nbsp;&nbsp;}</p>
+                                <p>});</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Column: Visual Diagram of Declarative Assembly -->
+                    <div class="tech-card reveal reveal-2" style="height: 100%; display: flex; flex-direction: column; justify-content: space-between; background: rgba(138, 43, 226, 0.05); border-color: rgba(138,43,226,0.15);">
+                        <div>
+                            <h3 style="font-size: 32px; font-weight: 700; margin-bottom: 25px; color: var(--accent-purple);">单接口声明式组装架构</h3>
+                            <p style="font-size: 20px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 40px;">
+                                无需复杂的链条（Chain）连接，Mastra 采用高度一体化的声明式 API。一个初始化配置解决所有依赖和环境约束。
+                            </p>
+
+                            <!-- Visual Block Diagram -->
+                            <div style="background: rgba(10,15,25,0.6); padding: 30px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.05); position: relative;">
+                                <div style="text-align: center; font-size: 20px; font-weight: bold; background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple)); padding: 15px; border-radius: 10px; margin-bottom: 30px;">
+                                    new Agent( { ... } )
+                                </div>
+                                <div style="display: grid; grid-template-columns: 1fr 1.3fr 1fr; gap: 15px; text-align: center;">
+                                    <div style="background: rgba(0, 210, 255, 0.1); border: 1px solid var(--accent-blue); border-radius: 8px; padding: 15px 10px;">
+                                        <div style="font-size: 16px; font-weight: bold; margin-bottom: 5px;">Model Router</div>
+                                        <div style="font-size: 12px; color: var(--text-secondary); font-family: var(--font-mono);">OpenAI / Claude</div>
+                                    </div>
+                                    <div style="background: rgba(138, 43, 226, 0.1); border: 1px solid var(--accent-purple); border-radius: 8px; padding: 15px 10px;">
+                                        <div style="font-size: 16px; font-weight: bold; margin-bottom: 5px;">System Instructions</div>
+                                        <div style="font-size: 12px; color: var(--text-secondary); font-family: var(--font-mono);">Role-playing Prompts</div>
+                                    </div>
+                                    <div style="background: rgba(0, 230, 118, 0.1); border: 1px solid var(--accent-green); border-radius: 8px; padding: 15px 10px;">
+                                        <div style="font-size: 16px; font-weight: bold; margin-bottom: 5px;">Mounted Tools</div>
+                                        <div style="font-size: 12px; color: var(--text-secondary); font-family: var(--font-mono);">Zod Safe Functions</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="font-family: var(--font-mono); color: var(--text-secondary); font-size: 16px; border-top: 1px dashed rgba(138, 43, 226, 0.3); padding-top: 20px;">
+                            ★ 支持超过 40+ 种行业主流模型的无缝一键平滑热切。
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+
+            <!-- === SLIDE 7: Workflows === -->
+            <section class="slide" id="slide7">
+                <div class="slide-header">
+                    <h2 class="slide-title">Workflow 编排：<span>用确定性驾驭复杂的业务流</span></h2>
+                    <p class="slide-subtitle">Unite LLM unpredictability with strict business flow charts</p>
+                </div>
+
+                <div class="grid-2">
+                    <!-- Left: Description and comparison table -->
+                    <div class="reveal reveal-1" style="height: 100%; display: flex; flex-direction: column; justify-content: space-between;">
+                        <div>
+                            <h3 style="font-size: 34px; font-weight: 700; margin-bottom: 25px; color: var(--accent-blue);">确定性 (Deterministic) 的力量</h3>
+                            <p style="font-size: 21px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 40px;">
+                                自主智能体能解决“模糊、发散式问题”，而生产环境里的关键交易、支付与报告流必须保证 100% 流程绝对可控。<br><br>
+                                Mastra Workflows 专为在非确定性世界中创建绝对可靠的图结构逻辑链条而生。
+                            </p>
+                            
+                            <!-- Key capabilities cards -->
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                                <div style="background: rgba(255,255,255,0.02); padding: 20px; border-radius: 12px; border-left: 3px solid var(--accent-blue);">
+                                    <h4 style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">状态与持久化</h4>
+                                    <p style="font-size: 14px; color: var(--text-secondary);">全面支持执行状态中途落库、多节点回滚。</p>
+                                </div>
+                                <div style="background: rgba(255,255,255,0.02); padding: 20px; border-radius: 12px; border-left: 3px solid var(--accent-purple);">
+                                    <h4 style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">流式条件分支</h4>
+                                    <p style="font-size: 14px; color: var(--text-secondary);">支持类似 .then()、.parallel() 和 .branch() 链式编排。</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="font-family: var(--font-mono); color: var(--text-secondary); font-size: 16px; border-top: 1px solid rgba(255, 255, 255, 0.05); padding-top: 20px;">
+                            ★ Human-in-the-loop: 支持设置特殊节点进行人工干预确认后方可继续流转。
+                        </div>
+                    </div>
+
+                    <!-- Right: Minimalist visual representation of graph -->
+                    <div class="tech-card reveal reveal-2" style="height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; position: relative; overflow: hidden;">
+                        <div style="position: absolute; top: 30px; left: 30px; font-family: var(--font-mono); color: var(--accent-blue); font-size: 16px;">
+                            GRAPH VISUALIZER
+                        </div>
+
+                        <!-- Minimal Graph Design with Pure CSS -->
+                        <div style="display: flex; flex-direction: column; align-items: center; gap: 45px; width: 100%;">
+                            <!-- Node 1: Start -->
+                            <div style="background: rgba(138, 43, 226, 0.15); border: 1px dashed var(--accent-purple); color: var(--text-primary); padding: 20px 40px; border-radius: 12px; font-family: var(--font-mono); font-size: 18px; text-align: center; position: relative;">
+                                🚀 Node_01: Web Trigger
+                                <div style="position: absolute; bottom: -35px; left: 50%; transform: translateX(-50%); color: var(--accent-purple); font-size: 24px;">↓</div>
+                            </div>
+
+                            <!-- Parallel Grid Node 2 -->
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 50px; width: 100%; position: relative;">
+                                <!-- Branch A -->
+                                <div style="background: rgba(0, 210, 255, 0.08); border: 1px solid var(--accent-blue); padding: 20px 20px; border-radius: 12px; text-align: center;">
+                                    <div style="font-family: var(--font-mono); font-size: 16px; font-weight: bold; margin-bottom: 5px;">Parallel_02A</div>
+                                    <div style="font-size: 14px; color: var(--text-secondary);">Agent 提取论文要点</div>
+                                </div>
+                                <!-- Branch B -->
+                                <div style="background: rgba(0, 210, 255, 0.08); border: 1px solid var(--accent-blue); padding: 20px 20px; border-radius: 12px; text-align: center;">
+                                    <div style="font-family: var(--font-mono); font-size: 16px; font-weight: bold; margin-bottom: 5px;">Parallel_02B</div>
+                                    <div style="font-size: 14px; color: var(--text-secondary);">向量数据库混合检索</div>
+                                </div>
+                                <div style="position: absolute; bottom: -35px; left: 50%; transform: translateX(-50%); color: var(--accent-blue); font-size: 24px;">↓</div>
+                            </div>
+
+                            <!-- Node 3: Aggregator / Branch Decision -->
+                            <div style="background: rgba(19, 27, 46, 0.8); border: 1px solid var(--text-secondary); color: var(--text-primary); padding: 20px 40px; border-radius: 12px; font-family: var(--font-mono); font-size: 18px; text-align: center; position: relative;">
+                                ⚖ Step_03: Branch / Filter Rule
+                                <div style="position: absolute; bottom: -35px; left: 50%; transform: translateX(-50%); color: var(--text-secondary); font-size: 24px;">↓</div>
+                            </div>
+
+                            <!-- Node 4: End -->
+                            <div style="background: rgba(0, 230, 118, 0.1); border: 1px solid var(--accent-green); color: var(--accent-green); padding: 15px 40px; border-radius: 30px; font-family: var(--font-mono); font-size: 18px; text-align: center;">
+                                ✓ End (Vercel Edge Output)
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+
+            <!-- === SLIDE 8: Production & Next Steps === -->
+            <section class="slide" id="slide8">
+                <div class="slide-header">
+                    <h2 class="slide-title">走向生产环境：<span>Mastra 进阶生态与下一步</span></h2>
+                    <p class="slide-subtitle">Ready to deploy? Discover core enterprise extensions</p>
+                </div>
+
+                <div class="grid-2">
+                    <!-- Left: Ecosystem Grid -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; height: 100%;">
+                        <!-- Item 1 -->
+                        <div class="tech-card reveal reveal-1" style="padding: 25px; display: flex; flex-direction: column; justify-content: space-between;">
+                            <div>
+                                <h4 style="font-size: 24px; font-weight: bold; margin-bottom: 10px; color: var(--accent-blue);">内置可观测性 (Observability)</h4>
+                                <p style="font-size: 16px; color: var(--text-secondary); line-height: 1.5;">
+                                    开箱即用的调用链追踪 (Traces) 与评估 (Evals)。内置 OpenTelemetry 支持，可无缝对接 Phoenix, Honeycomb 等第三方平台。
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <!-- Item 2 -->
+                        <div class="tech-card reveal reveal-2" style="padding: 25px; display: flex; flex-direction: column; justify-content: space-between;">
+                            <div>
+                                <h4 style="font-size: 24px; font-weight: bold; margin-bottom: 10px; color: var(--accent-purple);">MCP 原生模型上下文协议</h4>
+                                <p style="font-size: 16px; color: var(--text-secondary); line-height: 1.5;">
+                                    深度集成 Model Context Protocol (MCP) 服务器，支持一键直接共享、接入外部丰富的工具和数据生态环境。
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Item 3 -->
+                        <div class="tech-card reveal reveal-3" style="padding: 25px; display: flex; flex-direction: column; justify-content: space-between;">
+                            <div>
+                                <h4 style="font-size: 24px; font-weight: bold; margin-bottom: 10px; color: var(--accent-green);">内置向量检索 (RAG)</h4>
+                                <p style="font-size: 16px; color: var(--text-secondary); line-height: 1.5;">
+                                    极其平滑的数据入库切片（Chunking）机制，内置本地 LibSQL / SQLite，且全面兼容 Pinecone, PGVector 进阶接入。
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Item 4 -->
+                        <div class="tech-card reveal reveal-4" style="padding: 25px; display: flex; flex-direction: column; justify-content: space-between;">
+                            <div>
+                                <h4 style="font-size: 24px; font-weight: bold; margin-bottom: 10px; color: var(--text-primary);">一键多云轻松部署</h4>
+                                <p style="font-size: 16px; color: var(--text-secondary); line-height: 1.5;">
+                                    可作为独立 Express / Fastify 微服务运行，也可以零摩擦地打包成 serverless 边缘路由（Edge API Router）。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Call to Action / GitHub / Links -->
+                    <div class="tech-card reveal reveal-5" style="height: 100%; display: flex; flex-direction: column; justify-content: space-between; text-align: center; border-color: rgba(0, 210, 255, 0.2); background: radial-gradient(circle at 50% 50%, rgba(0, 210, 255, 0.05) 0%, transparent 80%);">
+                        <div style="margin-top: 40px;">
+                            <div style="display: inline-flex; width: 80px; height: 80px; background: rgba(0, 210, 255, 0.1); border: 1px solid var(--accent-blue); border-radius: 50%; align-items: center; justify-content: center; margin-bottom: 30px; color: var(--accent-blue);">
+                                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg>
+                            </div>
+                            <h3 style="font-size: 38px; font-weight: 700; margin-bottom: 20px;">现在就开启你的 TS 智能体之旅</h3>
+                            <p style="font-size: 20px; color: var(--text-secondary); max-width: 450px; margin: 0 auto 40px; line-height: 1.6;">
+                                欢迎加入 Mastra 社区。阅读开源指南，开发你的第一个原生 TypeScript 高星级 AI 智能体应用。
+                            </p>
+                        </div>
+
+                        <div style="display: flex; flex-direction: column; gap: 15px; width: 100%; max-width: 400px; margin: 0 auto 30px;">
+                            <a href="https://mastra.ai" target="_blank" style="background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple)); color: var(--text-primary); text-decoration: none; padding: 18px 30px; border-radius: 12px; font-weight: bold; font-size: 20px; transition: all 0.3s;">
+                                📖 访问 Mastra 官方文档 (mastra.ai)
+                            </a>
+                            <div style="font-family: var(--font-mono); color: var(--text-secondary); font-size: 16px;">
+                                GitHub: github.com/mastra-ai/mastra
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Slide controls (kept outside the stage, absolute to screen) -->
+    <div class="deck-controls">
+        <button class="control-btn" id="prevBtn" title="Previous Slide (← / Page Up)">PREV</button>
+        <button class="control-btn" id="nextBtn" title="Next Slide (→ / Space / Page Down)">NEXT</button>
+    </div>
+    
+    <!-- Visual slide progress bar at bottom screen -->
+    <div class="deck-progress" id="deckProgress"></div>
+
+    <!-- Inline editing controller system (E hotkey or hover bottom left) -->
+    <div class="edit-hotzone"></div>
+    <button class="edit-toggle" id="editToggle" title="Toggle Edit Mode (Press E)">✏️</button>
+
+
+    <!-- ===========================================
+       SLIDE PRESENTATION CONTROLLER
+       =========================================== */ -->
+    <script>
+        class SlidePresentation {
+            constructor() {
+                this.slides = document.querySelectorAll('.slide');
+                this.currentSlide = 0;
+                this.stage = document.getElementById('deckStage');
+                this.progress = document.getElementById('deckProgress');
+                this.prevBtn = document.getElementById('prevBtn');
+                this.nextBtn = document.getElementById('nextBtn');
+                
+                this.setupStageScale();
+                this.setupKeyboardNav();
+                this.setupTouchNav();
+                this.setupClickControls();
+                this.setupWheelNav();
+                this.showSlide(0);
+
+                window.addEventListener('resize', () => this.setupStageScale());
+            }
+
+            setupStageScale() {
+                // Scales the 1920x1080 stage inside the browser window
+                const factor = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+                const x = (window.innerWidth - 1920 * factor) / 2;
+                const y = (window.innerHeight - 1080 * factor) / 2;
+                this.stage.style.transform = `translate(${x}px, ${y}px) scale(${factor})`;
+            }
+
+            setupKeyboardNav() {
+                document.addEventListener('keydown', (e) => {
+                    // Skip nav if editing text
+                    if (e.target.getAttribute('contenteditable') === 'true') return;
+
+                    switch(e.key) {
+                        case 'ArrowRight':
+                        case ' ':
+                        case 'PageDown':
+                            this.next();
+                            e.preventDefault();
+                            break;
+                        case 'ArrowLeft':
+                        case 'PageUp':
+                            this.prev();
+                            e.preventDefault();
+                            break;
+                        case 'Home':
+                            this.showSlide(0);
+                            e.preventDefault();
+                            break;
+                        case 'End':
+                            this.showSlide(this.slides.length - 1);
+                            e.preventDefault();
+                            break;
+                    }
+                });
+            }
+
+            setupTouchNav() {
+                let startX = 0;
+                let startY = 0;
+                
+                document.addEventListener('touchstart', (e) => {
+                    startX = e.touches[0].clientX;
+                    startY = e.touches[0].clientY;
+                }, { passive: true });
+
+                document.addEventListener('touchend', (e) => {
+                    if (e.target.getAttribute('contenteditable') === 'true') return;
+                    
+                    const diffX = e.changedTouches[0].clientX - startX;
+                    const diffY = e.changedTouches[0].clientY - startY;
+
+                    // Swipe horizontally, threshold 50px, ignore heavy vertical scrolling
+                    if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 60) {
+                        if (diffX > 0) {
+                            this.prev();
+                        } else {
+                            this.next();
+                        }
+                    }
+                }, { passive: true });
+            }
+
+            setupClickControls() {
+                this.prevBtn.addEventListener('click', () => this.prev());
+                this.nextBtn.addEventListener('click', () => this.next());
+            }
+
+            setupWheelNav() {
+                let lastScrollTime = 0;
+                document.addEventListener('wheel', (e) => {
+                    if (e.target.closest('.code-container')) return; // Allow code block local scroll
+                    
+                    const now = Date.now();
+                    if (now - lastScrollTime < 1000) return; // Debounce wheel event
+                    
+                    if (Math.abs(e.deltaY) > 40) {
+                        if (e.deltaY > 0) {
+                            this.next();
+                        } else {
+                            this.prev();
+                        }
+                        lastScrollTime = now;
+                    }
+                }, { passive: false });
+            }
+
+            showSlide(index) {
+                // Clamp index bounds
+                this.currentSlide = Math.max(0, Math.min(index, this.slides.length - 1));
+                
+                this.slides.forEach((slide, i) => {
+                    const isActive = i === this.currentSlide;
+                    slide.classList.toggle('active', isActive);
+                    slide.classList.toggle('visible', isActive);
+                });
+
+                // Update Progress bar screen widths
+                const progressPercent = ((this.currentSlide + 1) / this.slides.length) * 100;
+                this.progress.style.width = `${progressPercent}%`;
+
+                // Disable control buttons appropriately
+                this.prevBtn.disabled = this.currentSlide === 0;
+                this.nextBtn.disabled = this.currentSlide === this.slides.length - 1;
+            }
+
+            next() {
+                this.showSlide(this.currentSlide + 1);
+            }
+
+            prev() {
+                this.showSlide(this.currentSlide - 1);
+            }
+        }
+
+        const presentation = new SlidePresentation();
+
+        /* ===========================================
+           INLINE EDITING SYSTEM (JS BASED)
+           =========================================== */
+        class SlideEditor {
+            constructor() {
+                this.isActive = false;
+                this.hotzone = document.querySelector('.edit-hotzone');
+                this.toggleBtn = document.getElementById('editToggle');
+                this.hideTimeout = null;
+                
+                this.setupHotzoneInteractions();
+                this.setupKeyboardTrigger();
+                this.loadEditedContent();
+            }
+
+            toggleEditMode() {
+                this.isActive = !this.isActive;
+                this.toggleBtn.classList.toggle('active', this.isActive);
+                
+                // Get all text nodes (headings, subtitles, list items, code comments)
+                const editableSelectors = 'h1, h2, h3, h4, p, li, span:not(.keyword):not(.string):not(.function):not(.comment):not(.type):not(.number)';
+                const elements = document.querySelectorAll(editableSelectors);
+                
+                elements.forEach(el => {
+                    // Don't modify elements that scale via standard system controls
+                    if (el.closest('.deck-controls') || el.closest('.edit-toggle')) return;
+                    
+                    if (this.isActive) {
+                        el.setAttribute('contenteditable', 'true');
+                    } else {
+                        el.removeAttribute('contenteditable');
+                    }
+                });
+
+                if (!this.isActive) {
+                    this.saveContent();
+                    alert('内容已成功保存至本地浏览器存储（Local Storage）中！');
+                } else {
+                    this.toggleBtn.classList.add('show');
+                }
+            }
+
+            setupHotzoneInteractions() {
+                this.hotzone.addEventListener('mouseenter', () => {
+                    clearTimeout(this.hideTimeout);
+                    this.toggleBtn.classList.add('show');
+                });
+
+                this.hotzone.addEventListener('mouseleave', () => {
+                    this.hideTimeout = setTimeout(() => {
+                        if (!this.isActive) this.toggleBtn.classList.remove('show');
+                    }, 400);
+                });
+
+                this.toggleBtn.addEventListener('mouseenter', () => {
+                    clearTimeout(this.hideTimeout);
+                });
+
+                this.toggleBtn.addEventListener('mouseleave', () => {
+                    this.hideTimeout = setTimeout(() => {
+                        if (!this.isActive) this.toggleBtn.classList.remove('show');
+                    }, 400);
+                });
+
+                this.toggleBtn.addEventListener('click', () => this.toggleEditMode());
+                this.hotzone.addEventListener('click', () => this.toggleEditMode());
+            }
+
+            setupKeyboardTrigger() {
+                document.addEventListener('keydown', (e) => {
+                    if ((e.key === 'e' || e.key === 'E') && e.target.getAttribute('contenteditable') !== 'true') {
+                        this.toggleEditMode();
+                        e.preventDefault();
+                    }
+                });
+            }
+
+            saveContent() {
+                const slidesData = [];
+                document.querySelectorAll('.slide').forEach((slide, sIdx) => {
+                    const slideNodes = [];
+                    slide.querySelectorAll('[contenteditable="true"]').forEach((node, nIdx) => {
+                        slideNodes.push({
+                            selector: node.tagName,
+                            index: nIdx,
+                            html: node.innerHTML
+                        });
+                    });
+                    slidesData.push(slideNodes);
+                });
+                localStorage.setItem('mastra_presentation_save', JSON.stringify(slidesData));
+            }
+
+            loadEditedContent() {
+                const saved = localStorage.getItem('mastra_presentation_save');
+                if (!saved) return;
+                try {
+                    const slidesData = JSON.parse(saved);
+                    document.querySelectorAll('.slide').forEach((slide, sIdx) => {
+                        const slideNodes = slidesData[sIdx] || [];
+                        const editables = slide.querySelectorAll('h1, h2, h3, h4, p, li, span:not(.keyword):not(.string):not(.function):not(.comment):not(.type):not(.number)');
+                        
+                        // Map them precisely back
+                        let editableIdx = 0;
+                        editables.forEach((el) => {
+                            if (el.closest('.deck-controls') || el.closest('.edit-toggle')) return;
+                            
+                            const match = slideNodes.find(n => n.index === editableIdx);
+                            if (match) {
+                                el.innerHTML = match.html;
+                            }
+                            editableIdx++;
+                        });
+                    });
+                } catch (e) {
+                    console.error('Error reloading saved slide states', e);
+                }
+            }
+        }
+
+        const editor = new SlideEditor();
+    </script>
+</body>
+</html>

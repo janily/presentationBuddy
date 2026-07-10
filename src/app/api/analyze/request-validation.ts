@@ -1,4 +1,5 @@
 import {
+  presentationRevisionRequestSchema,
   presentationInputSchema,
   presentationOutlineSchema,
 } from "@/src/mastra/workflows/presentation-generation-schemas";
@@ -31,7 +32,7 @@ function normalizeAgentRequestToPresentationInput(request: z.infer<typeof agentR
   };
 }
 
-export type WorkflowRequestAction = "start" | "resume";
+export type WorkflowRequestAction = "start" | "resume" | "revise";
 
 function hasNonNullProperty(body: Record<string, unknown>, property: "workflowRunId" | "approvedOutline") {
   return property in body && body[property] !== null && body[property] !== undefined;
@@ -45,6 +46,12 @@ export function isResumeWorkflowRequest(body: unknown) {
   const request = body as Record<string, unknown>;
 
   return hasNonNullProperty(request, "workflowRunId") || hasNonNullProperty(request, "approvedOutline");
+}
+
+export function isRevisionWorkflowRequest(body: unknown) {
+  return typeof body === "object"
+    && body !== null
+    && "revisionRequest" in body;
 }
 
 export function getPresentationBriefSource(body: unknown) {
@@ -68,6 +75,15 @@ export function getAgentRequestSource(body: unknown) {
 }
 
 export function validatePresentationWorkflowRequest(body: unknown) {
+  if (isRevisionWorkflowRequest(body)) {
+    const source = (body as { revisionRequest?: unknown }).revisionRequest;
+    const result = presentationRevisionRequestSchema.safeParse(source);
+
+    return result.success
+      ? { success: true as const, action: "revise" as const, data: result.data }
+      : { success: false as const, action: "revise" as const, error: result.error };
+  }
+
   if (isResumeWorkflowRequest(body)) {
     const result = resumeWorkflowRequestSchema.safeParse(body);
 

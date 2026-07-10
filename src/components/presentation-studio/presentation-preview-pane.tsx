@@ -15,6 +15,7 @@ interface PresentationPreviewPaneProps {
   outline: SlideOutlineItem[];
   outlineGeneration?: OutlineStepData;
   htmlGeneration?: HtmlGenerationStepData;
+  preservePreviewDuringGeneration?: boolean;
 }
 
 const generationSteps = [
@@ -180,7 +181,7 @@ function GenerationProgress({ htmlGeneration }: { htmlGeneration?: HtmlGeneratio
   );
 }
 
-export default function PresentationPreviewPane({ step, currentStep, html, generatedHtml, outline, outlineGeneration, htmlGeneration }: PresentationPreviewPaneProps) {
+export default function PresentationPreviewPane({ step, currentStep, html, generatedHtml, outline, outlineGeneration, htmlGeneration, preservePreviewDuringGeneration = false }: PresentationPreviewPaneProps) {
   const activeStep = currentStep ?? step ?? "brief";
   const activeHtml = generatedHtml ?? html ?? "";
 
@@ -189,6 +190,21 @@ export default function PresentationPreviewPane({ step, currentStep, html, gener
   }
 
   if (activeStep === "generating") {
+    if (preservePreviewDuringGeneration && activeHtml) {
+      return (
+        <div className="relative h-full min-h-[620px] overflow-hidden">
+          <HtmlPreview html={activeHtml} />
+          <div className="absolute left-1/2 top-4 flex max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-3 rounded-lg border border-[var(--border-light)] bg-white/95 px-4 py-3 shadow-lg backdrop-blur">
+            <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[var(--accent-terracotta)]" />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-[var(--text-primary)]">正在生成新版本</p>
+              <p className="truncate text-xs text-[var(--text-muted)]">{htmlGeneration?.message ?? "正在保留当前预览并应用修改…"}</p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return <GenerationProgress htmlGeneration={htmlGeneration} />;
   }
 

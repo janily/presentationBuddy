@@ -6,6 +6,7 @@ import {
   AgentRequestData,
   PresentationBriefData,
   PresentationOutlineData,
+  PresentationRevisionRequestData,
 } from "../types/presentation-workflow";
 
 const getNonEmptyString = (value: unknown) => typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
@@ -48,11 +49,23 @@ export const usePresentationWorkflow = () => {
         const agentRequestPart = lastMessage.parts.find(
           (item) => item.type === "data-agentRequest",
         );
+        const presentationRevisionPart = lastMessage.parts.find(
+          (item) => item.type === "data-presentationRevision",
+        );
 
         const presentationBrief = (presentationBriefPart as { data?: unknown } | undefined)?.data;
         const approvedOutline = (approvedOutlinePart as { data?: unknown } | undefined)?.data;
         const workflowRunId = getNonEmptyString((workflowRunIdPart as { data?: unknown } | undefined)?.data);
         const agentRequest = (agentRequestPart as { data?: unknown } | undefined)?.data;
+        const revisionRequest = (presentationRevisionPart as { data?: unknown } | undefined)?.data;
+
+        if (revisionRequest) {
+          return {
+            body: {
+              revisionRequest,
+            },
+          };
+        }
 
         if (approvedOutline && workflowRunId) {
           return {
@@ -141,6 +154,20 @@ export const usePresentationWorkflow = () => {
     });
   };
 
+  const sendRevision = (revisionRequest: PresentationRevisionRequestData) => {
+    setApprovalError(null);
+    clearError();
+    sendMessage({
+      role: "user",
+      parts: [
+        {
+          type: "data-presentationRevision",
+          data: revisionRequest,
+        },
+      ],
+    });
+  };
+
   const suspenseData = useMemo(() => {
     if (!lastWorkflowPart) {
       return null;
@@ -198,6 +225,7 @@ export const usePresentationWorkflow = () => {
   return {
     sendPresentationBrief,
     sendAgentRequest,
+    sendRevision,
     approveOutline,
     messages,
     status,

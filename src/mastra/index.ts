@@ -5,6 +5,7 @@ import { presentationBriefConversationAgent } from "./agents/presentation-brief-
 import { presentationHtmlGenerationAgent } from "./agents/presentation-html-generation-agent";
 import { presentationOutlineSuggestionAgent } from "./agents/presentation-outline-suggestion-agent";
 import { presentationGenerationWorkflow } from "./workflows/presentation-generation-workflow";
+import { presentationRevisionWorkflow } from "./workflows/presentation-revision-workflow";
 
 function createMastra() {
   return new Mastra({
@@ -16,6 +17,7 @@ function createMastra() {
     },
     workflows: {
       presentationGenerationWorkflow,
+      presentationRevisionWorkflow,
     },
 
     observability: {

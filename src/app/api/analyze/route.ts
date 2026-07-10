@@ -5,10 +5,11 @@ import { toAISdkFormat } from "@mastra/ai-sdk";
 import { NextResponse } from "next/server";
 import z from "zod";
 import { formatValidationErrors, validatePresentationWorkflowRequest } from "./request-validation";
+import { getPresentationArtifact } from "@/src/services/presentation-artifacts/artifact-store";
 
 export const maxDuration = 300;
 
-function validationErrorResponse(error: z.ZodError, action: "start" | "resume") {
+function validationErrorResponse(error: z.ZodError, action: "start" | "resume" | "revise") {
   const fields = formatValidationErrors(error);
 
   console.warn("Presentation workflow input validation failed:", {
@@ -20,7 +21,9 @@ function validationErrorResponse(error: z.ZodError, action: "start" | "resume") 
     {
       error: action === "resume"
         ? "Invalid presentation workflow resume request"
-        : "Invalid presentation generation request",
+        : action === "revise"
+          ? "Invalid presentation revision request"
+          : "Invalid presentation generation request",
       code: "validation_failed",
       fields,
     },
@@ -93,14 +96,75 @@ function classifyProcessingError(error: unknown) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const workflow = mastra.getWorkflow("presentationGenerationWorkflow");
     const validation = validatePresentationWorkflowRequest(body);
 
     if (!validation.success) {
       return validationErrorResponse(validation.error, validation.action);
     }
 
+    if (validation.action === "revise") {
+      const { presentationBrief, approvedOutline, revision, artifact } = validation.data;
+      const currentArtifact = getPresentationArtifact(artifact.deckId);
+      const currentVersion = currentArtifact?.version ?? 0;
+
+      if (currentVersion !== artifact.baseVersion) {
+        return NextResponse.json({
+          error: "The presentation changed before this revision started. Refresh the current version and try again.",
+          code: "artifact_version_conflict",
+          currentVersion,
+        }, { status: 409 });
+      }
+
+      const workflow = mastra.getWorkflow("presentationRevisionWorkflow");
+      const run = await workflow.createRunAsync();
+      const revisedStyle = [
+        revision.style ?? presentationBrief.style,
+        revision.palette?.length ? `Palette: ${revision.palette.join(", ")}` : null,
+        revision.instruction,
+      ].filter(Boolean).join(". ");
+      const stream = run.stream({
+        inputData: {
+          ...presentationBrief,
+          style: revisedStyle,
+          requirements: [
+            presentationBrief.requirements,
+            `Revision request (${revision.kind}): ${revision.instruction}`,
+          ].filter(Boolean).join("\n\n"),
+          outline: approvedOutline,
+          revision,
+          artifact,
+        },
+      });
+
+      request.signal.addEventListener("abort", () => {
+        void run.cancel();
+      }, { once: true });
+
+      console.log("Presentation revision workflow started", {
+        operationId: artifact.operationId,
+        workflowRunId: run.runId,
+        deckId: artifact.deckId,
+        baseVersion: artifact.baseVersion,
+        targetVersion: artifact.targetVersion,
+        revisionKind: revision.kind,
+      });
+
+      return createUIMessageStreamResponse({
+        stream: createUIMessageStream({
+          execute: ({ writer }) => {
+            writer.write({
+              type: "data-workflowRunId",
+              data: run.runId,
+            });
+            writer.merge(toAISdkFormat(stream, { from: "workflow" }));
+          },
+          onError: streamErrorMessage,
+        }),
+      });
+    }
+
     if (validation.action === "resume") {
+      const workflow = mastra.getWorkflow("presentationGenerationWorkflow");
       const { workflowRunId, approvedOutline } = validation.data;
 
       console.log("Received presentation workflow resume request:", {
@@ -111,12 +175,15 @@ export async function POST(request: NextRequest) {
       let stream;
       try {
         const run = await workflow.createRunAsync({ runId: workflowRunId });
-        stream = run.resumeStreamVNext({
+        stream = run.resumeStream({
           step: "presentation-outline-suggestion-step",
           resumeData: {
             approvedOutline,
           } as never,
         });
+        request.signal.addEventListener("abort", () => {
+          void run.cancel();
+        }, { once: true });
       } catch (error) {
         console.error("Presentation workflow resume failed:", {
           workflowRunId,
@@ -141,8 +208,9 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const { topic, audience, pageCount, style, requirements } =
+    const { topic, audience, pageCount, style, requirements, artifact } =
       validation.data;
+    const workflow = mastra.getWorkflow("presentationGenerationWorkflow");
 
     console.log("Received presentation generation request:", {
       topic,
@@ -152,19 +220,24 @@ export async function POST(request: NextRequest) {
       requirements,
     });
 
-    let run;
-    let stream;
+    type PresentationWorkflowRun = Awaited<ReturnType<typeof workflow.createRunAsync>>;
+    let run: PresentationWorkflowRun;
+    let stream: ReturnType<PresentationWorkflowRun["stream"]>;
     try {
       run = await workflow.createRunAsync();
-      stream = run.streamVNext({
+      stream = run.stream({
         inputData: {
           topic,
           audience,
           pageCount,
           style,
           requirements,
+          artifact,
         },
       });
+      request.signal.addEventListener("abort", () => {
+        void run.cancel();
+      }, { once: true });
     } catch (error) {
       const classification = classifyProcessingError(error);
 
