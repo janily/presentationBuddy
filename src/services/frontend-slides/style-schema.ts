@@ -22,7 +22,7 @@ export const frontendSlidesStyleSpecSchema = z.object({
 
 export const frontendSlidesStylePreviewSchema = z.object({
   style: frontendSlidesStyleSpecSchema,
-  previewHtml: z.string(),
+  previewImage: z.string(),
 });
 
 export type FrontendSlidesPurpose = z.infer<typeof frontendSlidesPurposeSchema>;

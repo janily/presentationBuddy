@@ -1,0 +1,360 @@
+
+> presentation-buddy@0.1.0 dev
+> next dev
+
+▲ Next.js 16.1.1 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://10.98.16.49:3000
+- Environments: .env
+
+✓ Starting...
+✓ Ready in 800ms
+ GET / 200 in 535ms (compile: 273ms, render: 262ms)
+model.configuration_resolved {
+  requestedProvider: 'openrouter',
+  resolvedProvider: 'openrouter',
+  modelId: 'openrouter/tencent/hy3:free',
+  baseUrlHost: 'openrouter.ai'
+}
+model.configuration_resolved {
+  requestedProvider: 'openrouter',
+  resolvedProvider: 'openrouter',
+  modelId: 'openrouter/tencent/hy3:free',
+  baseUrlHost: 'openrouter.ai'
+}
+model.configuration_resolved {
+  requestedProvider: 'openrouter',
+  resolvedProvider: 'openrouter',
+  modelId: 'openrouter/tencent/hy3:free',
+  baseUrlHost: 'openrouter.ai'
+}
+model.configuration_resolved {
+  requestedProvider: 'openrouter',
+  resolvedProvider: 'openrouter',
+  modelId: 'openrouter/tencent/hy3:free',
+  baseUrlHost: 'openrouter.ai'
+}
+Mastra telemetry is enabled, but the required instrumentation file was not loaded. If you are using Mastra outside of the mastra server environment, see: https://mastra.ai/en/docs/observability/tracing#tracing-outside-mastra-server-environment If you are using a custom instrumentation file or want to disable this warning, set the globalThis.___MASTRA_TELEMETRY___ variable to true in your instrumentation file.
+Mastra telemetry is deprecated and will be removed on the Nov 4th release. Instead use AI Tracing. More info can be found here: https://github.com/mastra-ai/mastra/issues/8577 and here: https://mastra.ai/en/docs/observability/ai-tracing/overview
+mastra-cloud-ai-tracing-exporter disabled: MASTRA_CLOUD_ACCESS_TOKEN environment variable not set.
+🚀 Sign up at https://cloud.mastra.ai to see your AI traces online and obtain your access token.
+ POST /api/style-discovery 200 in 834ms (compile: 807ms, render: 27ms)
+ POST /api/style-discovery 200 in 18ms (compile: 3ms, render: 15ms)
+✓ Compiled in 47ms
+✓ Compiled in 54ms
+model.configuration_resolved {
+  requestedProvider: 'openrouter',
+  resolvedProvider: 'openrouter',
+  modelId: 'openrouter/tencent/hy3:free',
+  baseUrlHost: 'openrouter.ai'
+}
+model.configuration_resolved {
+  requestedProvider: 'openrouter',
+  resolvedProvider: 'openrouter',
+  modelId: 'openrouter/tencent/hy3:free',
+  baseUrlHost: 'openrouter.ai'
+}
+model.configuration_resolved {
+  requestedProvider: 'openrouter',
+  resolvedProvider: 'openrouter',
+  modelId: 'openrouter/tencent/hy3:free',
+  baseUrlHost: 'openrouter.ai'
+}
+model.configuration_resolved {
+  requestedProvider: 'openrouter',
+  resolvedProvider: 'openrouter',
+  modelId: 'openrouter/tencent/hy3:free',
+  baseUrlHost: 'openrouter.ai'
+}
+ POST /api/style-discovery 200 in 124ms (compile: 108ms, render: 16ms)
+ POST /api/style-discovery 200 in 137ms (compile: 123ms, render: 13ms)
+ POST /api/style-discovery 200 in 152ms (compile: 124ms, render: 28ms)
+ GET / 200 in 278ms (compile: 79ms, render: 199ms)
+model.configuration_resolved {
+  requestedProvider: 'openrouter',
+  resolvedProvider: 'openrouter',
+  modelId: 'openrouter/tencent/hy3:free',
+  baseUrlHost: 'openrouter.ai'
+}
+model.configuration_resolved {
+  requestedProvider: 'openrouter',
+  resolvedProvider: 'openrouter',
+  modelId: 'openrouter/tencent/hy3:free',
+  baseUrlHost: 'openrouter.ai'
+}
+model.configuration_resolved {
+  requestedProvider: 'openrouter',
+  resolvedProvider: 'openrouter',
+  modelId: 'openrouter/tencent/hy3:free',
+  baseUrlHost: 'openrouter.ai'
+}
+model.configuration_resolved {
+  requestedProvider: 'openrouter',
+  resolvedProvider: 'openrouter',
+  modelId: 'openrouter/tencent/hy3:free',
+  baseUrlHost: 'openrouter.ai'
+}
+agent_chat.request_received {
+  operationId: 'operation-1783761834472-nbd9tsw4ll',
+  messageCount: 1,
+  hasGeneratedDeck: false
+}
+agent_chat.first_event_written { operationId: 'operation-1783761834472-nbd9tsw4ll', durationMs: 5 }
+agent_chat.provider_call_started { operationId: 'operation-1783761834472-nbd9tsw4ll' }
+agent_chat.first_model_delta {
+  operationId: 'operation-1783761834472-nbd9tsw4ll',
+  firstDeltaLatencyMs: 12201
+}
+agent_chat.structured_completed {
+  operationId: 'operation-1783761834472-nbd9tsw4ll',
+  durationMs: 13347
+}
+agent_chat.decision_emitted {
+  operationId: 'operation-1783761834472-nbd9tsw4ll',
+  durationMs: 13349,
+  readyToGenerate: false,
+  hasBrief: false,
+  blockedForConfirmation: false,
+  routedToStyleDiscovery: false
+}
+agent_chat.stream_closed {
+  operationId: 'operation-1783761834472-nbd9tsw4ll',
+  durationMs: 13350
+}
+ POST /api/agent-chat 200 in 13.5s (compile: 167ms, render: 13.4s)
+agent_chat.request_received {
+  operationId: 'operation-1783761881040-levkp2co4v',
+  messageCount: 3,
+  hasGeneratedDeck: false
+}
+agent_chat.first_event_written { operationId: 'operation-1783761881040-levkp2co4v', durationMs: 5 }
+agent_chat.provider_call_started { operationId: 'operation-1783761881040-levkp2co4v' }
+agent_chat.first_model_delta {
+  operationId: 'operation-1783761881040-levkp2co4v',
+  firstDeltaLatencyMs: 19705
+}
+agent_chat.structured_completed {
+  operationId: 'operation-1783761881040-levkp2co4v',
+  durationMs: 21009
+}
+agent_chat.decision_emitted {
+  operationId: 'operation-1783761881040-levkp2co4v',
+  durationMs: 21011,
+  readyToGenerate: false,
+  hasBrief: false,
+  blockedForConfirmation: false,
+  routedToStyleDiscovery: false
+}
+agent_chat.stream_closed {
+  operationId: 'operation-1783761881040-levkp2co4v',
+  durationMs: 21012
+}
+ POST /api/agent-chat 200 in 21.0s (compile: 7ms, render: 21.0s)
+agent_chat.request_received {
+  operationId: 'operation-1783761926848-aw4u5a00ljj',
+  messageCount: 5,
+  hasGeneratedDeck: false
+}
+agent_chat.first_event_written { operationId: 'operation-1783761926848-aw4u5a00ljj', durationMs: 4 }
+agent_chat.provider_call_started { operationId: 'operation-1783761926848-aw4u5a00ljj' }
+agent_chat.first_model_delta {
+  operationId: 'operation-1783761926848-aw4u5a00ljj',
+  firstDeltaLatencyMs: 9585
+}
+agent_chat.structured_completed {
+  operationId: 'operation-1783761926848-aw4u5a00ljj',
+  durationMs: 9842
+}
+agent_chat.decision_emitted {
+  operationId: 'operation-1783761926848-aw4u5a00ljj',
+  durationMs: 9844,
+  readyToGenerate: false,
+  hasBrief: true,
+  blockedForConfirmation: false,
+  routedToStyleDiscovery: false
+}
+agent_chat.stream_closed {
+  operationId: 'operation-1783761926848-aw4u5a00ljj',
+  durationMs: 9844
+}
+ POST /api/agent-chat 200 in 9.9s (compile: 8ms, render: 9.9s)
+ POST /api/style-discovery 200 in 12ms (compile: 3ms, render: 9ms)
+agent_chat.request_received {
+  operationId: 'operation-1783761987760-r5v4zc800d',
+  messageCount: 9,
+  hasGeneratedDeck: false
+}
+agent_chat.first_event_written { operationId: 'operation-1783761987760-r5v4zc800d', durationMs: 5 }
+agent_chat.provider_call_started { operationId: 'operation-1783761987760-r5v4zc800d' }
+agent_chat.stream_closed {
+  operationId: 'operation-1783761987760-r5v4zc800d',
+  durationMs: 30050
+}
+ POST /api/agent-chat 200 in 30.1s (compile: 4ms, render: 30.1s)
+✓ Compiled in 113ms
+✓ Compiled in 120ms
+✓ Compiled in 259ms
+ GET / 200 in 173ms (compile: 121ms, render: 52ms)
+✓ Compiled in 45ms
+✓ Compiled in 40ms
+ GET / 200 in 300ms (compile: 78ms, render: 221ms)
+model.configuration_resolved {
+  requestedProvider: 'openrouter',
+  resolvedProvider: 'openrouter',
+  modelId: 'openrouter/tencent/hy3:free',
+  baseUrlHost: 'openrouter.ai'
+}
+model.configuration_resolved {
+  requestedProvider: 'openrouter',
+  resolvedProvider: 'openrouter',
+  modelId: 'openrouter/tencent/hy3:free',
+  baseUrlHost: 'openrouter.ai'
+}
+model.configuration_resolved {
+  requestedProvider: 'openrouter',
+  resolvedProvider: 'openrouter',
+  modelId: 'openrouter/tencent/hy3:free',
+  baseUrlHost: 'openrouter.ai'
+}
+model.configuration_resolved {
+  requestedProvider: 'openrouter',
+  resolvedProvider: 'openrouter',
+  modelId: 'openrouter/tencent/hy3:free',
+  baseUrlHost: 'openrouter.ai'
+}
+agent_chat.request_received {
+  operationId: 'operation-1783764455352-87jh59qohwn',
+  messageCount: 1,
+  hasGeneratedDeck: false
+}
+agent_chat.first_event_written { operationId: 'operation-1783764455352-87jh59qohwn', durationMs: 6 }
+agent_chat.provider_call_started { operationId: 'operation-1783764455352-87jh59qohwn' }
+agent_chat.first_model_delta {
+  operationId: 'operation-1783764455352-87jh59qohwn',
+  firstDeltaLatencyMs: 15141
+}
+agent_chat.structured_completed {
+  operationId: 'operation-1783764455352-87jh59qohwn',
+  durationMs: 16010
+}
+agent_chat.decision_emitted {
+  operationId: 'operation-1783764455352-87jh59qohwn',
+  durationMs: 16012,
+  readyToGenerate: false,
+  hasBrief: false,
+  blockedForConfirmation: false,
+  routedToStyleDiscovery: false
+}
+agent_chat.stream_closed {
+  operationId: 'operation-1783764455352-87jh59qohwn',
+  durationMs: 16013
+}
+ POST /api/agent-chat 200 in 16.1s (compile: 126ms, render: 16.0s)
+agent_chat.request_received {
+  operationId: 'operation-1783764566991-h4vzps3wh4q',
+  messageCount: 3,
+  hasGeneratedDeck: false
+}
+agent_chat.first_event_written { operationId: 'operation-1783764566991-h4vzps3wh4q', durationMs: 4 }
+agent_chat.provider_call_started { operationId: 'operation-1783764566991-h4vzps3wh4q' }
+agent_chat.first_model_delta {
+  operationId: 'operation-1783764566991-h4vzps3wh4q',
+  firstDeltaLatencyMs: 19697
+}
+agent_chat.structured_completed {
+  operationId: 'operation-1783764566991-h4vzps3wh4q',
+  durationMs: 19734
+}
+agent_chat.decision_emitted {
+  operationId: 'operation-1783764566991-h4vzps3wh4q',
+  durationMs: 19735,
+  readyToGenerate: false,
+  hasBrief: true,
+  blockedForConfirmation: false,
+  routedToStyleDiscovery: false
+}
+agent_chat.stream_closed {
+  operationId: 'operation-1783764566991-h4vzps3wh4q',
+  durationMs: 19736
+}
+ POST /api/agent-chat 200 in 19.8s (compile: 7ms, render: 19.7s)
+agent_chat.request_received {
+  operationId: 'operation-1783764605119-6l2945jh3ct',
+  messageCount: 7,
+  hasGeneratedDeck: false
+}
+agent_chat.first_event_written { operationId: 'operation-1783764605119-6l2945jh3ct', durationMs: 3 }
+agent_chat.provider_call_started { operationId: 'operation-1783764605119-6l2945jh3ct' }
+agent_chat.first_model_delta {
+  operationId: 'operation-1783764605119-6l2945jh3ct',
+  firstDeltaLatencyMs: 14998
+}
+agent_chat.structured_completed {
+  operationId: 'operation-1783764605119-6l2945jh3ct',
+  durationMs: 15621
+}
+agent_chat.decision_emitted {
+  operationId: 'operation-1783764605119-6l2945jh3ct',
+  durationMs: 15623,
+  readyToGenerate: true,
+  hasBrief: true,
+  blockedForConfirmation: false,
+  routedToStyleDiscovery: false
+}
+agent_chat.stream_closed {
+  operationId: 'operation-1783764605119-6l2945jh3ct',
+  durationMs: 15624
+}
+ POST /api/agent-chat 200 in 15.6s (compile: 3ms, render: 15.6s)
+Received presentation generation request: {
+  topic: 'Mastra agent 开发框架的入门教程',
+  audience: '有 TypeScript/Node.js 基础的开发者',
+  pageCount: 10,
+  style: 'Swiss Modern',
+  requirements: '含基础代码示例，低密度演讲辅助排版\n\n含基础代码示例，低密度演讲辅助排版'
+}
+Presentation workflow timeout configuration: {
+  environment: 'development',
+  multiplier: 1,
+  outlineGenerationTimeoutMs: 300000,
+  htmlGenerationTimeoutMs: 480000,
+  frontendSlidesTimeoutMs: 420000,
+  outlineFirstUpdateTimeoutMs: 60000,
+  outlineStreamIdleTimeoutMs: 180000,
+  htmlStreamIdleTimeoutMs: 240000
+}
+Presentation outline generation: starting {
+  timestamp: '2026-07-11T10:10:20.908Z',
+  topic: 'Mastra agent 开发框架的入门教程',
+  pageCount: 10,
+  timeoutMs: 300000
+}
+Presentation outline generation: completed {
+  timestamp: '2026-07-11T10:11:01.921Z',
+  durationMs: 41012,
+  slideCount: 10
+}
+ POST /api/analyze 200 in 41s (compile: 92ms, render: 41s)
+Received presentation workflow resume request: {
+  workflowRunId: '2e039a46-9edd-49ac-8c72-1cabae446f13',
+  slideCount: 10
+}
+Presentation HTML generation: frontend-slides Mastra agent completed {
+  timestamp: '2026-07-11T10:14:09.314Z',
+  durationMs: 140057,
+  generatedCharacters: 22413,
+  expectedSlideCount: 10
+}
+Generated presentation HTML saved: {
+  filePath: 'E:\\dev\\presentationBuddy\\public\\generated-slides\\presentation-deck-05f3ea51-1d06-4b22-9fde-c2f2e6cdbecf.html',
+  size: 22413,
+  servedByStatic: true,
+  source: 'public'
+}
+Presentation HTML generation: saved preview document {
+  timestamp: '2026-07-11T10:14:09.334Z',
+  durationMs: 18,
+  totalDurationMs: 140078,
+  htmlUrl: '/generated-slides/presentation-deck-05f3ea51-1d06-4b22-9fde-c2f2e6cdbecf.html'
+}
+ POST /api/analyze 200 in 2.3min (compile: 5ms, render: 2.3min)

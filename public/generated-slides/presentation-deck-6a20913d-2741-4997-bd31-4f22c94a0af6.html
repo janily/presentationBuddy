@@ -1,0 +1,1650 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TypeScript 原生 AI Agent 开发：Mastra 框架入门指南</title>
+
+    <!-- Google Fonts: Space Grotesk (Display), JetBrains Mono (Code), plus Inter for secondary elements -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,700;1,400&family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* ===========================================
+           CSS CUSTOM PROPERTIES (THEME)
+           =========================================== */
+        :root {
+            /* Colors - Dark Geek Style */
+            --bg-primary: #0D0E11;       /* Deepest dark grey */
+            --bg-secondary: #14161D;     /* Slightly lighter card background */
+            --bg-tertiary: #1C1F28;      /* Borders and active elements */
+            
+            --accent-green: #00F59B;     /* Main Fluorescent Green */
+            --accent-purple: #7C3AED;    /* Secondary Tech Purple */
+            --accent-blue: #00D2FF;      /* Visual utility/Cyan */
+            
+            --text-primary: #FFFFFF;
+            --text-secondary: #9EA3B0;
+            --text-muted: #535868;
+            
+            --accent-glow-green: rgba(0, 245, 155, 0.2);
+            --accent-glow-purple: rgba(124, 58, 237, 0.25);
+
+            /* Typography */
+            --font-display: 'Space Grotesk', 'Inter', sans-serif;
+            --font-body: 'Inter', sans-serif;
+            --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+            /* Animations */
+            --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+            --duration-normal: 0.6s;
+            --duration-slow: 1s;
+        }
+
+        /* ===========================================
+           BASE RESET & MANDATORY VIEWPORT-BASE.CSS
+           =========================================== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+            background: var(--bg-primary);
+            font-family: var(--font-body);
+            color: var(--text-primary);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Full-window deck viewport */
+        .deck-viewport {
+            position: fixed;
+            inset: 0;
+            overflow: hidden;
+            background: var(--bg-primary);
+        }
+
+        /* Fixed 16:9 design canvas. scaled via JS transform. */
+        .deck-stage {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 1920px;
+            height: 1080px;
+            overflow: hidden;
+            transform-origin: 0 0;
+            background: var(--bg-primary);
+            background-image: 
+                radial-gradient(circle at 10% 20%, var(--accent-glow-purple) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, var(--accent-glow-green) 0%, transparent 40%);
+        }
+
+        /* Slides stack inside the fixed stage. Layout at 1920x1080. */
+        .slide {
+            position: absolute;
+            inset: 0;
+            width: 1920px;
+            height: 1080px;
+            overflow: hidden;
+            display: block;
+            visibility: hidden;
+            opacity: 0;
+            pointer-events: none;
+            padding: 80px 100px;
+        }
+
+        .slide.active,
+        .slide.visible {
+            visibility: visible;
+            opacity: 1;
+            pointer-events: auto;
+            z-index: 1;
+        }
+
+        img, video, canvas, svg {
+            max-width: 100%;
+            max-height: 100%;
+        }
+
+        /* ===========================================
+           ENTRANCE REVEAL ANIMATIONS
+           =========================================== */
+        .reveal {
+            opacity: 0;
+            transform: translateY(25px);
+            transition: opacity var(--duration-normal) var(--ease-out-expo),
+                        transform var(--duration-normal) var(--ease-out-expo);
+        }
+
+        .slide.visible .reveal {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Custom Staggers */
+        .reveal:nth-child(1) { transition-delay: 0.1s; }
+        .reveal:nth-child(2) { transition-delay: 0.2s; }
+        .reveal:nth-child(3) { transition-delay: 0.3s; }
+        .reveal:nth-child(4) { transition-delay: 0.4s; }
+        .reveal:nth-child(5) { transition-delay: 0.5s; }
+        .reveal:nth-child(6) { transition-delay: 0.6s; }
+
+        /* ===========================================
+           UI COMPONENTS & TYPOGRAPHY STYLE
+           =========================================== */
+        h1, h2, h3, h4 {
+            font-family: var(--font-display);
+            font-weight: 700;
+        }
+
+        p {
+            font-family: var(--font-body);
+            color: var(--text-secondary);
+        }
+
+        /* Header Slide Layouts */
+        .slide-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 50px;
+            border-bottom: 1px solid var(--bg-tertiary);
+            padding-bottom: 25px;
+        }
+
+        .slide-title {
+            font-size: 48px;
+            letter-spacing: -1px;
+            background: linear-gradient(90deg, #FFFFFF, #D5D9E2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .slide-title::before {
+            content: '';
+            display: inline-block;
+            width: 8px;
+            height: 38px;
+            background: var(--accent-green);
+            border-radius: 4px;
+        }
+
+        .slide-tag {
+            font-family: var(--font-mono);
+            font-size: 16px;
+            color: var(--accent-green);
+            background: rgba(0, 245, 155, 0.08);
+            border: 1px solid rgba(0, 245, 155, 0.2);
+            padding: 6px 16px;
+            border-radius: 20px;
+            letter-spacing: 0.5px;
+        }
+
+        /* Grid Framework for Slides */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            height: calc(100% - 150px);
+            align-items: start;
+        }
+
+        .grid-3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 30px;
+            height: calc(100% - 150px);
+            align-items: stretch;
+        }
+
+        /* Cards and Elements */
+        .tech-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--bg-tertiary);
+            border-radius: 16px;
+            padding: 40px;
+            position: relative;
+            overflow: hidden;
+            transition: border-color 0.3s ease, transform 0.3s ease;
+        }
+
+        .tech-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--accent-green), transparent);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .tech-card:hover {
+            border-color: rgba(0, 245, 155, 0.4);
+            transform: translateY(-4px);
+        }
+
+        .tech-card:hover::before {
+            opacity: 1;
+        }
+
+        .tech-card h3 {
+            font-size: 28px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: #FFF;
+        }
+
+        .tech-card p {
+            font-size: 18px;
+            line-height: 1.6;
+        }
+
+        /* IDE Code Window */
+        .ide-window {
+            background: #090A0D;
+            border: 1px solid var(--bg-tertiary);
+            border-radius: 12px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+            font-family: var(--font-mono);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .ide-header {
+            background: #121318;
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--bg-tertiary);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .ide-dots {
+            display: flex;
+            gap: 8px;
+        }
+
+        .ide-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+        .ide-dot.red { background: #FF5F56; }
+        .ide-dot.yellow { background: #FFBD2E; }
+        .ide-dot.green { background: #27C93F; }
+
+        .ide-title {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .ide-lang {
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+
+        .ide-content {
+            padding: 24px;
+            font-size: 16px;
+            line-height: 1.6;
+            overflow-y: auto;
+            color: #E2E8F0;
+            flex-grow: 1;
+        }
+
+        /* Syntax Highlighting */
+        .kw { color: #F43F5E; font-weight: bold; } /* keyword */
+        .str { color: #34D399; }                    /* string */
+        .cls { color: #60A5FA; }                    /* class */
+        .fn { color: #FBBF24; }                     /* function */
+        .var { color: #F472B6; }                    /* variable */
+        .typ { color: #A78BFA; }                    /* type */
+        .cmt { color: #64748B; font-style: italic; } /* comment */
+
+        /* ===========================================
+           SLIDE-SPECIFIC CUSTOM DESIGNS
+           =========================================== */
+
+        /* Slide 1: Cover */
+        .cover-container {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: flex-start;
+            height: 100%;
+            padding-left: 50px;
+            position: relative;
+        }
+
+        .cover-tagline {
+            font-family: var(--font-mono);
+            font-size: 20px;
+            color: var(--accent-green);
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            margin-bottom: 30px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .cover-tagline::after {
+            content: '';
+            width: 80px;
+            height: 1px;
+            background: var(--accent-green);
+        }
+
+        .cover-title {
+            font-size: 82px;
+            line-height: 1.1;
+            margin-bottom: 30px;
+            letter-spacing: -2px;
+            background: linear-gradient(135deg, #FFFFFF 30%, var(--text-secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .cover-title span {
+            background: linear-gradient(90deg, var(--accent-green), var(--accent-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .cover-desc {
+            font-size: 24px;
+            max-width: 800px;
+            line-height: 1.6;
+            margin-bottom: 50px;
+        }
+
+        .cover-meta {
+            display: flex;
+            gap: 40px;
+            font-family: var(--font-mono);
+            font-size: 16px;
+        }
+
+        .cover-meta-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--text-secondary);
+        }
+
+        .cover-meta-item strong {
+            color: var(--accent-green);
+        }
+
+        /* Slide 2: Pain vs Gain Comparison */
+        .versus-container {
+            display: grid;
+            grid-template-columns: 1fr 80px 1fr;
+            height: calc(100% - 150px);
+            align-items: center;
+        }
+
+        .vs-card {
+            height: 100%;
+            border-radius: 16px;
+            padding: 50px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .vs-card.pain {
+            background: rgba(13, 14, 17, 0.4);
+            border: 1px dashed var(--bg-tertiary);
+        }
+
+        .vs-card.gain {
+            background: rgba(0, 245, 155, 0.02);
+            border: 1px solid rgba(0, 245, 155, 0.2);
+            box-shadow: 0 0 40px rgba(0, 245, 155, 0.05);
+        }
+
+        .vs-card h3 {
+            font-size: 32px;
+            margin-bottom: 25px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .vs-card.pain h3 { color: var(--text-secondary); }
+        .vs-card.gain h3 { color: var(--accent-green); }
+
+        .vs-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .vs-item {
+            font-size: 20px;
+            line-height: 1.6;
+            display: flex;
+            gap: 15px;
+        }
+
+        .vs-item .icon {
+            font-family: var(--font-mono);
+            font-weight: bold;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        .pain .vs-item .icon { color: #EF4444; }
+        .gain .vs-item .icon { color: var(--accent-green); }
+
+        .vs-divider {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-display);
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--text-muted);
+            height: 100%;
+        }
+
+        .vs-divider::before, .vs-divider::after {
+            content: '';
+            width: 1px;
+            flex-grow: 1;
+            background: var(--bg-tertiary);
+            margin: 20px 0;
+        }
+
+        /* Slide 3: Three Pillars Icons */
+        .pillar-icon {
+            width: 64px;
+            height: 64px;
+            border-radius: 12px;
+            background: rgba(255,255,255,0.03);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 30px;
+            border: 1px solid var(--bg-tertiary);
+        }
+
+        .tech-card:hover .pillar-icon {
+            background: rgba(0, 245, 155, 0.1);
+            border-color: var(--accent-green);
+        }
+
+        /* Slide 5: Diagram tool dataflow */
+        .flow-diagram {
+            background: var(--bg-secondary);
+            border: 1px solid var(--bg-tertiary);
+            border-radius: 16px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-around;
+            padding: 40px;
+            position: relative;
+        }
+
+        .flow-node {
+            background: #1C1F28;
+            border: 1px solid var(--bg-tertiary);
+            padding: 20px 30px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-family: var(--font-mono);
+            position: relative;
+            z-index: 2;
+        }
+
+        .flow-node.highlight {
+            border-color: var(--accent-green);
+            box-shadow: 0 0 15px rgba(0, 245, 155, 0.15);
+        }
+
+        .flow-arrow {
+            display: flex;
+            justify-content: center;
+            color: var(--accent-green);
+            font-size: 24px;
+            position: relative;
+            height: 20px;
+        }
+
+        .flow-arrow::after {
+            content: '';
+            position: absolute;
+            width: 2px;
+            height: 40px;
+            background: linear-gradient(180deg, var(--accent-green), transparent);
+            top: -10px;
+        }
+
+        /* Slide 6: Horizontal DAG UI */
+        .dag-container {
+            display: flex;
+            flex-direction: column;
+            gap: 40px;
+            height: calc(100% - 150px);
+        }
+
+        .dag-pipeline {
+            background: var(--bg-secondary);
+            border: 1px solid var(--bg-tertiary);
+            border-radius: 16px;
+            padding: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: relative;
+        }
+
+        .dag-step {
+            background: #1C1F28;
+            border: 1px solid var(--bg-tertiary);
+            padding: 25px 35px;
+            border-radius: 12px;
+            text-align: center;
+            position: relative;
+            min-width: 240px;
+        }
+
+        .dag-step.active {
+            border-color: var(--accent-green);
+            background: rgba(0, 245, 155, 0.02);
+        }
+
+        .dag-step-num {
+            font-family: var(--font-mono);
+            font-size: 14px;
+            color: var(--accent-green);
+            margin-bottom: 8px;
+        }
+
+        .dag-step-title {
+            font-size: 20px;
+            font-weight: bold;
+            color: #FFF;
+        }
+
+        .dag-connector {
+            flex-grow: 1;
+            height: 2px;
+            background: var(--bg-tertiary);
+            position: relative;
+            margin: 0 15px;
+        }
+
+        .dag-connector::after {
+            content: '➔';
+            position: absolute;
+            right: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+        }
+
+        .dag-connector.active-flow {
+            background: linear-gradient(90deg, var(--accent-green), var(--accent-purple));
+        }
+
+        .dag-connector.active-flow::after {
+            color: var(--accent-purple);
+        }
+
+        .dag-parallel-box {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        /* Slide 7: Concept Hub Map */
+        .hub-canvas {
+            background: var(--bg-secondary);
+            border: 1px solid var(--bg-tertiary);
+            border-radius: 16px;
+            height: 100%;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .hub-center {
+            width: 180px;
+            height: 180px;
+            border-radius: 50%;
+            background: radial-gradient(circle, var(--accent-purple) 0%, rgba(12,14,17,1) 70%);
+            border: 2px solid var(--accent-purple);
+            box-shadow: 0 0 40px var(--accent-glow-purple);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            text-align: center;
+        }
+
+        .hub-node {
+            position: absolute;
+            background: #1C1F28;
+            border: 1px solid var(--bg-tertiary);
+            padding: 20px 30px;
+            border-radius: 12px;
+            font-family: var(--font-mono);
+            font-size: 16px;
+            z-index: 5;
+            transition: border-color 0.3s ease;
+        }
+
+        .hub-node:hover {
+            border-color: var(--accent-green);
+        }
+
+        /* Positions */
+        .hub-node-1 { top: 80px; left: 100px; }
+        .hub-node-2 { top: 80px; right: 100px; }
+        .hub-node-3 { bottom: 80px; left: 100px; }
+        .hub-node-4 { bottom: 80px; right: 100px; }
+
+        /* Slide 8: Simulated terminal & outputs */
+        .changelog-pipeline {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 25px;
+            height: 55%;
+        }
+
+        .terminal-box {
+            background: #050608;
+            border: 1px solid var(--bg-tertiary);
+            border-radius: 12px;
+            font-family: var(--font-mono);
+            padding: 25px;
+            height: 35%;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .terminal-head {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .terminal-body {
+            color: var(--accent-green);
+            font-size: 15px;
+            line-height: 1.5;
+            flex-grow: 1;
+        }
+
+        /* Slide 9: Observability layouts */
+        .obs-grid {
+            display: grid;
+            grid-template-columns: 1.2fr 0.8fr;
+            gap: 40px;
+            height: calc(100% - 150px);
+        }
+
+        /* Slide 10: Call To Action block */
+        .cta-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: calc(100% - 150px);
+            text-align: center;
+        }
+
+        .cta-command {
+            background: #121318;
+            border: 1px solid var(--accent-green);
+            box-shadow: 0 0 50px var(--accent-glow-green);
+            padding: 30px 60px;
+            border-radius: 16px;
+            font-family: var(--font-mono);
+            font-size: 38px;
+            color: var(--accent-green);
+            margin-bottom: 60px;
+            position: relative;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .cta-command:active {
+            transform: scale(0.98);
+        }
+
+        .cta-links {
+            display: flex;
+            gap: 50px;
+        }
+
+        .cta-link-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 18px;
+            transition: color 0.3s ease;
+        }
+
+        .cta-link-item:hover {
+            color: #FFF;
+        }
+
+        .cta-link-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: var(--bg-secondary);
+            border: 1px solid var(--bg-tertiary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .cta-link-item:hover .cta-link-icon {
+            border-color: var(--accent-green);
+            color: var(--accent-green);
+        }
+
+        /* ===========================================
+           DECK CONTROLS & SIDEBAR NAVIGATION
+           =========================================== */
+        .deck-controls {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            background: rgba(20, 22, 29, 0.85);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--bg-tertiary);
+            padding: 10px 24px;
+            border-radius: 30px;
+            z-index: 1000;
+        }
+
+        .control-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 18px;
+            padding: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.3s ease;
+        }
+
+        .control-btn:hover {
+            color: var(--accent-green);
+        }
+
+        .progress-indicator {
+            font-family: var(--font-mono);
+            font-size: 14px;
+            color: var(--text-secondary);
+            letter-spacing: 1px;
+        }
+
+        /* ===========================================
+           INLINE EDITING STYLES
+           =========================================== */
+        .edit-hotzone {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 80px;
+            height: 80px;
+            z-index: 10000;
+            cursor: pointer;
+        }
+
+        .edit-toggle {
+            position: fixed;
+            top: 25px;
+            left: 25px;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: var(--bg-secondary);
+            border: 1px solid var(--bg-tertiary);
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease, border-color 0.3s ease, background 0.3s ease;
+            z-index: 10001;
+            font-size: 18px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        .edit-toggle.show,
+        .edit-toggle.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .edit-toggle.active {
+            background: var(--accent-green);
+            color: #000;
+            border-color: var(--accent-green);
+        }
+
+        [contenteditable="true"] {
+            outline: 2px dashed rgba(0, 245, 155, 0.4);
+            outline-offset: 4px;
+            background: rgba(0, 245, 155, 0.03);
+            border-radius: 4px;
+        }
+
+        [contenteditable="true"]:focus {
+            outline: 2px solid var(--accent-green);
+            background: rgba(0, 245, 155, 0.05);
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--bg-tertiary);
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="deck-viewport">
+        <!-- Floating Live Stage of exactly 1920x1080 dimensions -->
+        <main class="deck-stage" id="deckStage">
+
+            <!-- SLIDE 1: COVER -->
+            <section class="slide title-slide active">
+                <div class="cover-container">
+                    <div class="cover-tagline reveal">TypeScript Native AI Agent Framework</div>
+                    <h1 class="cover-title reveal" contenteditable="false">TypeScript 原生 AI Agent 开发：<br><span>Mastra 框架入门指南</span></h1>
+                    <p class="cover-desc reveal" contenteditable="false">专为 TypeScript 开发者打造。完美融合 Agents、Tools 与 Workflows，全面释放全栈语言生态下的强类型、轻量级与工程级 AI 构建力。</p>
+                    <div class="cover-meta reveal">
+                        <div class="cover-meta-item">架构设计：<strong>Mastra Core API</strong></div>
+                        <div class="cover-meta-item">语言生态：<strong>TypeScript 5.x / ESM</strong></div>
+                        <div class="cover-meta-item">运行时：<strong>Node.js & Bun & Edge</strong></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SLIDE 2: WHY CHOOSE MASTRA -->
+            <section class="slide">
+                <div class="slide-header">
+                    <div class="slide-title" contenteditable="false">为什么选择 Mastra？</div>
+                    <div class="slide-tag">Eco-System Sync</div>
+                </div>
+                <div class="versus-container">
+                    <!-- Left Pain Point Block -->
+                    <div class="vs-card pain reveal">
+                        <div>
+                            <h3 contenteditable="false">传统 Python 衍生框架</h3>
+                            <ul class="vs-list">
+                                <li class="vs-item" contenteditable="false">
+                                    <span class="icon">✗</span>
+                                    <span><strong>生态割裂：</strong>在 JS/TS 中写包装包（LangChainJS 等），由于多层封装和转换，API 调用复杂难调试。</span>
+                                </li>
+                                <li class="vs-item" contenteditable="false">
+                                    <span class="icon">✗</span>
+                                    <span><strong>类型丢失：</strong>输入/输出链路缺乏保障，复杂场景下的返回值类型难以推导，经常遇到 runtime error。</span>
+                                </li>
+                                <li class="vs-item" contenteditable="false">
+                                    <span class="icon">✗</span>
+                                    <span><strong>运行冗余：</strong>强行打包 Python 或复杂解释器，带来了巨大的包体积与不必要的跨语言互操作开销。</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Divider -->
+                    <div class="vs-divider reveal">VS</div>
+
+                    <!-- Right Mastra Gain Point Block -->
+                    <div class="vs-card gain reveal">
+                        <div>
+                            <h3 contenteditable="false">Mastra TS 原生优势</h3>
+                            <ul class="vs-list">
+                                <li class="vs-item" contenteditable="false">
+                                    <span class="icon">✓</span>
+                                    <span><strong>生态契合：</strong>无缝融入 Vercel AI SDK、Next.js 与 Node 生态，面向原生 TS 标准设计，极致轻量。</span>
+                                </li>
+                                <li class="vs-item" contenteditable="false">
+                                    <span class="icon">✓</span>
+                                    <span><strong>全链路强类型：</strong>完美结合 Zod 运行时校验，从 Tool 输入定义到 Agent 的 Output 结果实现彻底类型安全。</span>
+                                </li>
+                                <li class="vs-item" contenteditable="false">
+                                    <span class="icon">✓</span>
+                                    <span><strong>现代工程化：</strong>无多余运行时转译，极快启动，完全契合 Serverless 和 Cloudflare Workers 等轻量边缘计算。</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SLIDE 3: THREE PILLARS -->
+            <section class="slide">
+                <div class="slide-header">
+                    <div class="slide-title" contenteditable="false">Mastra 框架的三大核心支柱</div>
+                    <div class="slide-tag">Core Concepts</div>
+                </div>
+                <div class="grid-3">
+                    <!-- Column 1: Agent -->
+                    <div class="tech-card reveal">
+                        <div class="pillar-icon">
+                            <!-- Loop SVG -->
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent-green)" stroke-width="2">
+                                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                            </svg>
+                        </div>
+                        <h3 contenteditable="false">智能体 (Agents)</h3>
+                        <p contenteditable="false">基于大语言模型（LLM）的多轮对话、系统提示词（System Prompt）和自主决策环。作为大脑，它可以自主决定在什么时机调用外部工具。</p>
+                    </div>
+
+                    <!-- Column 2: Tools -->
+                    <div class="tech-card reveal">
+                        <div class="pillar-icon">
+                            <!-- Wrench SVG -->
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent-green)" stroke-width="2">
+                                <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+                            </svg>
+                        </div>
+                        <h3 contenteditable="false">工具 (Tools)</h3>
+                        <p contenteditable="false">定义明确输入（Schema）与输出类型的可执行异步函数。完全由 Zod 支持运行时校验，让 Agent 可以安全地调用数据库、第三方 API 或执行本地计算。</p>
+                    </div>
+
+                    <!-- Column 3: Workflows -->
+                    <div class="tech-card reveal">
+                        <div class="pillar-icon">
+                            <!-- Flowchart SVG -->
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent-green)" stroke-width="2">
+                                <rect x="3" y="3" width="7" height="7" rx="1"/>
+                                <rect x="14" y="3" width="7" height="7" rx="1"/>
+                                <rect x="8.5" y="14" width="7" height="7" rx="1"/>
+                                <path d="M6.5 10v2a2 2 0 0 0 2 2h3.5"/>
+                                <path d="M17.5 10v2a2 2 0 0 1-2 2h-3.5"/>
+                            </svg>
+                        </div>
+                        <h3 contenteditable="false">工作流 (Workflows)</h3>
+                        <p contenteditable="false">兼顾分支、并行和确定性的图形化流程编排（DAG）。将多步骤的复杂业务逻辑固化，用确定性的规则来约束 LLM 决策，降低失控风险。</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SLIDE 4: QUICK START -->
+            <section class="slide">
+                <div class="slide-header">
+                    <div class="slide-title" contenteditable="false">5 分钟跑通第一个 Agent</div>
+                    <div class="slide-tag">Quick Start</div>
+                </div>
+                <div class="grid-2">
+                    <div class="reveal">
+                        <div class="tech-card" style="margin-bottom: 25px;">
+                            <h3 contenteditable="false">1. 安装依赖</h3>
+                            <p contenteditable="false">Mastra 核心库非常纯粹，零捆绑包，支持在你的任意 TS/JS 新老项目中直接安装使用。</p>
+                        </div>
+                        <div class="tech-card" style="margin-bottom: 25px;">
+                            <h3 contenteditable="false">2. 声明 Agent 实例</h3>
+                            <p contenteditable="false">通过原生 ESM 语法直接引入 Agent，绑定大模型提供方和系统提示词以指导 AI 核心逻辑行为。</p>
+                        </div>
+                        <div class="tech-card">
+                            <h3 contenteditable="false">3. 执行提问</h3>
+                            <p contenteditable="false">极简的 Promise API 式调用。通过调用 .text() 函数并传入输入直接发起第一轮推理和获取答复。</p>
+                        </div>
+                    </div>
+
+                    <!-- Code Mockup -->
+                    <div class="ide-window reveal">
+                        <div class="ide-header">
+                            <div class="ide-dots">
+                                <div class="ide-dot red"></div>
+                                <div class="ide-dot yellow"></div>
+                                <div class="ide-dot green"></div>
+                            </div>
+                            <div class="ide-title">quickstart.ts</div>
+                            <div class="ide-lang">TypeScript</div>
+                        </div>
+                        <div class="ide-content">
+                            <span class="cmt">// 1. 导入 Mastra Agent 类</span><br>
+                            <span class="kw">import</span> { <span class="cls">Agent</span> } <span class="kw">from</span> <span class="str">'@mastra/core'</span>;<br><br>
+                            
+                            <span class="cmt">// 2. 创建一个拥有特定人设的 Agent 实例</span><br>
+                            <span class="kw">const</span> <span class="var">codeHelper</span> = <span class="kw">new</span> <span class="cls">Agent</span>({<br>
+                            &nbsp;&nbsp;<span class="var">name</span>: <span class="str">'CodeHelper'</span>,<br>
+                            &nbsp;&nbsp;<span class="var">instructions</span>: <span class="str">'你是一个专业的 TypeScript 开发，回答应当极简高效'</span>,<br>
+                            &nbsp;&nbsp;<span class="var">model</span>: { <span class="var">provider</span>: <span class="str">'openai'</span>, <span class="var">name</span>: <span class="str">'gpt-4o'</span> },<br>
+                            });<br><br>
+                            
+                            <span class="cmt">// 3. 运行 Agent 并输出回答</span><br>
+                            <span class="kw">async function</span> <span class="fn">main</span>() {<br>
+                            &nbsp;&nbsp;<span class="kw">const</span> <span class="var">response</span> = <span class="kw">await</span> <span class="var">codeHelper</span>.<span class="fn">text</span>({<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;<span class="var">input</span>: <span class="str">'如何实现一个 Zod 到 JSON Schema 的转换？'</span><br>
+                            &nbsp;&nbsp;});<br>
+                            &nbsp;&nbsp;<span class="var">console</span>.<span class="fn">log</span>(<span class="var">response</span>.<span class="var">text</span>);<br>
+                            }<br><br>
+                            <span class="fn">main</span>();
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SLIDE 5: TOOL CALLING -->
+            <section class="slide">
+                <div class="slide-header">
+                    <div class="slide-title" contenteditable="false">深入 Tool 调用：基于 Zod 的强类型约束</div>
+                    <div class="slide-tag">Typesafe Tools</div>
+                </div>
+                <div class="grid-2">
+                    <!-- Flow diagram representing Zod validation pipeline -->
+                    <div class="flow-diagram reveal">
+                        <div class="flow-node highlight">
+                            <span>Zod Input Schema 定义</span>
+                            <span style="color: var(--accent-green)">[Runtime Check]</span>
+                        </div>
+                        <div class="flow-arrow">▼</div>
+                        <div class="flow-node">
+                            <span>系统内置解析：生成 Function JSON</span>
+                            <span style="color: var(--accent-purple)">[Schema Format]</span>
+                        </div>
+                        <div class="flow-arrow">▼</div>
+                        <div class="flow-node highlight">
+                            <span>大语言模型决策：选择并填充参数</span>
+                            <span style="color: var(--accent-blue)">[LLM Arguments]</span>
+                        </div>
+                        <div class="flow-arrow">▼</div>
+                        <div class="flow-node">
+                            <span>执行逻辑：执行异步操作 (execute)</span>
+                            <span style="color: var(--accent-green)">[Type Safe Output]</span>
+                        </div>
+                    </div>
+
+                    <!-- Code block showing createTool -->
+                    <div class="ide-window reveal">
+                        <div class="ide-header">
+                            <div class="ide-dots">
+                                <div class="ide-dot red"></div>
+                                <div class="ide-dot yellow"></div>
+                                <div class="ide-dot green"></div>
+                            </div>
+                            <div class="ide-title">search-tool.ts</div>
+                            <div class="ide-lang">TypeScript</div>
+                        </div>
+                        <div class="ide-content">
+                            <span class="kw">import</span> { <span class="cls">createTool</span> } <span class="kw">from</span> <span class="str">'@mastra/core'</span>;<br>
+                            <span class="kw">import</span> { <span class="var">z</span> } <span class="kw">from</span> <span class="str">'zod'</span>;<br><br>
+                            
+                            <span class="kw">export const</span> <span class="var">searchDocsTool</span> = <span class="fn">createTool</span>({<br>
+                            &nbsp;&nbsp;<span class="var">id</span>: <span class="str">'searchDocs'</span>,<br>
+                            &nbsp;&nbsp;<span class="var">description</span>: <span class="str">'搜索 Mastra 框架官方技术文档'</span>,<br>
+                            &nbsp;&nbsp;<span class="cmt">// 使用 Zod 运行时强校验输入结构</span><br>
+                            &nbsp;&nbsp;<span class="var">inputSchema</span>: <span class="var">z</span>.<span class="fn">object</span>({<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;<span class="var">query</span>: <span class="var">z</span>.<span class="fn">string</span>().<span class="fn">describe</span>(<span class="str">'搜索关键词'</span>),<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;<span class="var">limit</span>: <span class="var">z</span>.<span class="fn">number</span>().<span class="fn">optional</span>().<span class="fn">default</span>(<span class="num">5</span>)<br>
+                            &nbsp;&nbsp;}),<br>
+                            &nbsp;&nbsp;<span class="cmt">// 输入参数 query 自动推导为 string 类型</span><br>
+                            &nbsp;&nbsp;<span class="var">execute</span>: <span class="kw">async</span> ({ <span class="var">query</span>, <span class="var">limit</span> }) => {<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;<span class="cmt">// 执行底层的数据库检索或者搜索引擎 API</span><br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">return await</span> <span class="fn">fetchRemoteDocs</span>(<span class="var">query</span>, <span class="var">limit</span>);<br>
+                            &nbsp;&nbsp;}<br>
+                            });
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SLIDE 6: WORKFLOW ORCHESTRATION -->
+            <section class="slide">
+                <div class="slide-header">
+                    <div class="slide-title" contenteditable="false">编排 Workflow：确定性与灵活性的完美结合</div>
+                    <div class="slide-tag">Deterministic Workflow</div>
+                </div>
+                <div class="dag-container">
+                    <!-- Top horizontal pipeline flowchart representation -->
+                    <div class="dag-pipeline reveal">
+                        <div class="dag-step active">
+                            <div class="dag-step-num">Step 1</div>
+                            <div class="dag-step-title" contenteditable="false">获取更新抓取</div>
+                        </div>
+                        <div class="dag-connector active-flow"></div>
+                        <div class="dag-parallel-box">
+                            <div class="dag-step active">
+                                <div class="dag-step-num">Step 2A</div>
+                                <div class="dag-step-title" contenteditable="false">Agent 分类过滤</div>
+                            </div>
+                            <div style="height: 10px;"></div>
+                            <div class="dag-step">
+                                <div class="dag-step-num">Step 2B</div>
+                                <div class="dag-step-title" contenteditable="false">提取元数据分析</div>
+                            </div>
+                        </div>
+                        <div class="dag-connector"></div>
+                        <div class="dag-step">
+                            <div class="dag-step-num">Step 3</div>
+                            <div class="dag-step-title" contenteditable="false">输出 MD Changelog</div>
+                        </div>
+                    </div>
+
+                    <!-- Side-by-side or below code logic -->
+                    <div class="ide-window reveal" style="height: calc(100% - 220px)">
+                        <div class="ide-header">
+                            <div class="ide-dots">
+                                <div class="ide-dot red"></div>
+                                <div class="ide-dot yellow"></div>
+                                <div class="ide-dot green"></div>
+                            </div>
+                            <div class="ide-title">changelog-workflow.ts</div>
+                            <div class="ide-lang">TypeScript</div>
+                        </div>
+                        <div class="ide-content">
+                            <span class="kw">import</span> { <span class="cls">Workflow</span> } <span class="kw">from</span> <span class="str">'@mastra/core'</span>;<br><br>
+                            
+                            <span class="kw">export const</span> <span class="var">changelogWorkflow</span> = <span class="kw">new</span> <span class="cls">Workflow</span>({ <span class="var">name</span>: <span class="str">'changelog-generator'</span> })<br>
+                            &nbsp;&nbsp;.<span class="fn">step</span>(<span class="var">scrapeStep</span>)<br>
+                            &nbsp;&nbsp;.<span class="fn">then</span>({<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;<span class="cmt">// 并行执行任务 Step 2A 与 Step 2B</span><br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;<span class="var">parallel</span>: [<span class="var">classifyAgentStep</span>, <span class="var">metadataExtractStep</span>]<br>
+                            &nbsp;&nbsp;})<br>
+                            &nbsp;&nbsp;.<span class="fn">then</span>(<span class="var">generateMarkdownStep</span>); <span class="cmt">// 整合并行结果生成最后的 markdown 文档</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SLIDE 7: MEMORY & CONTEXT -->
+            <section class="slide">
+                <div class="slide-header">
+                    <div class="slide-title" contenteditable="false">上下文与长期记忆 (Memory & Context)</div>
+                    <div class="slide-tag">Cognitive Layer</div>
+                </div>
+                <div class="grid-2">
+                    <div class="reveal">
+                        <div class="tech-card" style="margin-bottom: 30px;">
+                            <h3 contenteditable="false">
+                                <span style="color:var(--accent-purple)">●</span> 
+                                会话持久化 (Thread Session)
+                            </h3>
+                            <p contenteditable="false">内置高效的会话追踪。不仅记录多轮对话中的一问一答，还可以动态提取结构化上下文，并在多轮运行中实现自动化摘要存储，减缓 Token 膨胀速度。</p>
+                        </div>
+                        <div class="tech-card" style="margin-bottom: 30px;">
+                            <h3 contenteditable="false">
+                                <span style="color:var(--accent-green)">●</span> 
+                                RAG 原生集成 (Vector Retrier)
+                            </h3>
+                            <p contenteditable="false">内置多种向量检索器与 Embeddings 处理层，从文本分块、生成 Vector 到检索相关背景，完全原生对接，无需引入外部臃肿组件。</p>
+                        </div>
+                        <div class="tech-card">
+                            <h3 contenteditable="false">
+                                <span style="color:var(--accent-blue)">●</span> 
+                                MCP 协议原生支持
+                            </h3>
+                            <p contenteditable="false">作为下一代大模型工具互操作协议（Model Context Protocol）的追随者，Mastra 支持无缝对接任何兼容 MCP 的服务器，打破孤岛数据瓶颈。</p>
+                        </div>
+                    </div>
+
+                    <!-- Connection Hub Visualization -->
+                    <div class="hub-canvas reveal">
+                        <div class="hub-center">
+                            <span style="font-family: var(--font-display); font-weight: bold; font-size: 22px; color: #FFF;">LLM Core</span>
+                            <span style="font-family: var(--font-mono); font-size: 13px; color: var(--accent-purple);">Mastra Agent</span>
+                        </div>
+                        <div class="hub-node hub-node-1">
+                            <span>Thread History</span>
+                            <div style="font-size: 11px; color: var(--accent-green);">[Observational]</div>
+                        </div>
+                        <div class="hub-node hub-node-2">
+                            <span>Vector Store</span>
+                            <div style="font-size: 11px; color: var(--accent-green);">[Pinecone/PgVector]</div>
+                        </div>
+                        <div class="hub-node hub-node-3">
+                            <span>MCP Server</span>
+                            <div style="font-size: 11px; color: var(--accent-green);">[Postgres/Files]</div>
+                        </div>
+                        <div class="hub-node hub-node-4">
+                            <span>Semantic Graph</span>
+                            <div style="font-size: 11px; color: var(--accent-green);">[Context Buffer]</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SLIDE 8: PRACTICAL CASE -->
+            <section class="slide">
+                <div class="slide-header">
+                    <div class="slide-title" contenteditable="false">实战案例：构建 Changelog 自动追踪智能体</div>
+                    <div class="slide-tag">Real World Practice</div>
+                </div>
+                
+                <div class="changelog-pipeline reveal">
+                    <!-- Step 1 -->
+                    <div class="tech-card">
+                        <div class="pillar-icon" style="background: rgba(0,210,255,0.05); border-color: var(--accent-blue)">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent-blue)" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/><path d="m12 16 4-4-4-4M8 12h8"/>
+                            </svg>
+                        </div>
+                        <h4 contenteditable="false">1. 抓取与搜集 (Scrape)</h4>
+                        <p style="font-size: 15px;" contenteditable="false">使用 FirecrawlTool 抓取主流开源项目的 Releases 或 GitHub 更新日志，剥离 HTML、CSS 等冗余信息，沉淀出纯净的源数据内容。</p>
+                    </div>
+
+                    <!-- Step 2 -->
+                    <div class="tech-card">
+                        <div class="pillar-icon" style="background: rgba(124,58,237,0.05); border-color: var(--accent-purple)">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent-purple)" stroke-width="2">
+                                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                            </svg>
+                        </div>
+                        <h4 contenteditable="false">2. 结构化抽取 (Process)</h4>
+                        <p style="font-size: 15px;" contenteditable="false">Agent 接管数据，分析新版本中的 Feature（特性）、Bug Fixes（修复）与 Breaking Changes（破坏性更新），提取版本号与作者信息。</p>
+                    </div>
+
+                    <!-- Step 3 -->
+                    <div class="tech-card">
+                        <div class="pillar-icon" style="background: rgba(0,245,155,0.05); border-color: var(--accent-green)">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent-green)" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/>
+                            </svg>
+                        </div>
+                        <h4 contenteditable="false">3. 生成报告 (Output)</h4>
+                        <p style="font-size: 15px;" contenteditable="false">通过工具将分类归纳好的数据输出为一份排版精美、层级分明的 Markdown 日报，并自动推送至开发者 Slack 频道或 GitHub Wiki 页面。</p>
+                    </div>
+                </div>
+
+                <!-- Simulated CLI Output -->
+                <div class="terminal-box reveal" style="margin-top: 30px;">
+                    <div class="terminal-head">
+                        <span>● terminal - dev@mastra: ~/projects/changelog-agent</span>
+                    </div>
+                    <div class="terminal-body" contenteditable="false">
+                        $ npx tsx run-agent.ts --project="mastra-core"<br>
+                        <span style="color: #64748B">[10:45:01]</span> <span style="color: var(--accent-blue)">[INFO]</span> Initiating Firecrawl scrape on target 'github.com/mastra-ai/mastra/releases'...<br>
+                        <span style="color: #64748B">[10:45:03]</span> <span style="color: var(--accent-purple)">[AGENT]</span> Processing payload (14.2kb), extracting structured entities via GPT-4o Schema...<br>
+                        <span style="color: #64748B">[10:45:05]</span> <span style="color: var(--accent-green)">[SUCCESS]</span> Generated changelog output: <strong>CHANGELOG_v2.1.0.md</strong> containing 4 features, 1 breaking change.<br>
+                        $ _
+                    </div>
+                </div>
+            </section>
+
+            <!-- SLIDE 9: OBSERVABILITY & DEPLOYMENT -->
+            <section class="slide">
+                <div class="slide-header">
+                    <div class="slide-title" contenteditable="false">可观测性与生产部署 (Observability)</div>
+                    <div class="slide-tag">Telemetry & Ops</div>
+                </div>
+                <div class="obs-grid">
+                    <div class="reveal">
+                        <div class="tech-card" style="margin-bottom: 30px; height: calc(50% - 15px)">
+                            <h3 contenteditable="false">1. 本地可交互 Dev 看板</h3>
+                            <p contenteditable="false">Mastra 自带本地 Web 调试控制台。在本地运行调试命令时，一键启动本地 GUI，查看每一个 Agent 的多轮对话历史，清晰观察 Agent 具体的调用工具耗时与 Trace Tracing 深度追踪，无需引入第三方昂贵的 SAAS 服务。</p>
+                        </div>
+                        <div class="tech-card" style="height: calc(50% - 15px)">
+                            <h3 contenteditable="false">2. 生产级 OpenTelemetry 支持</h3>
+                            <p contenteditable="false">原生整合 OpenTelemetry 标准链路。支持无缝输出标准的 Span 埋点到 Datadog、Jaeger、Arize Phoenix 等应用性能和可观测性监控平台，在关键推理链、中间状态和 LLM 网络请求调用上拥有高可靠保障。</p>
+                        </div>
+                    </div>
+
+                    <!-- Simulated Local Dev web UI -->
+                    <div class="ide-window reveal">
+                        <div class="ide-header">
+                            <div class="ide-dots">
+                                <div class="ide-dot red"></div>
+                                <div class="ide-dot yellow"></div>
+                                <div class="ide-dot green"></div>
+                            </div>
+                            <div class="ide-title">Mastra Console - Local Inspector</div>
+                            <div class="ide-lang" style="color: var(--accent-green)">● Running</div>
+                        </div>
+                        <div class="ide-content" style="font-size: 14px; line-height: 1.4;">
+                            <div style="border-bottom: 1px solid var(--bg-tertiary); padding-bottom: 10px; margin-bottom: 10px;">
+                                <span style="color: var(--accent-green)">[Agent Execution Trace]</span> <strong>changelog-agent</strong>
+                            </div>
+                            <div style="margin-bottom: 8px;">
+                                ├─ <span style="color: var(--accent-blue)">[SPAN]</span> <strong>Agent_Run</strong> <span style="color: var(--text-muted)">(total: 1420ms)</span>
+                            </div>
+                            <div style="margin-left: 20px; margin-bottom: 8px;">
+                                ├─ <span style="color: var(--accent-purple)">[SPAN]</span> <strong>Execute_Tool: searchDocs</strong> <span style="color: var(--text-muted)">(340ms)</span><br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: var(--text-muted)">input: { query: 'Zod' }</span>
+                            </div>
+                            <div style="margin-left: 20px; margin-bottom: 8px;">
+                                ├─ <span style="color: var(--accent-purple)">[SPAN]</span> <strong>LLM_Call: gpt-4o</strong> <span style="color: var(--text-muted)">(1080ms)</span><br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: var(--text-muted)">tokens: in: 4.2k, out: 820</span>
+                            </div>
+                            <div style="margin-bottom: 8px;">
+                                └─ <span style="color: var(--accent-green)">[SUCCESS]</span> Finished with exit code 0
+                            </div>
+                            <div style="border-top: 1px solid var(--bg-tertiary); padding-top: 10px; margin-top: 20px;">
+                                <span style="color: var(--text-secondary)">Next.js 部署：直接作为 Route Handlers 打包即可</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SLIDE 10: CALL TO ACTION -->
+            <section class="slide">
+                <div class="slide-header">
+                    <div class="slide-title" contenteditable="false">立刻启航：迈出你构建 Agent 的第一步</div>
+                    <div class="slide-tag">Get Started</div>
+                </div>
+                <div class="cta-container">
+                    <div class="cta-command reveal" id="cliCommand" onclick="copyCLICommand()" contenteditable="false">
+                        npx mastra init
+                    </div>
+                    
+                    <p class="reveal" style="font-size: 22px; max-width: 900px; line-height: 1.6; margin-bottom: 60px;" contenteditable="false">
+                        只需运行以上初始化命令，选择你的推荐技术栈模版（Next.js / Fastify / Node.js），即可瞬间开启强类型 TypeScript 智能体开发的丝滑旅程。
+                    </p>
+
+                    <div class="cta-links reveal">
+                        <a href="https://github.com/mastra-ai/mastra" target="_blank" class="cta-link-item">
+                            <div class="cta-link-icon">★</div>
+                            <span contenteditable="false">GitHub Repository</span>
+                        </a>
+                        <a href="https://mastra.ai" target="_blank" class="cta-link-item">
+                            <div class="cta-link-icon">⚙</div>
+                            <span contenteditable="false">官方参考文档</span>
+                        </a>
+                        <a href="https://discord.gg/mastra" target="_blank" class="cta-link-item">
+                            <div class="cta-link-icon">✦</div>
+                            <span contenteditable="false">加入 Discord 社区</span>
+                        </a>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- Presentation Controls (outside active scaling stage) -->
+        <div class="deck-controls">
+            <button class="control-btn" id="prevBtn" title="Previous (Left Arrow / Page Up)">◀</button>
+            <div class="progress-indicator" id="progressInd">1 / 10</div>
+            <button class="control-btn" id="nextBtn" title="Next (Right Arrow / Page Down / Space)">▶</button>
+        </div>
+
+        <!-- Inline Editor Toggle -->
+        <div class="edit-hotzone"></div>
+        <button class="edit-toggle" id="editToggle" title="Edit mode (E)">✏️</button>
+
+    </div>
+
+    <!-- ===========================================
+         CORE SLIDE CONTROLLER & UTILITY JS
+         =========================================== -->
+    <script>
+        class SlidePresentation {
+            constructor() {
+                this.slides = document.querySelectorAll('.slide');
+                this.currentSlide = 0;
+                this.stage = document.getElementById('deckStage');
+                this.progressInd = document.getElementById('progressInd');
+                
+                this.setupStageScale();
+                this.setupNavigation();
+                this.setupTouchNav();
+                this.showSlide(0);
+                this.initInlineEditor();
+            }
+
+            setupStageScale() {
+                const scale = () => {
+                    const factor = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+                    const x = (window.innerWidth - 1920 * factor) / 2;
+                    const y = (window.innerHeight - 1080 * factor) / 2;
+                    this.stage.style.transform = `translate(${x}px, ${y}px) scale(${factor})`;
+                };
+                scale();
+                window.addEventListener('resize', scale);
+            }
+
+            setupNavigation() {
+                document.getElementById('prevBtn').addEventListener('click', () => this.prevSlide());
+                document.getElementById('nextBtn').addEventListener('click', () => this.nextSlide());
+
+                // Keyboard handling
+                document.addEventListener('keydown', (e) => {
+                    // Check if user is typing inside contenteditable
+                    if (e.target.getAttribute('contenteditable')) return;
+
+                    switch(e.key) {
+                        case 'ArrowLeft':
+                        case 'PageUp':
+                            this.prevSlide();
+                            break;
+                        case 'ArrowRight':
+                        case 'PageDown':
+                        case ' ':
+                            e.preventDefault();
+                            this.nextSlide();
+                            break;
+                        case 'e':
+                        case 'E':
+                            this.toggleEditMode();
+                            break;
+                    }
+                });
+
+                // Scroll Wheel navigation (throttled)
+                let lastScroll = 0;
+                window.addEventListener('wheel', (e) => {
+                    const now = Date.now();
+                    if (now - lastScroll < 1200) return;
+                    lastScroll = now;
+
+                    if (e.deltaY > 20) {
+                        this.nextSlide();
+                    } else if (e.deltaY < -20) {
+                        this.prevSlide();
+                    }
+                }, { passive: true });
+            }
+
+            setupTouchNav() {
+                let startX = 0;
+                let startY = 0;
+                
+                window.addEventListener('touchstart', (e) => {
+                    startX = e.touches[0].clientX;
+                    startY = e.touches[0].clientY;
+                }, { passive: true });
+
+                window.addEventListener('touchend', (e) => {
+                    const diffX = e.changedTouches[0].clientX - startX;
+                    const diffY = e.changedTouches[0].clientY - startY;
+
+                    if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 60) {
+                        if (diffX < 0) {
+                            this.nextSlide();
+                        } else {
+                            this.prevSlide();
+                        }
+                    }
+                }, { passive: true });
+            }
+
+            showSlide(index) {
+                this.currentSlide = Math.max(0, Math.min(index, this.slides.length - 1));
+                this.slides.forEach((slide, i) => {
+                    slide.classList.toggle('active', i === this.currentSlide);
+                    // Slight delay for visibility so entrance transition fires nicely
+                    setTimeout(() => {
+                        slide.classList.toggle('visible', i === this.currentSlide);
+                    }, 50);
+                });
+                this.progressInd.textContent = `${this.currentSlide + 1} / ${this.slides.length}`;
+            }
+
+            nextSlide() {
+                if (this.currentSlide < this.slides.length - 1) {
+                    this.showSlide(this.currentSlide + 1);
+                }
+            }
+
+            prevSlide() {
+                if (this.currentSlide > 0) {
+                    this.showSlide(this.currentSlide - 1);
+                }
+            }
+
+            // ===========================================
+            // INLINE EDITOR BUSINESS LOGIC
+            // ===========================================
+            initInlineEditor() {
+                this.isEditMode = false;
+                const hotzone = document.querySelector('.edit-hotzone');
+                const editToggle = document.getElementById('editToggle');
+                let hideTimeout = null;
+
+                // Load saved content from localStorage on startup
+                this.loadEdits();
+
+                // 1. Click on toggle button
+                editToggle.addEventListener('click', () => {
+                    this.toggleEditMode();
+                });
+
+                // 2. Hotzone hover setup with 400ms grace period
+                hotzone.addEventListener('mouseenter', () => {
+                    clearTimeout(hideTimeout);
+                    editToggle.classList.add('show');
+                });
+                hotzone.addEventListener('mouseleave', () => {
+                    hideTimeout = setTimeout(() => {
+                        if (!this.isEditMode) editToggle.classList.remove('show');
+                    }, 400);
+                });
+                editToggle.addEventListener('mouseenter', () => {
+                    clearTimeout(hideTimeout);
+                });
+                editToggle.addEventListener('mouseleave', () => {
+                    hideTimeout = setTimeout(() => {
+                        if (!this.isEditMode) editToggle.classList.remove('show');
+                    }, 400);
+                });
+
+                // 3. Hotzone direct click triggers editor mode directly
+                hotzone.addEventListener('click', () => {
+                    this.toggleEditMode();
+                });
+            }
+
+            toggleEditMode() {
+                this.isEditMode = !this.isEditMode;
+                const editToggle = document.getElementById('editToggle');
+                
+                editToggle.classList.toggle('active', this.isEditMode);
+                if (this.isEditMode) {
+                    editToggle.classList.add('show');
+                }
+
+                // Gather all elements to make editable
+                const editableElements = document.querySelectorAll('.slide-title, .vs-card h3, .vs-item, .tech-card h3, .tech-card p, .tech-card h4, .cover-title, .cover-desc, .cta-container p, .cta-link-item span, .terminal-body');
+                
+                editableElements.forEach(el => {
+                    el.setAttribute('contenteditable', this.isEditMode ? 'true' : 'false');
+                    
+                    if (this.isEditMode) {
+                        // Bind save actions when elements blur
+                        el.addEventListener('blur', () => this.saveEdits());
+                    }
+                });
+            }
+
+            saveEdits() {
+                const data = [];
+                const editableElements = document.querySelectorAll('[contenteditable]');
+                
+                editableElements.forEach((el, index) => {
+                    data.push({
+                        id: index,
+                        html: el.innerHTML
+                    });
+                });
+
+                localStorage.setItem('mastra_presentation_saves', JSON.stringify(data));
+            }
+
+            loadEdits() {
+                const saved = localStorage.getItem('mastra_presentation_saves');
+                if (!saved) return;
+
+                try {
+                    const data = JSON.parse(saved);
+                    const editableElements = document.querySelectorAll('.slide-title, .vs-card h3, .vs-item, .tech-card h3, .tech-card p, .tech-card h4, .cover-title, .cover-desc, .cta-container p, .cta-link-item span, .terminal-body');
+                    
+                    data.forEach(item => {
+                        if (editableElements[item.id]) {
+                            editableElements[item.id].innerHTML = item.html;
+                        }
+                    });
+                } catch (e) {
+                    console.error('Error loading presentation saves', e);
+                }
+            }
+        }
+
+        // Initialize presentation
+        const app = new SlidePresentation();
+
+        // Extra presentation utility features
+        function copyCLICommand() {
+            const cmd = document.getElementById('cliCommand').textContent.trim();
+            navigator.clipboard.writeText(cmd).then(() => {
+                const originalText = document.getElementById('cliCommand').innerHTML;
+                document.getElementById('cliCommand').innerHTML = "✓ Copied to clipboard!";
+                document.getElementById('cliCommand').style.borderColor = "#7C3AED";
+                setTimeout(() => {
+                    document.getElementById('cliCommand').innerHTML = "npx mastra init";
+                    document.getElementById('cliCommand').style.borderColor = "var(--accent-green)";
+                }, 2000);
+            });
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,769 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mastra 框架入门：从零构建 TS AI Agent</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;700&family=JetBrains+Mono:wght@400;700&display=swap">
+<style>
+/* ===========================================
+   FIXED 16:9 STAGE: MANDATORY BASE STYLES
+   Include this ENTIRE file in every presentation.
+   Slides are authored at 1920×1080 and scaled as a whole.
+   =========================================== */
+
+/* 1. Lock the browser viewport */
+html,
+body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+    background: var(--stage-bg, #000);
+}
+
+/* 2. Full-window deck viewport */
+.deck-viewport {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    background: var(--stage-bg, #000);
+}
+
+/* 3. Fixed 16:9 design canvas.
+   JavaScript sets transform: translate(...) scale(...). */
+.deck-stage {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    transform-origin: 0 0;
+    background: var(--slide-bg, #fff);
+}
+
+/* 4. Slides stack inside the fixed stage.
+   Content must be laid out at 1920×1080, not reflowed per device. */
+.slide {
+    position: absolute;
+    inset: 0;
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    display: block;
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+    background: var(--slide-bg, #fff);
+}
+
+.slide.active,
+.slide.visible {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+    z-index: 1;
+}
+
+/* 5. Keep media inside authored slide bounds */
+img,
+video,
+canvas,
+svg {
+    max-width: 100%;
+    max-height: 100%;
+}
+
+/* 6. Presentation chrome stays outside the slide design system */
+.deck-controls {
+    position: fixed;
+    left: 50%;
+    bottom: 22px;
+    transform: translateX(-50%);
+    z-index: 1000;
+}
+
+/* 7. Print one fixed-size slide per page */
+@media print {
+    html,
+    body {
+        width: 1920px;
+        height: auto;
+        overflow: visible;
+        background: #fff;
+    }
+
+    .deck-viewport {
+        position: static;
+        overflow: visible;
+        background: #fff;
+    }
+
+    .deck-stage {
+        position: static;
+        width: auto;
+        height: auto;
+        transform: none !important;
+        background: none;
+    }
+
+    .slide {
+        position: relative;
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+        width: 1920px;
+        height: 1080px;
+        break-after: page;
+        page-break-after: always;
+    }
+
+    .slide:last-child {
+        break-after: auto;
+        page-break-after: auto;
+    }
+
+    .deck-controls {
+        display: none !important;
+    }
+}
+
+/* 8. Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.2s !important;
+    }
+}
+
+/* ===========================================
+   CUSTOM SWISS MODERN THEME
+   =========================================== */
+:root {
+    --bg-primary: #FFFFFF;
+    --text-primary: #111111;
+    --accent: #E30613;
+    --code-bg: #F5F5F5;
+    --font-display: 'Archivo', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+    --slide-padding: 72px;
+    --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+    --duration-normal: 0.6s;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+.deck-stage {
+    background: var(--bg-primary);
+    --slide-bg: var(--bg-primary);
+}
+
+.slide {
+    background: var(--bg-primary);
+    --slide-bg: var(--bg-primary);
+}
+
+/* Grid system for slide content */
+.slide-grid {
+    position: absolute;
+    inset: 0;
+    padding: var(--slide-padding);
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    grid-template-rows: auto 1fr;
+    gap: 24px;
+    align-content: start;
+}
+
+/* Typography */
+h1, h2, h3, p, li, span, div {
+    font-family: var(--font-display);
+    color: var(--text-primary);
+}
+
+.main-title {
+    grid-column: 1 / 9;
+    font-size: 120px;
+    font-weight: 700;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+}
+
+.subtitle {
+    grid-column: 1 / 9;
+    font-size: 40px;
+    font-weight: 400;
+    margin-top: 32px;
+    line-height: 1.3;
+}
+
+.audience {
+    position: absolute;
+    right: var(--slide-padding);
+    bottom: var(--slide-padding);
+    font-size: 24px;
+    font-weight: 400;
+    letter-spacing: 0.05em;
+}
+
+.vertical-title {
+    grid-column: 1 / 3;
+    writing-mode: vertical-rl;
+    font-size: 90px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin-top: 40px;
+}
+
+.right-content {
+    grid-column: 4 / 12;
+    align-self: center;
+    padding-left: 40px;
+}
+
+.separator {
+    width: 100%;
+    height: 1px;
+    background: var(--text-primary);
+    margin-bottom: 48px;
+}
+
+.right-content p {
+    font-size: 36px;
+    font-weight: 400;
+    line-height: 1.4;
+    margin-bottom: 28px;
+}
+
+.section-title {
+    grid-column: 1 / 12;
+    font-size: 64px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin-bottom: 20px;
+}
+
+/* Matrix slide */
+.matrix {
+    grid-column: 1 / 12;
+    align-self: center;
+}
+.matrix-row {
+    display: grid;
+    grid-template-columns: 120px 360px 1fr;
+    gap: 24px;
+    border-top: 1px solid var(--text-primary);
+    padding: 28px 0;
+    font-size: 32px;
+    align-items: baseline;
+}
+.matrix-row:last-child {
+    border-bottom: 1px solid var(--text-primary);
+}
+.matrix-row .num {
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 40px;
+}
+.matrix-row .term {
+    font-weight: 700;
+}
+.matrix-row .def {
+    font-weight: 400;
+}
+
+/* Code blocks */
+.code-block {
+    background: var(--code-bg);
+    padding: 40px;
+    font-family: var(--font-mono);
+    font-size: 28px;
+    line-height: 1.6;
+    color: var(--text-primary);
+    border: none;
+    white-space: pre;
+    overflow: hidden;
+    align-self: start;
+}
+
+.red-line {
+    grid-column: 11 / 12;
+    width: 2px;
+    background: var(--accent);
+    height: 100%;
+    align-self: stretch;
+}
+
+.code-stack {
+    grid-column: 1 / 12;
+    align-self: center;
+}
+.divider {
+    height: 1px;
+    background: var(--text-primary);
+    margin: 24px 0;
+}
+
+/* Split execute */
+.split {
+    grid-column: 1 / 12;
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 24px;
+    align-self: center;
+}
+.split .code-block {
+    grid-column: 1 / 7;
+}
+.terminal {
+    grid-column: 7 / 13;
+    background: #111111;
+    color: #FFFFFF;
+    padding: 40px;
+    font-family: var(--font-mono);
+    font-size: 26px;
+    line-height: 1.6;
+    white-space: pre;
+    overflow: hidden;
+    align-self: start;
+}
+
+/* Advanced slide */
+.adv-left {
+    grid-column: 1 / 5;
+    align-self: center;
+    font-size: 34px;
+    font-weight: 400;
+    line-height: 1.5;
+}
+.adv-left p {
+    margin-bottom: 32px;
+}
+.adv-right {
+    grid-column: 7 / 13;
+    align-self: center;
+}
+
+/* Pitfalls */
+.pitfalls {
+    grid-column: 1 / 12;
+    list-style: none;
+    align-self: center;
+    margin-top: 20px;
+}
+.pitfalls li {
+    margin-bottom: 56px;
+    font-size: 42px;
+    font-weight: 400;
+    line-height: 1.3;
+}
+.pitfalls .red {
+    color: var(--accent);
+    font-weight: 700;
+}
+.pitfalls .black {
+    color: var(--text-primary);
+}
+
+/* Summary */
+.quote-block {
+    grid-column: 1 / 12;
+    align-self: center;
+}
+.big-link {
+    font-size: 110px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: -0.02em;
+}
+.recap {
+    font-size: 38px;
+    font-weight: 400;
+    margin-top: 32px;
+}
+.footer-grid {
+    position: absolute;
+    bottom: var(--slide-padding);
+    left: var(--slide-padding);
+    right: var(--slide-padding);
+    display: flex;
+    justify-content: space-between;
+    font-size: 24px;
+    font-weight: 400;
+    border-top: 1px solid var(--text-primary);
+    padding-top: 24px;
+}
+
+/* Animations */
+.reveal {
+    opacity: 0;
+    transform: translateY(30px);
+    transition: opacity var(--duration-normal) var(--ease-out-expo),
+                transform var(--duration-normal) var(--ease-out-expo);
+}
+.slide.visible .reveal {
+    opacity: 1;
+    transform: translateY(0);
+}
+.slide.visible .reveal:nth-child(1) { transition-delay: 0.1s; }
+.slide.visible .reveal:nth-child(2) { transition-delay: 0.2s; }
+.slide.visible .reveal:nth-child(3) { transition-delay: 0.3s; }
+.slide.visible .reveal:nth-child(4) { transition-delay: 0.4s; }
+.slide.visible .reveal:nth-child(5) { transition-delay: 0.5s; }
+
+/* Inline editing chrome */
+.edit-hotzone {
+    position: fixed; top: 0; left: 0;
+    width: 80px; height: 80px;
+    z-index: 10000;
+    cursor: pointer;
+}
+.edit-toggle {
+    position: fixed; top: 16px; left: 16px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+    z-index: 10001;
+    background: #111;
+    color: #fff;
+    border: none;
+    padding: 8px 12px;
+    font-family: var(--font-mono);
+    font-size: 20px;
+    cursor: pointer;
+}
+.edit-toggle.show,
+.edit-toggle.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+.editing [contenteditable] {
+    outline: 2px solid var(--accent);
+    outline-offset: 4px;
+}
+</style>
+</head>
+<body>
+<div class="deck-viewport">
+    <main class="deck-stage" id="deckStage">
+
+        <!-- Slide 1: Title -->
+        <section class="slide">
+            <div class="slide-grid">
+                <h1 class="main-title reveal">Mastra 开发框架入门</h1>
+                <p class="subtitle reveal">面向 TypeScript 开发者的 AI Agent 构建指南</p>
+                <div class="audience reveal">Audience: TS/Node.js Devs</div>
+            </div>
+        </section>
+
+        <!-- Slide 2: What is Mastra? -->
+        <section class="slide">
+            <div class="slide-grid">
+                <div class="vertical-title reveal">什么是 Mastra？</div>
+                <div class="right-content">
+                    <div class="separator reveal"></div>
+                    <p class="reveal">原生 TypeScript/Node.js 优先的 Agent 框架</p>
+                    <p class="reveal">类型安全、轻量、可组合（Agents + Tools）</p>
+                    <p class="reveal">定位：比通用 LLM 库更高层，比重型框架更灵活</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 3: Core Concept Matrix -->
+        <section class="slide">
+            <div class="slide-grid">
+                <h2 class="section-title reveal">核心概念矩阵</h2>
+                <div class="matrix">
+                    <div class="matrix-row reveal"><span class="num">01</span><span class="term">Agent</span><span class="def">具备指令与模型的执行单元</span></div>
+                    <div class="matrix-row reveal"><span class="num">02</span><span class="term">Tools</span><span class="def">赋予 Agent 外部调用能力</span></div>
+                    <div class="matrix-row reveal"><span class="num">03</span><span class="term">Workflows</span><span class="def">多步状态编排</span></div>
+                    <div class="matrix-row reveal"><span class="num">04</span><span class="term">Memory</span><span class="def">会话上下文持久化</span></div>
+                    <div class="matrix-row reveal"><span class="num">05</span><span class="term">RAG</span><span class="def">检索增强生成集成</span></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 4: Environment Setup -->
+        <section class="slide">
+            <div class="slide-grid">
+                <h2 class="section-title reveal">环境准备与安装</h2>
+                <pre class="code-block reveal" style="grid-column: 1 / 8;"><code># Node.js >= 18 (支持 ESM)
+npm install @mastra/core
+# 可选 AI SDK
+npm install @ai-sdk/openai</code></pre>
+            </div>
+        </section>
+
+        <!-- Slide 5: Define First Agent -->
+        <section class="slide">
+            <div class="slide-grid">
+                <h2 class="section-title reveal">定义第一个 Agent</h2>
+                <pre class="code-block reveal" style="grid-column: 1 / 9;"><code>import { Agent } from '@mastra/core';
+import { openai } from '@ai-sdk/openai';
+
+const agent = new Agent({
+  name: 'assistant',
+  instructions: 'You are a helpful assistant.',
+  model: openai('gpt-4o'),
+});</code></pre>
+                <div class="red-line reveal" style="grid-column: 11 / 12;"></div>
+            </div>
+        </section>
+
+        <!-- Slide 6: Add Tools -->
+        <section class="slide">
+            <div class="slide-grid">
+                <h2 class="section-title reveal">为 Agent 添加工具</h2>
+                <div class="code-stack">
+                    <pre class="code-block reveal"><code>import { createTool } from '@mastra/core';
+import { z } from 'zod';
+
+const weatherTool = createTool({
+  id: 'weather',
+  inputSchema: z.object({ city: z.string() }),
+  outputSchema: z.object({ temp: z.number() }),
+  execute: async ({ city }) => ({ temp: 20 }),
+});</code></pre>
+                    <div class="divider reveal"></div>
+                    <pre class="code-block reveal"><code>const agent = new Agent({
+  name: 'assistant',
+  instructions: '...',
+  model: openai('gpt-4o'),
+  tools: [weatherTool],
+});</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 7: Execute & Stream -->
+        <section class="slide">
+            <div class="slide-grid">
+                <h2 class="section-title reveal">执行与流式响应</h2>
+                <div class="split">
+                    <pre class="code-block reveal"><code>const response = await agent.stream({
+  messages: [{ role: 'user', content: 'Hello' }],
+});
+
+for await (const chunk of response.textStream) {
+  process.stdout.write(chunk);
+}</code></pre>
+                    <pre class="terminal reveal"><code>Hello! How can I help you today?
+> Token stream completed.
+> Agent execution finished.</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 8: Advanced Workflow & Memory -->
+        <section class="slide">
+            <div class="slide-grid">
+                <h2 class="section-title reveal">进阶：工作流与记忆</h2>
+                <div class="adv-left reveal">
+                    <p>Workflow：将多个 Agent/Tool 编排为可控管道</p>
+                    <p>Memory：跨会话保存用户上下文</p>
+                </div>
+                <div class="adv-right reveal">
+                    <svg class="wireframe" viewBox="0 0 600 400" width="100%" height="100%">
+                        <rect x="50" y="50" width="150" height="80" fill="none" stroke="#111111" stroke-width="2"/>
+                        <text x="125" y="95" text-anchor="middle" font-family="Archivo" font-size="24" fill="#111111">Agent</text>
+                        <rect x="250" y="50" width="150" height="80" fill="none" stroke="#111111" stroke-width="2"/>
+                        <text x="325" y="95" text-anchor="middle" font-family="Archivo" font-size="24" fill="#111111">Tool</text>
+                        <rect x="450" y="50" width="100" height="80" fill="none" stroke="#111111" stroke-width="2"/>
+                        <text x="500" y="95" text-anchor="middle" font-family="Archivo" font-size="20" fill="#111111">Memory</text>
+                        <line x1="200" y1="90" x2="250" y2="90" stroke="#111111" stroke-width="2"/>
+                        <line x1="400" y1="90" x2="450" y2="90" stroke="#111111" stroke-width="2"/>
+                        <rect x="150" y="200" width="300" height="100" fill="none" stroke="#E30613" stroke-width="2"/>
+                        <text x="300" y="255" text-anchor="middle" font-family="Archivo" font-size="24" fill="#E30613">Workflow</text>
+                        <line x1="125" y1="130" x2="300" y2="200" stroke="#111111" stroke-width="2"/>
+                        <line x1="325" y1="130" x2="300" y2="200" stroke="#111111" stroke-width="2"/>
+                        <line x1="500" y1="130" x2="450" y2="200" stroke="#111111" stroke-width="2"/>
+                    </svg>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 9: Pitfall Guide -->
+        <section class="slide">
+            <div class="slide-grid">
+                <h2 class="section-title reveal">开发避坑指南</h2>
+                <ul class="pitfalls">
+                    <li class="reveal"><span class="black">务必使用 Zod 明确 Tool 参数类型</span></li>
+                    <li class="reveal"><span class="red">红线警示：勿将 API Key 硬编码于前端</span></li>
+                    <li class="reveal"><span class="black">根据任务复杂度选择适配的 LLM 模型</span></li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- Slide 10: Summary & Resources -->
+        <section class="slide">
+            <div class="slide-grid">
+                <div class="quote-block reveal">
+                    <p class="big-link">docs.mastra.ai</p>
+                    <p class="recap">回顾：Agent / Tools / Workflow / Memory</p>
+                </div>
+                <div class="footer-grid reveal">
+                    <div class="page-num">10 / 10</div>
+                    <div class="logo-placeholder">Mastra</div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+</div>
+
+<div class="edit-hotzone"></div>
+<button class="edit-toggle" id="editToggle" title="Edit mode (E)">✏️</button>
+
+<script>
+/* ===========================================
+   SLIDE PRESENTATION CONTROLLER
+   =========================================== */
+class SlidePresentation {
+    constructor() {
+        this.slides = document.querySelectorAll('.slide');
+        this.currentSlide = 0;
+        this.stage = document.getElementById('deckStage');
+        this.setupStageScale();
+        this.setupKeyboardNav();
+        this.setupTouchNav();
+        this.setupWheelNav();
+        this.showSlide(0);
+    }
+
+    setupStageScale() {
+        const scale = () => {
+            const factor = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+            const x = (window.innerWidth - 1920 * factor) / 2;
+            const y = (window.innerHeight - 1080 * factor) / 2;
+            this.stage.style.transform = `translate(${x}px, ${y}px) scale(${factor})`;
+        };
+        scale();
+        window.addEventListener('resize', scale);
+    }
+
+    setupKeyboardNav() {
+        document.addEventListener('keydown', (e) => {
+            if (e.target.getAttribute('contenteditable')) return;
+            if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
+                this.showSlide(this.currentSlide + 1);
+            } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+                this.showSlide(this.currentSlide - 1);
+            } else if (e.key === 'Home') {
+                this.showSlide(0);
+            } else if (e.key === 'End') {
+                this.showSlide(this.slides.length - 1);
+            }
+        });
+    }
+
+    setupTouchNav() {
+        let startX = 0;
+        let startY = 0;
+        this.stage.addEventListener('touchstart', (e) => {
+            startX = e.touches[0].clientX;
+            startY = e.touches[0].clientY;
+        }, { passive: true });
+        this.stage.addEventListener('touchend', (e) => {
+            const diffX = e.changedTouches[0].clientX - startX;
+            const diffY = e.changedTouches[0].clientY - startY;
+            if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
+                if (diffX < 0) this.showSlide(this.currentSlide + 1);
+                else this.showSlide(this.currentSlide - 1);
+            }
+        }, { passive: true });
+    }
+
+    setupWheelNav() {
+        let debounce = false;
+        window.addEventListener('wheel', (e) => {
+            if (debounce) return;
+            if (Math.abs(e.deltaY) > 30) {
+                debounce = true;
+                if (e.deltaY > 0) this.showSlide(this.currentSlide + 1);
+                else this.showSlide(this.currentSlide - 1);
+                setTimeout(() => { debounce = false; }, 800);
+            }
+        }, { passive: true });
+    }
+
+    showSlide(index) {
+        this.currentSlide = Math.max(0, Math.min(index, this.slides.length - 1));
+        this.slides.forEach((slide, i) => {
+            slide.classList.toggle('active', i === this.currentSlide);
+            slide.classList.toggle('visible', i === this.currentSlide);
+        });
+    }
+}
+
+/* ===========================================
+   INLINE EDITING CONTROLLER
+   =========================================== */
+class InlineEditor {
+    constructor() {
+        this.isActive = false;
+        this.toggleBtn = document.getElementById('editToggle');
+        this.hotzone = document.querySelector('.edit-hotzone');
+        this.setupHotzone();
+        this.setupToggle();
+        this.setupKeyboard();
+    }
+
+    toggleEditMode() {
+        this.isActive = !this.isActive;
+        this.toggleBtn.classList.toggle('active', this.isActive);
+        document.body.classList.toggle('editing', this.isActive);
+        const editableElements = document.querySelectorAll('.slide h1, .slide h2, .slide p, .slide li, .slide code, .slide span:not(.num):not(.term):not(.def)');
+        editableElements.forEach(el => {
+            if (this.isActive) {
+                el.setAttribute('contenteditable', 'true');
+            } else {
+                el.removeAttribute('contenteditable');
+            }
+        });
+    }
+
+    setupHotzone() {
+        let hideTimeout = null;
+        this.hotzone.addEventListener('mouseenter', () => {
+            clearTimeout(hideTimeout);
+            this.toggleBtn.classList.add('show');
+        });
+        this.hotzone.addEventListener('mouseleave', () => {
+            hideTimeout = setTimeout(() => {
+                if (!this.isActive) this.toggleBtn.classList.remove('show');
+            }, 400);
+        });
+        this.toggleBtn.addEventListener('mouseenter', () => {
+            clearTimeout(hideTimeout);
+        });
+        this.toggleBtn.addEventListener('mouseleave', () => {
+            hideTimeout = setTimeout(() => {
+                if (!this.isActive) this.toggleBtn.classList.remove('show');
+            }, 400);
+        });
+        this.hotzone.addEventListener('click', () => this.toggleEditMode());
+    }
+
+    setupToggle() {
+        this.toggleBtn.addEventListener('click', () => this.toggleEditMode());
+    }
+
+    setupKeyboard() {
+        document.addEventListener('keydown', (e) => {
+            if ((e.key === 'e' || e.key === 'E') && !e.target.getAttribute('contenteditable')) {
+                this.toggleEditMode();
+            }
+        });
+    }
+}
+
+/* Initialize */
+new SlidePresentation();
+new InlineEditor();
+</script>
+</body>
+</html>

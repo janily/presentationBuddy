@@ -1,0 +1,34 @@
+⚠ Warning: Next.js inferred your workspace root, but it may not be correct.
+ We detected multiple lockfiles and selected the directory of E:\dev\package-lock.json as the root directory.
+ To silence this warning, set `turbopack.root` in your Next.js config, or consider removing one of the lockfiles if it's not needed.
+   See https://nextjs.org/docs/app/api-reference/config/next-config-js/turbopack#root-directory for more information.
+ Detected additional lockfiles: 
+   * E:\dev\presentationBuddy\pnpm-lock.yaml
+
+Error in LLM Execution Step Error: Agent chat timed out
+    at Timeout._onTimeout (src\app\api\agent-chat\route.ts:67:22)
+  65 |   const timeout = setTimeout(() => {
+  66 |     timedOut = true;
+> 67 |     controller.abort(new Error("Agent chat timed out"));
+     |                      ^
+  68 |   }, AGENT_CHAT_TOTAL_TIMEOUT_MS);
+  69 |
+  70 |   parentSignal.addEventListener("abort", forwardAbort, { once: true });
+Error in agent stream {
+  error: Error: Agent chat timed out
+      at Timeout._onTimeout (src\app\api\agent-chat\route.ts:67:22)
+    65 |   const timeout = setTimeout(() => {
+    66 |     timedOut = true;
+  > 67 |     controller.abort(new Error("Agent chat timed out"));
+       |                      ^
+    68 |   }, AGENT_CHAT_TOTAL_TIMEOUT_MS);
+    69 |
+    70 |   parentSignal.addEventListener("abort", forwardAbort, { once: true });,
+  runId: 'cc5a9f09-3667-45d0-9845-4e7b4001c2d9'
+}
+agent_chat.request_timed_out {
+  operationId: 'operation-1783761987760-r5v4zc800d',
+  durationMs: 30048
+}
+WorkflowRunOutput.pipeThrough() is deprecated. Use fullStream.pipeThrough() instead.
+WorkflowRunOutput.pipeThrough() is deprecated. Use fullStream.pipeThrough() instead.

@@ -15,7 +15,7 @@ import { getQuickActionDefinition, type AgentQuickActionChoice, type AgentQuickC
 import { appendCompletionMessage } from "./agent-message-model";
 import { dispatchAgentChatUIChunk, type AgentChatStreamCallbacks } from "./agent-chat-ui-stream";
 import { requestsCancelledGenerationRetry } from "./cancelled-generation-retry";
-import type { FrontendSlidesStylePreview, FrontendSlidesStyleSpec } from "@/src/services/frontend-slides/style-catalog";
+import { discoverFrontendSlideStyles, type FrontendSlidesStylePreview, type FrontendSlidesStyleSpec } from "@/src/services/frontend-slides/style-catalog";
 import { isStructureChangingRevision } from "./revision-routing";
 import type { AgentChatResponse, AgentChatUIChunk, AgentChatUIMessage } from "@/src/types/agent-chat";
 import PresentationPreviewPane from "./presentation-preview-pane";
@@ -364,7 +364,9 @@ export default function PresentationStudio() {
     });
   }, [activeArtifact, baseOutline, beginRevision, selectedStyle, sendAgentRequest, styleDiscoveryBrief]);
 
-  const discoverStyles = useCallback(async (agentBrief: AgentBriefData) => {
+  // Kept temporarily for direct endpoint diagnostics; interactive discovery uses local assets below.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const discoverStylesViaApi = useCallback(async (agentBrief: AgentBriefData) => {
     setStyleDiscoveryBrief(agentBrief);
     setSelectedStyle(null);
     setIsDiscoveringStyles(true);
@@ -389,6 +391,18 @@ export default function PresentationStudio() {
     } finally {
       setIsDiscoveringStyles(false);
     }
+  }, []);
+
+  const discoverStyles = useCallback((agentBrief: AgentBriefData) => {
+    setStyleDiscoveryBrief(agentBrief);
+    setSelectedStyle(null);
+    setIsDiscoveringStyles(false);
+    setStylePreviews(discoverFrontendSlideStyles({
+      topic: agentBrief.topic,
+      audience: agentBrief.audience,
+      purpose: agentBrief.purpose ?? "teaching-tutorial",
+      density: agentBrief.density ?? "speaker-led",
+    }));
   }, []);
 
   const handleSelectStyle = useCallback((style: FrontendSlidesStyleSpec) => {

@@ -1,6 +1,7 @@
 "use client";
 
 import { CheckCircle2, Circle, FileCode2, LayoutTemplate, Loader2, Sparkles } from "lucide-react";
+import Image from "next/image";
 import HtmlPreview from "./html-preview";
 import type { HtmlGenerationStepData, OutlineStepData } from "@/src/types/presentation-workflow";
 import type { SlideOutlineItem } from "./presentation-outline-utils";
@@ -44,12 +45,12 @@ function StyleDiscovery({ previews, selectedStyleId, isLoading, onSelect }: {
           </div>
         ) : (
           <div className="grid gap-5 xl:grid-cols-3">
-            {previews.map(({ style, previewHtml }) => {
+            {previews.map(({ style, previewImage }) => {
               const selected = selectedStyleId === style.id;
               return (
                 <button key={style.id} type="button" onClick={() => onSelect?.(style)} className={`overflow-hidden rounded-2xl border-2 bg-white text-left shadow-sm transition hover:-translate-y-1 hover:shadow-xl ${selected ? "border-[var(--accent-terracotta)] ring-4 ring-[var(--accent-terracotta)]/10" : "border-transparent"}`}>
                   <div className="aspect-video w-full overflow-hidden bg-black">
-                    <iframe title={`${style.name} 风格预览`} srcDoc={previewHtml} sandbox="allow-scripts" className="h-full w-full pointer-events-none" />
+                    <Image src={previewImage} alt={`${style.name} 风格预览`} width={960} height={540} className="h-full w-full object-cover" />
                   </div>
                   <div className="p-4">
                     <div className="flex items-center justify-between gap-3"><h3 className="font-semibold text-[var(--text-primary)]">{style.name}</h3>{selected ? <CheckCircle2 className="h-5 w-5 text-[var(--accent-terracotta)]" /> : null}</div>

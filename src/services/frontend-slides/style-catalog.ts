@@ -26,6 +26,8 @@ const styles: FrontendSlidesStyleSpec[] = [
 
 const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]!);
 
+// Retained only as a server-side diagnostic fixture; interactive preview uses static local images.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function createPreviewHtml(style: FrontendSlidesStyleSpec, input: FrontendSlidesDiscoveryInput) {
   const topic = escapeHtml(input.topic);
   const terminal = style.id === "terminal-green";
@@ -66,6 +68,6 @@ export function discoverFrontendSlideStyles(input: FrontendSlidesDiscoveryInput,
         throw new Error(`frontend-slides preset ${style.name} drifted from STYLE_PRESETS.md; missing: ${missingTokens.join(", ")}`);
       }
     }
-    return { style, previewHtml: createPreviewHtml(style, input) };
+    return { style, previewImage: `/style-previews/${style.id}.svg` };
   });
 }
