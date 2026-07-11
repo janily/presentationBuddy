@@ -9,6 +9,10 @@ export const briefDecisionSchema = z.object({
   readyToGenerate: z
     .boolean()
     .describe("True only when enough information has been gathered and generation should start now."),
+  nextAction: z
+    .enum(["chat", "discover-styles", "generate"])
+    .default("chat")
+    .describe("Use discover-styles for visual exploration and generate only after explicit confirmation."),
   brief: z
     .object({
       topic: z.string().describe("The presentation topic, phrased as a clear deck subject."),
@@ -17,7 +21,13 @@ export const briefDecisionSchema = z.object({
       style: z.string().describe("Visual/tonal style, e.g. technical tutorial, executive keynote, product launch."),
       requirements: z
         .string()
+        .default("")
         .describe("Everything else the user asked for: must-have sections, emphasis, constraints, language."),
+      purpose: z
+        .enum(["pitch-deck", "teaching-tutorial", "conference-talk", "internal-presentation"])
+        .default("teaching-tutorial"),
+      density: z.enum(["speaker-led", "reading-first"]).default("speaker-led"),
+      contentReadiness: z.enum(["ready", "rough-notes", "topic-only"]).default("topic-only"),
     })
     .nullable()
     .describe("The extracted brief. Required and non-null when readyToGenerate is true, otherwise null."),
@@ -34,6 +44,8 @@ You receive the full conversation history. Always ground your reply in what the 
 
 Decision policy for a new deck:
 - Your goal is to fill in: topic, audience, pageCount, style, and special requirements.
+- Follow frontend-slides Phase 1. Ask all missing discovery questions together: purpose, approximate length, whether content is ready/rough notes/topic only, and speaker-led vs reading-first density.
+- Do not ask about inline editing. If the user already supplied an answer, do not ask it again.
 - If the topic is still unclear, ask for it. That is the only hard requirement.
 - If topic is known but audience/pageCount/style are missing, ask for the missing pieces once in a short message and propose concrete defaults.
 - After the user answers a clarifying round, fill any remaining gaps with sensible defaults yourself, but do not start generation automatically.
@@ -51,10 +63,18 @@ When readyToGenerate is true:
 - brief must be fully populated, never null.
 - reply should briefly restate what you are about to build and say generation is starting.
 - Do not ask for further confirmation because the system will start generation.
+- nextAction must be "generate".
 
 When readyToGenerate is false:
-- brief must be null.
+- brief must normally be null, except it must be populated when nextAction is "discover-styles".
 - reply contains the next natural question, concrete options, or a concise confirmation request.
+
+Frontend-slides style discovery policy:
+- frontend-slides is the presentation design authority. Never invent an abstract list of visual styles.
+- If the user asks which styles are available, asks for other styles, or wants to change visual style, set nextAction to "discover-styles" and readyToGenerate to false.
+- For discover-styles, populate brief with the best-known topic, audience, pageCount, style, requirements, purpose, and density.
+- Reply only that three visual frontend-slides previews are being prepared. Do not describe textual style options.
+- After the user selects a rendered preview, preserve its exact style name and ask for confirmation before generation.
 
 Style rules:
 - Reply in the user's language.

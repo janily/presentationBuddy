@@ -33,4 +33,32 @@ describe("buildFrontendSlidesMastraPrompt", () => {
     expect(prompt).toContain(".slide { visibility: hidden; }");
     expect(prompt).toContain("Swiss Modern");
   });
+
+  it("locks generation to the selected frontend-slides design contract", () => {
+    const prompt = buildFrontendSlidesMastraPrompt(
+      {
+        title: "Mastra",
+        narrativeGoal: "Teach agents",
+        style: "Terminal Green",
+        designGuidance: [],
+        slides: [{ title: "Intro", content: "Welcome", layout: "title" }],
+        density: "reading-first",
+        styleSpec: {
+          id: "terminal-green",
+          name: "Terminal Green",
+          source: "frontend-slides-preset",
+          vibe: "developer-focused",
+          layout: "terminal",
+          typography: { display: "JetBrains Mono", body: "JetBrains Mono" },
+          palette: { background: "#0d1117", surface: "#161b22", text: "#e6edf3", accent: "#39d353", secondary: "#58a6ff" },
+          signatureElements: ["scan lines", "blinking cursor"],
+        },
+      },
+      { skill: "rules", htmlTemplate: "template", viewportBaseCss: "viewport", animationPatterns: "motion" },
+    );
+
+    expect(prompt).toContain("Selected style contract (NON-NEGOTIABLE)");
+    expect(prompt).toContain('"id": "terminal-green"');
+    expect(prompt).toContain("Content density: reading-first");
+  });
 });

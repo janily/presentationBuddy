@@ -1,4 +1,5 @@
 import z from "zod";
+import { frontendSlidesStyleSpecSchema } from "@/src/services/frontend-slides/style-schema";
 
 export const artifactOperationSchema = z.object({
   operationId: z.string().trim().min(1, "Operation ID is required"),
@@ -26,6 +27,10 @@ export const presentationInputSchema = z.object({
     .optional(),
   style: z.string().optional(),
   requirements: z.string().optional(),
+  purpose: z.enum(["pitch-deck", "teaching-tutorial", "conference-talk", "internal-presentation"]).optional(),
+  density: z.enum(["speaker-led", "reading-first"]).optional(),
+  contentReadiness: z.enum(["ready", "rough-notes", "topic-only"]).optional(),
+  styleSpec: frontendSlidesStyleSpecSchema.optional(),
   artifact: artifactOperationSchema.optional(),
 });
 
@@ -51,6 +56,7 @@ export const revisionSpecSchema = z.object({
   targetSlides: z.array(z.number().int().positive()).optional(),
   style: z.string().trim().min(1).optional(),
   palette: z.array(z.string().trim().min(1)).min(1).optional(),
+  styleSpec: frontendSlidesStyleSpecSchema.optional(),
   requiresOutlineReview: z.boolean(),
 });
 

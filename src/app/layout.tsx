@@ -72,8 +72,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    // Browser extensions can add attributes to the document root before React
+    // hydrates it. Limit the escape hatch to these two static shell elements so
+    // hydration mismatches inside the application are still reported.
+    <html lang="en" suppressHydrationWarning>
       <body
+        suppressHydrationWarning
         className={`${fraunces.variable} ${commissioner.variable} antialiased`}
         style={{
           fontFamily: "var(--font-commissioner), system-ui, sans-serif",

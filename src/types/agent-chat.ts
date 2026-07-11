@@ -6,12 +6,16 @@ export type AgentBriefData = {
   pageCount: number;
   style: string;
   requirements?: string;
+  purpose?: "pitch-deck" | "teaching-tutorial" | "conference-talk" | "internal-presentation";
+  density?: "speaker-led" | "reading-first";
+  contentReadiness?: "ready" | "rough-notes" | "topic-only";
 };
 
 export type AgentChatResponse = {
   reply?: string;
   readyToGenerate?: boolean;
   brief?: AgentBriefData | null;
+  nextAction?: "chat" | "discover-styles" | "generate";
   error?: string;
 };
 

@@ -577,7 +577,10 @@ export const presentationHtmlGenerationStep = createStep({
     let html = "";
     let generator: PresentationHtmlStepData["generator"] | undefined;
     let fallbackReason: string | undefined;
-    const frontendSlidesInput = mapOutlineToFrontendSlides(inputData.outline, inputData.style);
+    const frontendSlidesInput = mapOutlineToFrontendSlides(inputData.outline, inputData.style, {
+      density: inputData.density,
+      styleSpec: inputData.styleSpec,
+    });
 
     writeHtmlProgress({
       activeStepId: "load-skill",

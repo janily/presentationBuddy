@@ -1,4 +1,5 @@
 import type { PresentationOutlineData } from "@/src/types/presentation-workflow";
+import type { FrontendSlidesDensity, FrontendSlidesPurpose, FrontendSlidesStyleSpec } from "@/src/services/frontend-slides/style-catalog";
 
 export interface PresentationBrief {
   topic: string;
@@ -6,6 +7,10 @@ export interface PresentationBrief {
   slideCount: number;
   style: string;
   requirements: string;
+  purpose?: FrontendSlidesPurpose;
+  density?: FrontendSlidesDensity;
+  contentReadiness?: "ready" | "rough-notes" | "topic-only";
+  styleSpec?: FrontendSlidesStyleSpec;
 }
 
 export interface SlideOutlineItem {

@@ -4,6 +4,7 @@ import { CheckCircle2, Circle, FileCode2, LayoutTemplate, Loader2, Sparkles } fr
 import HtmlPreview from "./html-preview";
 import type { HtmlGenerationStepData, OutlineStepData } from "@/src/types/presentation-workflow";
 import type { SlideOutlineItem } from "./presentation-outline-utils";
+import type { FrontendSlidesStylePreview, FrontendSlidesStyleSpec } from "@/src/services/frontend-slides/style-catalog";
 
 type PreviewPaneStep = "brief" | "outlining" | "review" | "generating" | "preview";
 
@@ -16,6 +17,53 @@ interface PresentationPreviewPaneProps {
   outlineGeneration?: OutlineStepData;
   htmlGeneration?: HtmlGenerationStepData;
   preservePreviewDuringGeneration?: boolean;
+  stylePreviews?: FrontendSlidesStylePreview[];
+  selectedStyleId?: string;
+  isDiscoveringStyles?: boolean;
+  onSelectStyle?: (style: FrontendSlidesStyleSpec) => void;
+}
+
+function StyleDiscovery({ previews, selectedStyleId, isLoading, onSelect }: {
+  previews: FrontendSlidesStylePreview[];
+  selectedStyleId?: string;
+  isLoading: boolean;
+  onSelect?: (style: FrontendSlidesStyleSpec) => void;
+}) {
+  return (
+    <div className="h-full min-h-[620px] overflow-auto bg-[#f5f2ec] p-6">
+      <div className="mx-auto max-w-7xl">
+        <div className="mb-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--accent-terracotta)]">Frontend Slides · Style Discovery</p>
+          <h2 className="mt-2 text-3xl font-semibold text-[var(--text-primary)]">请选择一个真实视觉方向</h2>
+          <p className="mt-2 text-[var(--text-secondary)]">每个选项都是按当前演示主题生成的标题页，而不是抽象风格名称。</p>
+        </div>
+        {isLoading ? (
+          <div className="flex min-h-96 items-center justify-center rounded-3xl border border-[var(--border-light)] bg-white">
+            <Loader2 className="h-7 w-7 animate-spin text-[var(--accent-terracotta)]" />
+            <span className="ml-3 text-[var(--text-secondary)]">正在应用 frontend-slides 设计系统…</span>
+          </div>
+        ) : (
+          <div className="grid gap-5 xl:grid-cols-3">
+            {previews.map(({ style, previewHtml }) => {
+              const selected = selectedStyleId === style.id;
+              return (
+                <button key={style.id} type="button" onClick={() => onSelect?.(style)} className={`overflow-hidden rounded-2xl border-2 bg-white text-left shadow-sm transition hover:-translate-y-1 hover:shadow-xl ${selected ? "border-[var(--accent-terracotta)] ring-4 ring-[var(--accent-terracotta)]/10" : "border-transparent"}`}>
+                  <div className="aspect-video w-full overflow-hidden bg-black">
+                    <iframe title={`${style.name} 风格预览`} srcDoc={previewHtml} sandbox="allow-scripts" className="h-full w-full pointer-events-none" />
+                  </div>
+                  <div className="p-4">
+                    <div className="flex items-center justify-between gap-3"><h3 className="font-semibold text-[var(--text-primary)]">{style.name}</h3>{selected ? <CheckCircle2 className="h-5 w-5 text-[var(--accent-terracotta)]" /> : null}</div>
+                    <p className="mt-1 text-sm text-[var(--text-secondary)]">{style.vibe}</p>
+                    <p className="mt-2 text-xs text-[var(--text-muted)]">{style.typography.display} · {style.signatureElements.slice(0, 2).join(" · ")}</p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 const generationSteps = [
@@ -181,9 +229,13 @@ function GenerationProgress({ htmlGeneration }: { htmlGeneration?: HtmlGeneratio
   );
 }
 
-export default function PresentationPreviewPane({ step, currentStep, html, generatedHtml, outline, outlineGeneration, htmlGeneration, preservePreviewDuringGeneration = false }: PresentationPreviewPaneProps) {
+export default function PresentationPreviewPane({ step, currentStep, html, generatedHtml, outline, outlineGeneration, htmlGeneration, preservePreviewDuringGeneration = false, stylePreviews = [], selectedStyleId, isDiscoveringStyles = false, onSelectStyle }: PresentationPreviewPaneProps) {
   const activeStep = currentStep ?? step ?? "brief";
   const activeHtml = generatedHtml ?? html ?? "";
+
+  if (isDiscoveringStyles || stylePreviews.length > 0) {
+    return <StyleDiscovery previews={stylePreviews} selectedStyleId={selectedStyleId} isLoading={isDiscoveringStyles} onSelect={onSelectStyle} />;
+  }
 
   if (activeStep === "preview" && activeHtml) {
     return <HtmlPreview html={activeHtml} />;

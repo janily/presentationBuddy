@@ -1,4 +1,5 @@
 import type { PresentationOutlineData, SlideOutlineData } from "@/src/types/presentation-workflow";
+import type { FrontendSlidesDensity, FrontendSlidesStyleSpec } from "@/src/services/frontend-slides/style-catalog";
 
 export type FrontendSlideLayout = "title" | "content" | "split" | "quote";
 
@@ -13,18 +14,23 @@ export type FrontendSlidesInput = {
   style: string;
   narrativeGoal: string;
   designGuidance: string[];
+  density?: FrontendSlidesDensity;
+  styleSpec?: FrontendSlidesStyleSpec;
   slides: FrontendSlide[];
 };
 
 export function mapOutlineToFrontendSlides(
   outline: PresentationOutlineData,
   style?: string,
+  options?: { density?: FrontendSlidesDensity; styleSpec?: FrontendSlidesStyleSpec },
 ): FrontendSlidesInput {
   return {
     title: outline.title,
     style: style?.trim() || "modern professional",
     narrativeGoal: outline.narrativeGoal,
     designGuidance: outline.designGuidance,
+    density: options?.density,
+    styleSpec: options?.styleSpec,
     slides: outline.slides.map((slide, index) => ({
       title: slide.title,
       content: formatSlideContent(slide),

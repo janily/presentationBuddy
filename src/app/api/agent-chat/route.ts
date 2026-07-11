@@ -23,6 +23,7 @@ const chatMessageSchema = z.object({
 const agentChatRequestSchema = z.object({
   messages: z.array(chatMessageSchema).min(1),
   hasGeneratedDeck: z.boolean().optional(),
+  hasSelectedStyle: z.boolean().optional(),
   operationId: z.string().trim().min(1).optional(),
   deckContext: z.object({
     presentationBrief: presentationInputSchema,
@@ -43,6 +44,7 @@ type AgentChatResultPayload = {
   reply: string;
   readyToGenerate: boolean;
   brief: BriefDecision["brief"] | null;
+  nextAction: BriefDecision["nextAction"];
 };
 
 type AgentChatStreamEvent =
@@ -256,6 +258,7 @@ The JSON shape must be:
 {
   "reply": "string shown to the user",
   "readyToGenerate": boolean,
+  "nextAction": "chat" | "discover-styles" | "generate",
   "brief": null | {
     "topic": "string",
     "audience": "string",
@@ -321,7 +324,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid agent chat request" }, { status: 400 });
   }
 
-  const { messages, hasGeneratedDeck, deckContext } = validation.data;
+  const { messages, hasGeneratedDeck, hasSelectedStyle, deckContext } = validation.data;
   const operationId = validation.data.operationId ?? crypto.randomUUID();
 
   return createAgentChatStreamResponse(operationId, async (emit) => {
@@ -379,18 +382,33 @@ export async function POST(request: Request) {
         && !explicitlyConfirmedGeneration(lastUserMessage),
       );
 
-      const payload: AgentChatResultPayload = shouldBlockGeneration
+      const shouldDiscoverStyle = Boolean(
+        decision.readyToGenerate
+        && decision.brief
+        && !hasSelectedStyle,
+      );
+
+      const payload: AgentChatResultPayload = shouldDiscoverStyle
+        ? {
+          reply: "内容方向已经确认。生成前先按 frontend-slides 为你准备三个真实标题页预览，请从中选择整套演示文稿的视觉系统。",
+          readyToGenerate: false,
+          brief: decision.brief,
+          nextAction: "discover-styles",
+        }
+        : shouldBlockGeneration
         ? {
           reply: hasGeneratedDeck
             ? buildRevisionConfirmationReply(decision)
             : buildGenerationConfirmationReply(decision),
           readyToGenerate: false,
           brief: null,
+          nextAction: "chat",
         }
         : {
           reply: decision.reply,
           readyToGenerate: decision.readyToGenerate && Boolean(decision.brief),
           brief: decision.brief,
+          nextAction: decision.nextAction,
         };
 
       emit({ type: "assistant-snapshot", text: payload.reply });
@@ -402,6 +420,7 @@ export async function POST(request: Request) {
         readyToGenerate: payload.readyToGenerate,
         hasBrief: Boolean(payload.brief),
         blockedForConfirmation: shouldBlockGeneration,
+        routedToStyleDiscovery: shouldDiscoverStyle,
       });
     } catch (error) {
       if (request.signal.aborted) {

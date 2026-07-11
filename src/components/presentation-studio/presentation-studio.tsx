@@ -14,6 +14,8 @@ import AgentPanel, { type AgentMessage } from "./agent-panel";
 import { getQuickActionDefinition, type AgentQuickActionChoice, type AgentQuickCommand } from "./agent-quick-actions";
 import { appendCompletionMessage } from "./agent-message-model";
 import { dispatchAgentChatUIChunk, type AgentChatStreamCallbacks } from "./agent-chat-ui-stream";
+import { requestsCancelledGenerationRetry } from "./cancelled-generation-retry";
+import type { FrontendSlidesStylePreview, FrontendSlidesStyleSpec } from "@/src/services/frontend-slides/style-catalog";
 import { isStructureChangingRevision } from "./revision-routing";
 import type { AgentChatResponse, AgentChatUIChunk, AgentChatUIMessage } from "@/src/types/agent-chat";
 import PresentationPreviewPane from "./presentation-preview-pane";
@@ -24,6 +26,14 @@ import { deriveStudioPhase, type StudioErrorSource, type StudioPhase } from "./u
 type PreviewPaneStep = "brief" | "outlining" | "review" | "generating" | "preview";
 
 type AgentBriefData = NonNullable<AgentChatResponse["brief"]>;
+
+type PendingArtifact = {
+  operation: ArtifactOperation;
+  brief: PresentationBrief;
+  outline: PresentationOutlineData;
+  revision?: RevisionSpec;
+  mode: "generation" | "revision";
+};
 
 const getErrorMessage = (error: Error | undefined, fallback: string) => {
   if (!error?.message) return fallback;
@@ -76,6 +86,10 @@ function toBriefData(brief: PresentationBrief, artifact?: ArtifactOperation): Pr
     pageCount: brief.slideCount,
     style: brief.style,
     requirements: brief.requirements,
+    purpose: brief.purpose,
+    density: brief.density,
+    contentReadiness: brief.contentReadiness,
+    styleSpec: brief.styleSpec,
     artifact,
   };
 }
@@ -112,13 +126,12 @@ export default function PresentationStudio() {
     brief: PresentationBrief;
     outline: PresentationOutlineData;
   } | null>(null);
-  const [pendingArtifact, setPendingArtifact] = useState<{
-    operation: ArtifactOperation;
-    brief: PresentationBrief;
-    outline: PresentationOutlineData;
-    revision?: RevisionSpec;
-    mode: "generation" | "revision";
-  } | null>(null);
+  const [pendingArtifact, setPendingArtifact] = useState<PendingArtifact | null>(null);
+  const [lastCancelledArtifact, setLastCancelledArtifact] = useState<PendingArtifact | null>(null);
+  const [stylePreviews, setStylePreviews] = useState<FrontendSlidesStylePreview[]>([]);
+  const [selectedStyle, setSelectedStyle] = useState<FrontendSlidesStyleSpec | null>(null);
+  const [styleDiscoveryBrief, setStyleDiscoveryBrief] = useState<AgentBriefData | null>(null);
+  const [isDiscoveringStyles, setIsDiscoveringStyles] = useState(false);
   const agentChatAbortRef = useRef<AbortController | null>(null);
   const deckIdRef = useRef(`deck-${makeId()}`);
   const publishedArtifactKeyRef = useRef<string | null>(null);
@@ -264,10 +277,12 @@ export default function PresentationStudio() {
     const revisedBrief: PresentationBrief = {
       ...baselineBrief,
       style: revision.style ?? baselineBrief.style,
+      styleSpec: revision.styleSpec ?? baselineBrief.styleSpec,
       requirements: [baselineBrief.requirements, revision.instruction].filter(Boolean).join("\n\n"),
     };
 
     setHtmlWatchdogError(null);
+    setLastCancelledArtifact(null);
     setPendingArtifact({ operation, brief: revisedBrief, outline: baselineOutline, revision, mode: "revision" });
     sendRevision({
       presentationBrief: toBriefData(revisedBrief),
@@ -279,13 +294,21 @@ export default function PresentationStudio() {
   }, [activeArtifact, activeHtmlGenerationStepData?.artifact?.deckId, activeHtmlGenerationStepData?.artifact?.version, baseOutline, brief, sendRevision]);
 
   const startGenerationFromBrief = useCallback((agentBrief: AgentBriefData, revisionMessage?: string) => {
+    setStylePreviews([]);
+    setIsDiscoveringStyles(false);
     const nextBrief: PresentationBrief = {
       topic: agentBrief.topic,
       audience: agentBrief.audience,
       slideCount: agentBrief.pageCount,
-      style: agentBrief.style,
+      style: selectedStyle?.name ?? agentBrief.style,
       requirements: agentBrief.requirements?.trim() ?? "",
+      purpose: agentBrief.purpose ?? styleDiscoveryBrief?.purpose,
+      density: agentBrief.density ?? styleDiscoveryBrief?.density,
+      contentReadiness: agentBrief.contentReadiness ?? styleDiscoveryBrief?.contentReadiness,
+      styleSpec: selectedStyle ?? undefined,
     };
+
+    setLastCancelledArtifact(null);
 
     if (activeArtifact && baseOutline) {
       if (
@@ -315,6 +338,7 @@ export default function PresentationStudio() {
         kind: "mixed",
         instruction: nextBrief.requirements || `Apply the requested style: ${nextBrief.style}`,
         style: nextBrief.style,
+        styleSpec: nextBrief.styleSpec,
         requiresOutlineReview: false,
       });
       return;
@@ -338,7 +362,43 @@ export default function PresentationStudio() {
     sendAgentRequest(nextBrief.requirements || nextBrief.topic, {
       ...toBriefData(nextBrief, operation),
     });
-  }, [activeArtifact, baseOutline, beginRevision, sendAgentRequest]);
+  }, [activeArtifact, baseOutline, beginRevision, selectedStyle, sendAgentRequest, styleDiscoveryBrief]);
+
+  const discoverStyles = useCallback(async (agentBrief: AgentBriefData) => {
+    setStyleDiscoveryBrief(agentBrief);
+    setSelectedStyle(null);
+    setIsDiscoveringStyles(true);
+    setStylePreviews([]);
+    try {
+      const response = await fetch("/api/style-discovery", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          topic: agentBrief.topic,
+          audience: agentBrief.audience,
+          purpose: agentBrief.purpose ?? "teaching-tutorial",
+          density: agentBrief.density ?? "speaker-led",
+        }),
+      });
+      const data = await response.json() as { previews?: FrontendSlidesStylePreview[]; error?: string };
+      if (!response.ok || !data.previews) throw new Error(data.error ?? "无法生成风格预览");
+      setStylePreviews(data.previews);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setChatMessages((current) => [...current, { id: makeId(), role: "assistant", kind: "text", content: `frontend-slides 风格预览生成失败：${message}` }]);
+    } finally {
+      setIsDiscoveringStyles(false);
+    }
+  }, []);
+
+  const handleSelectStyle = useCallback((style: FrontendSlidesStyleSpec) => {
+    setSelectedStyle(style);
+    setChatMessages((current) => [
+      ...current,
+      { id: makeId(), role: "user", kind: "text", content: `选择 frontend-slides 风格：${style.name}` },
+      { id: makeId(), role: "assistant", kind: "text", content: `已选择「${style.name}」。我会保持它的字体、配色、布局语法和标志性元素贯穿整份演示文稿。回复“确认生成”后开始。` },
+    ]);
+  }, []);
 
   const sendToAgentChat = useCallback(async (
     history: AgentMessage[],
@@ -352,6 +412,7 @@ export default function PresentationStudio() {
         body: {
         messages: textHistory(history),
         hasGeneratedDeck,
+        hasSelectedStyle: Boolean(selectedStyle ?? activeArtifact?.brief.styleSpec),
           operationId,
         deckContext: activeArtifact ? {
           presentationBrief: toBriefData(activeArtifact.brief),
@@ -382,10 +443,50 @@ export default function PresentationStudio() {
     if (!streamState.result?.reply) throw new Error("Agent chat stream ended without a result");
 
     return streamState.result;
-  }, [activeArtifact]);
+  }, [activeArtifact, selectedStyle]);
 
   const handleAgentSend = useCallback(async (message: string, options: { force?: boolean } = {}) => {
     const userMessage: AgentMessage = { id: makeId(), role: "user", kind: "text", content: message };
+
+    if (lastCancelledArtifact && requestsCancelledGenerationRetry(message)) {
+      const operation: ArtifactOperation = {
+        ...lastCancelledArtifact.operation,
+        operationId: `operation-${makeId()}`,
+      };
+      const resumedArtifact: PendingArtifact = { ...lastCancelledArtifact, operation };
+
+      setLastCancelledArtifact(null);
+      setHtmlWatchdogError(null);
+      setPendingArtifact(resumedArtifact);
+      setChatMessages((current) => [
+        ...current,
+        userMessage,
+        {
+          id: makeId(),
+          role: "assistant",
+          kind: "text",
+          content: "好的，继续执行刚才已确认的调整，不会重新修改方向。正在恢复生成……",
+        },
+      ]);
+
+      window.setTimeout(() => {
+        if (resumedArtifact.revision) {
+          sendRevision({
+            presentationBrief: toBriefData(resumedArtifact.brief),
+            approvedOutline: resumedArtifact.outline,
+            revision: resumedArtifact.revision,
+            artifact: operation,
+          });
+          return;
+        }
+
+        sendAgentRequest(
+          resumedArtifact.brief.requirements || resumedArtifact.brief.topic,
+          toBriefData(resumedArtifact.brief, operation),
+        );
+      }, 0);
+      return;
+    }
 
     if (phase === "generating" && !options.force) {
       setChatMessages((current) => [
@@ -443,6 +544,8 @@ export default function PresentationStudio() {
 
       if (data.readyToGenerate && data.brief) {
         startGenerationFromBrief(data.brief, message);
+      } else if (data.nextAction === "discover-styles" && data.brief) {
+        await discoverStyles(data.brief);
       }
     } catch (error) {
       if (abortController.signal.aborted) return;
@@ -461,10 +564,23 @@ export default function PresentationStudio() {
         setAgentProgressMessage(null);
       }
     }
-  }, [chatMessages, generatedHtml, phase, sendToAgentChat, startGenerationFromBrief]);
+  }, [chatMessages, discoverStyles, generatedHtml, lastCancelledArtifact, phase, sendAgentRequest, sendRevision, sendToAgentChat, startGenerationFromBrief]);
 
   const handleQuickAction = useCallback((command: AgentQuickCommand) => {
     if (phase === "generating" || isAgentReplying) return;
+    if (command === "change-style" && (activeArtifact?.brief ?? brief)) {
+      const source = activeArtifact?.brief ?? brief!;
+      void discoverStyles({
+        topic: source.topic,
+        audience: source.audience,
+        pageCount: source.slideCount,
+        style: source.style,
+        requirements: source.requirements,
+        purpose: source.purpose,
+        density: source.density,
+      });
+      return;
+    }
     const action = getQuickActionDefinition(command);
 
     setChatMessages((current) => [
@@ -472,7 +588,7 @@ export default function PresentationStudio() {
       { id: makeId(), role: "user", kind: "text", content: action.userText },
       { id: `quick-choice-${makeId()}`, role: "system", kind: "quick-choice", action },
     ]);
-  }, [isAgentReplying, phase]);
+  }, [activeArtifact?.brief, brief, discoverStyles, isAgentReplying, phase]);
 
   const handleApplyRevision = useCallback((choice: AgentQuickActionChoice) => {
     if (phase === "generating") return;
@@ -507,6 +623,7 @@ export default function PresentationStudio() {
     }
 
     if (phase === "generating") {
+      setLastCancelledArtifact(pendingArtifact);
       resetWorkflow();
       setPendingArtifact(null);
       setHtmlWatchdogError(null);
@@ -515,7 +632,7 @@ export default function PresentationStudio() {
         { id: makeId(), role: "assistant", kind: "text", content: "已取消生成，当前预览保持不变。" },
       ]);
     }
-  }, [phase, resetWorkflow]);
+  }, [pendingArtifact, phase, resetWorkflow]);
 
   useEffect(() => {
     const data = htmlGenerationStep?.data;
@@ -571,6 +688,11 @@ export default function PresentationStudio() {
     setAgentProgressMessage(null);
     setActiveArtifact(null);
     setPendingArtifact(null);
+    setLastCancelledArtifact(null);
+    setStylePreviews([]);
+    setSelectedStyle(null);
+    setStyleDiscoveryBrief(null);
+    setIsDiscoveringStyles(false);
     deckIdRef.current = `deck-${makeId()}`;
     publishedArtifactKeyRef.current = null;
   }, [resetWorkflow]);
@@ -692,7 +814,7 @@ export default function PresentationStudio() {
 
   return (
     <PresentationWorkspace
-      previewContent={<PresentationPreviewPane currentStep={previewStep} generatedHtml={generatedHtml} outline={outline} outlineGeneration={outlineStep?.data} htmlGeneration={activeHtmlGenerationStepData} preservePreviewDuringGeneration={Boolean(activeArtifact && pendingArtifact)} />}
+      previewContent={<PresentationPreviewPane currentStep={previewStep} generatedHtml={generatedHtml} outline={outline} outlineGeneration={outlineStep?.data} htmlGeneration={activeHtmlGenerationStepData} preservePreviewDuringGeneration={Boolean(activeArtifact && pendingArtifact)} stylePreviews={stylePreviews} selectedStyleId={selectedStyle?.id} isDiscoveringStyles={isDiscoveringStyles} onSelectStyle={handleSelectStyle} />}
       agentContent={agentContent}
     />
   );

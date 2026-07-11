@@ -159,6 +159,35 @@ describe("analyze request validation", () => {
     }
   });
 
+  it("preserves the selected frontend-slides style contract in generation input", () => {
+    const result = validatePresentationWorkflowRequest({
+      presentationBrief: {
+        topic: "Mastra",
+        audience: "TypeScript developers",
+        pageCount: 8,
+        style: "Terminal Green",
+        density: "reading-first",
+        purpose: "teaching-tutorial",
+        styleSpec: {
+          id: "terminal-green",
+          name: "Terminal Green",
+          source: "frontend-slides-preset",
+          vibe: "developer focused",
+          layout: "terminal",
+          typography: { display: "JetBrains Mono", body: "JetBrains Mono" },
+          palette: { background: "#0d1117", surface: "#161b22", text: "#e6edf3", accent: "#39d353", secondary: "#58a6ff" },
+          signatureElements: ["scan lines", "blinking cursor"],
+        },
+      },
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success && result.action === "start") {
+      expect(result.data.styleSpec?.id).toBe("terminal-green");
+      expect(result.data.density).toBe("reading-first");
+    }
+  });
+
   it("rejects revision versions that do not advance the base version by one", () => {
     const result = validatePresentationWorkflowRequest({
       revisionRequest: {

@@ -9,6 +9,11 @@ export type FrontendSlidesFinalContext = {
   stylePresets?: string;
 };
 
+export type FrontendSlidesDiscoveryContext = {
+  skill: string;
+  stylePresets: string;
+};
+
 function getProjectRoot() {
   let projectRoot = process.cwd();
 
@@ -52,4 +57,13 @@ export async function loadFrontendSlidesFinalContext(): Promise<FrontendSlidesFi
     animationPatterns,
     stylePresets,
   };
+}
+
+export async function loadFrontendSlidesDiscoveryContext(): Promise<FrontendSlidesDiscoveryContext> {
+  const [skill, stylePresets] = await Promise.all([
+    readSkillFile("SKILL.md"),
+    readSkillFile("STYLE_PRESETS.md"),
+  ]);
+
+  return { skill, stylePresets };
 }

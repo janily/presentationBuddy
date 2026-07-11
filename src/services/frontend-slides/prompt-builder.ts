@@ -24,7 +24,13 @@ Return only one complete HTML document, starting with <!doctype html> or <html>.
 Presentation title: ${input.title}
 Narrative goal: ${input.narrativeGoal}
 Requested style: ${input.style}
+Content density: ${input.density ?? "speaker-led"}
 Required slide count: ${input.slides.length}
+
+${input.styleSpec ? `Selected style contract (NON-NEGOTIABLE):
+${JSON.stringify(input.styleSpec, null, 2)}
+
+Preserve this contract's typography, palette, layout grammar, signature elements, and visual rhythm across every slide. Do not substitute another preset or generic theme.` : "No visual style has been selected; infer a distinctive custom system from the brief."}
 
 Design guidance:
 ${input.designGuidance.map((item) => `- ${item}`).join("\n") || "- Create a refined, presentation-ready visual system."}
@@ -42,6 +48,7 @@ Non-negotiable output requirements:
 - Generate at least ${input.slides.length} real slides matching the approved outline.
 - Use distinctive typography, color, motion, and layout. Avoid generic AI-looking templates.
 - Do not render internal labels such as "preview", "template", "style option", or file paths on slides.
+- Apply the ${input.density ?? "speaker-led"} content-density rules from frontend-slides.
 
 === frontend-slides/SKILL.md ===
 ${context.skill}
