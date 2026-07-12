@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, Circle, FileCode2, LayoutTemplate, Loader2, Sparkles } from "lucide-react";
+import { CheckCircle2, Circle, FileCode2, LayoutTemplate, Loader2, RefreshCcw, Sparkles } from "lucide-react";
 import Image from "next/image";
 import HtmlPreview from "./html-preview";
 import type { HtmlGenerationStepData, OutlineStepData } from "@/src/types/presentation-workflow";
@@ -21,14 +21,20 @@ interface PresentationPreviewPaneProps {
   stylePreviews?: FrontendSlidesStylePreview[];
   selectedStyleId?: string;
   isDiscoveringStyles?: boolean;
+  styleBatch?: number;
+  remainingStyleCount?: number;
   onSelectStyle?: (style: FrontendSlidesStyleSpec) => void;
+  onMoreStyles?: () => void;
 }
 
-function StyleDiscovery({ previews, selectedStyleId, isLoading, onSelect }: {
+function StyleDiscovery({ previews, selectedStyleId, isLoading, batch, remaining, onSelect, onMore }: {
   previews: FrontendSlidesStylePreview[];
   selectedStyleId?: string;
   isLoading: boolean;
+  batch: number;
+  remaining: number;
   onSelect?: (style: FrontendSlidesStyleSpec) => void;
+  onMore?: () => void;
 }) {
   return (
     <div className="h-full min-h-[620px] overflow-auto bg-[#f5f2ec] p-6">
@@ -37,6 +43,7 @@ function StyleDiscovery({ previews, selectedStyleId, isLoading, onSelect }: {
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--accent-terracotta)]">Frontend Slides · Style Discovery</p>
           <h2 className="mt-2 text-3xl font-semibold text-[var(--text-primary)]">请选择一个真实视觉方向</h2>
           <p className="mt-2 text-[var(--text-secondary)]">每个选项都是按当前演示主题生成的标题页，而不是抽象风格名称。</p>
+          <p className="mt-2 text-sm text-[var(--text-muted)]">第 {batch} 批{remaining > 0 ? ` · 还有 ${remaining} 种可看` : " · 已展示全部可用方向"}</p>
         </div>
         {isLoading ? (
           <div className="flex min-h-96 items-center justify-center rounded-3xl border border-[var(--border-light)] bg-white">
@@ -62,6 +69,14 @@ function StyleDiscovery({ previews, selectedStyleId, isLoading, onSelect }: {
             })}
           </div>
         )}
+        {!isLoading ? (
+          <div className="mt-6 flex justify-center">
+            <button type="button" onClick={onMore} disabled={remaining === 0} className="inline-flex h-10 items-center gap-2 rounded-lg border border-[var(--border-light)] bg-white px-4 text-sm font-medium text-[var(--text-secondary)] transition hover:border-[var(--accent-terracotta)] hover:text-[var(--accent-terracotta)] disabled:cursor-not-allowed disabled:opacity-45">
+              <RefreshCcw className="h-4 w-4" />
+              {remaining > 0 ? "换一批" : "已展示全部风格"}
+            </button>
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -230,12 +245,12 @@ function GenerationProgress({ htmlGeneration }: { htmlGeneration?: HtmlGeneratio
   );
 }
 
-export default function PresentationPreviewPane({ step, currentStep, html, generatedHtml, outline, outlineGeneration, htmlGeneration, preservePreviewDuringGeneration = false, stylePreviews = [], selectedStyleId, isDiscoveringStyles = false, onSelectStyle }: PresentationPreviewPaneProps) {
+export default function PresentationPreviewPane({ step, currentStep, html, generatedHtml, outline, outlineGeneration, htmlGeneration, preservePreviewDuringGeneration = false, stylePreviews = [], selectedStyleId, isDiscoveringStyles = false, styleBatch = 1, remainingStyleCount = 0, onSelectStyle, onMoreStyles }: PresentationPreviewPaneProps) {
   const activeStep = currentStep ?? step ?? "brief";
   const activeHtml = generatedHtml ?? html ?? "";
 
   if (isDiscoveringStyles || stylePreviews.length > 0) {
-    return <StyleDiscovery previews={stylePreviews} selectedStyleId={selectedStyleId} isLoading={isDiscoveringStyles} onSelect={onSelectStyle} />;
+    return <StyleDiscovery previews={stylePreviews} selectedStyleId={selectedStyleId} isLoading={isDiscoveringStyles} batch={styleBatch} remaining={remainingStyleCount} onSelect={onSelectStyle} onMore={onMoreStyles} />;
   }
 
   if (activeStep === "preview" && activeHtml) {

@@ -10,6 +10,7 @@ import {
   type ModelMessage,
 } from "ai";
 import type { AgentChatUIMessage } from "@/src/types/agent-chat";
+import { applyIntentGuard } from "./intent-routing";
 import { NextResponse } from "next/server";
 import z from "zod";
 
@@ -33,7 +34,8 @@ const agentChatRequestSchema = z.object({
 
 // Keep the request bounded; the agent only needs recent turns to stay coherent.
 const MAX_HISTORY_MESSAGES = 20;
-const AGENT_CHAT_TOTAL_TIMEOUT_MS = 30_000;
+const AGENT_CHAT_TOTAL_TIMEOUT_MS = 90_000;
+const AGENT_CHAT_CLASSIFICATION_TIMEOUT_MS = 20_000;
 const AGENT_CHAT_SLOW_STATUS_MS = 3_000;
 const AGENT_CHAT_VERY_SLOW_STATUS_MS = 8_000;
 
@@ -45,10 +47,13 @@ type AgentChatResultPayload = {
   readyToGenerate: boolean;
   brief: BriefDecision["brief"] | null;
   nextAction: BriefDecision["nextAction"];
+  revision: BriefDecision["revision"];
+  styleId: BriefDecision["styleId"];
 };
 
 type AgentChatStreamEvent =
   | { type: "progress"; message: string }
+  | { type: "reasoning"; delta: string; state: "start" | "delta" | "end" }
   | { type: "assistant-delta"; delta: string }
   | { type: "assistant-snapshot"; text: string }
   | { type: "decision"; payload: AgentChatResultPayload }
@@ -64,8 +69,29 @@ function createRequestDeadline(parentSignal: AbortSignal) {
   const forwardAbort = () => controller.abort(parentSignal.reason);
   const timeout = setTimeout(() => {
     timedOut = true;
-    controller.abort(new Error("Agent chat timed out"));
+    controller.abort();
   }, AGENT_CHAT_TOTAL_TIMEOUT_MS);
+
+  parentSignal.addEventListener("abort", forwardAbort, { once: true });
+
+  return {
+    signal: controller.signal,
+    didTimeOut: () => timedOut,
+    cleanup: () => {
+      clearTimeout(timeout);
+      parentSignal.removeEventListener("abort", forwardAbort);
+    },
+  };
+}
+
+function createChildDeadline(parentSignal: AbortSignal, timeoutMs: number) {
+  const controller = new AbortController();
+  let timedOut = false;
+  const forwardAbort = () => controller.abort(parentSignal.reason);
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
 
   parentSignal.addEventListener("abort", forwardAbort, { once: true });
 
@@ -124,6 +150,13 @@ function createAgentChatStreamResponse(
             writer.write({
               type: "data-agentStatus",
               data: { operationId, message: event.message },
+              transient: true,
+            });
+            break;
+          case "reasoning":
+            writer.write({
+              type: "data-agentReasoning",
+              data: { operationId, delta: event.delta, state: event.state },
               transient: true,
             });
             break;
@@ -187,10 +220,7 @@ function parseJsonObject(text: string) {
 async function generateBriefDecisionStructured(
   conversationAgent: ConversationAgent,
   history: ModelMessage[],
-  emit: (event: AgentChatStreamEvent) => void,
   abortSignal: AbortSignal,
-  requestStartedAt: number,
-  operationId: string,
 ): Promise<BriefDecision | undefined> {
   const stream = await conversationAgent.stream(history, {
     structuredOutput: {
@@ -199,42 +229,49 @@ async function generateBriefDecisionStructured(
     abortSignal,
   });
 
-  let streamedReply = "";
-  let firstDeltaAt: number | null = null;
-
-  const partialReader = (async () => {
-    for await (const partial of stream.objectStream) {
-      const reply = typeof partial?.reply === "string" ? partial.reply : "";
-      if (!reply || reply.length <= streamedReply.length) continue;
-
-      const delta = reply.slice(streamedReply.length);
-      streamedReply = reply;
-
-      if (!firstDeltaAt) {
-        firstDeltaAt = Date.now();
-        console.log("agent_chat.first_model_delta", {
-          operationId,
-          firstDeltaLatencyMs: firstDeltaAt - requestStartedAt,
-        });
-      }
-
-      emit({ type: "assistant-delta", delta });
-    }
-  })();
-
   try {
     const decision = await stream.object as BriefDecision | undefined;
-    await partialReader.catch((error) => {
-      console.warn("agent-chat structured partial stream ended with an error:", {
-        message: error instanceof Error ? error.message : String(error),
-      });
-    });
-
     return decision;
   } catch (error) {
-    await partialReader.catch(() => undefined);
     throw error;
   }
+}
+
+async function streamConversationalReply(
+  conversationAgent: ConversationAgent,
+  history: ModelMessage[],
+  emit: (event: AgentChatStreamEvent) => void,
+  abortSignal: AbortSignal,
+  requestStartedAt: number,
+  operationId: string,
+) {
+  const stream = await conversationAgent.stream(history, { abortSignal });
+  let reply = "";
+  let firstVisibleEventAt: number | null = null;
+
+  for await (const chunk of stream.fullStream) {
+    if (chunk.type === "reasoning-start") {
+      emit({ type: "reasoning", delta: "", state: "start" });
+    } else if (chunk.type === "reasoning-delta" && chunk.payload.text) {
+      if (!firstVisibleEventAt) firstVisibleEventAt = Date.now();
+      emit({ type: "reasoning", delta: chunk.payload.text, state: "delta" });
+    } else if (chunk.type === "reasoning-end") {
+      emit({ type: "reasoning", delta: "", state: "end" });
+    } else if (chunk.type === "text-delta" && chunk.payload.text) {
+      if (!firstVisibleEventAt) firstVisibleEventAt = Date.now();
+      reply += chunk.payload.text;
+      emit({ type: "assistant-delta", delta: chunk.payload.text });
+    }
+  }
+
+  if (firstVisibleEventAt) {
+    console.log("agent_chat.first_model_delta", {
+      operationId,
+      firstDeltaLatencyMs: firstVisibleEventAt - requestStartedAt,
+    });
+  }
+
+  return reply.trim();
 }
 
 async function generateBriefDecisionFallback(
@@ -244,7 +281,6 @@ async function generateBriefDecisionFallback(
   abortSignal: AbortSignal,
   operationId: string,
 ): Promise<BriefDecision> {
-  emit({ type: "assistant-snapshot", text: "" });
   emit({ type: "progress", message: "结构化回复失败，正在重试普通文本解析..." });
   console.warn("agent_chat.fallback_started", { operationId });
 
@@ -258,7 +294,7 @@ The JSON shape must be:
 {
   "reply": "string shown to the user",
   "readyToGenerate": boolean,
-  "nextAction": "chat" | "discover-styles" | "generate",
+  "nextAction": "chat" | "revise-content" | "revise-structure" | "change-palette" | "discover-styles" | "more-styles" | "select-style" | "generate",
   "brief": null | {
     "topic": "string",
     "audience": "string",
@@ -290,28 +326,73 @@ async function generateBriefDecision(
   requestStartedAt: number,
   operationId: string,
 ) {
+  const visibleReply = await streamConversationalReply(
+    conversationAgent,
+    history,
+    emit,
+    abortSignal,
+    requestStartedAt,
+    operationId,
+  );
+  const classificationHistory: ModelMessage[] = [
+    ...history,
+    { role: "assistant", content: visibleReply },
+    {
+      role: "user",
+      content: "Classify the action implied by the latest user request and the assistant reply. Return the brief decision only. Do not continue the conversation.",
+    },
+  ];
+  const classificationDeadline = createChildDeadline(abortSignal, AGENT_CHAT_CLASSIFICATION_TIMEOUT_MS);
+  const chatOnlyDecision = (): BriefDecision => ({
+    reply: visibleReply || "我已经理解你的要求，请继续补充你希望我执行的具体调整。",
+    readyToGenerate: false,
+    nextAction: "chat",
+    revision: null,
+    styleId: null,
+    brief: null,
+  });
+
   try {
     const decision = await generateBriefDecisionStructured(
       conversationAgent,
-      history,
-      emit,
-      abortSignal,
-      requestStartedAt,
-      operationId,
+      classificationHistory,
+      classificationDeadline.signal,
     );
     console.log("agent_chat.structured_completed", {
       operationId,
       durationMs: Date.now() - requestStartedAt,
     });
-    return decision;
+    return decision ? { ...decision, reply: visibleReply || decision.reply } : decision;
   } catch (structuredError) {
     if (abortSignal.aborted) throw structuredError;
+    if (classificationDeadline.didTimeOut()) {
+      console.warn("agent_chat.classification_timed_out", { operationId });
+      return chatOnlyDecision();
+    }
 
     console.warn("Presentation brief structured output failed; retrying with JSON text fallback:", {
       message: structuredError instanceof Error ? structuredError.message : String(structuredError),
     });
 
-    return generateBriefDecisionFallback(conversationAgent, history, emit, abortSignal, operationId);
+    try {
+      const decision = await generateBriefDecisionFallback(
+        conversationAgent,
+        classificationHistory,
+        emit,
+        classificationDeadline.signal,
+        operationId,
+      );
+      return { ...decision, reply: visibleReply || decision.reply };
+    } catch (fallbackError) {
+      if (abortSignal.aborted) throw fallbackError;
+      if (classificationDeadline.didTimeOut()) {
+        console.warn("agent_chat.classification_fallback_timed_out", { operationId });
+        return chatOnlyDecision();
+      }
+      throw fallbackError;
+    }
+  } finally {
+    classificationDeadline.cleanup();
   }
 }
 
@@ -362,7 +443,7 @@ export async function POST(request: Request) {
         durationMs: Date.now() - requestStartedAt,
       });
       console.log("agent_chat.provider_call_started", { operationId });
-      const decision = await generateBriefDecision(
+      const rawDecision = await generateBriefDecision(
         conversationAgent,
         history,
         emit,
@@ -371,29 +452,37 @@ export async function POST(request: Request) {
         operationId,
       );
 
+      const lastUserMessage = getLastUserMessage(messages);
+      const decision = rawDecision
+        ? applyIntentGuard(rawDecision, lastUserMessage, Boolean(hasGeneratedDeck), { explicitlyConfirmedGeneration })
+        : rawDecision;
+
       if (!decision?.reply) {
         throw new Error("Brief agent returned no structured decision");
       }
 
-      const lastUserMessage = getLastUserMessage(messages);
       const shouldBlockGeneration = Boolean(
         decision.readyToGenerate
         && decision.brief
         && !explicitlyConfirmedGeneration(lastUserMessage),
       );
 
-      const shouldDiscoverStyle = Boolean(
-        decision.readyToGenerate
+      const shouldDiscoverStyle = decision.nextAction === "discover-styles" || decision.nextAction === "more-styles";
+      const shouldRequireInitialStyle = Boolean(
+        !hasGeneratedDeck
+        && decision.readyToGenerate
         && decision.brief
         && !hasSelectedStyle,
       );
 
-      const payload: AgentChatResultPayload = shouldDiscoverStyle
+      const payload: AgentChatResultPayload = shouldRequireInitialStyle
         ? {
-          reply: "内容方向已经确认。生成前先按 frontend-slides 为你准备三个真实标题页预览，请从中选择整套演示文稿的视觉系统。",
+          reply: "内容方向已经确认。生成前先按 frontend-slides 为你准备一组真实标题页预览，请从中选择整套演示文稿的视觉系统。",
           readyToGenerate: false,
           brief: decision.brief,
           nextAction: "discover-styles",
+          revision: null,
+          styleId: null,
         }
         : shouldBlockGeneration
         ? {
@@ -403,12 +492,16 @@ export async function POST(request: Request) {
           readyToGenerate: false,
           brief: null,
           nextAction: "chat",
+          revision: null,
+          styleId: null,
         }
         : {
           reply: decision.reply,
           readyToGenerate: decision.readyToGenerate && Boolean(decision.brief),
           brief: decision.brief,
           nextAction: decision.nextAction,
+          revision: decision.revision,
+          styleId: decision.styleId,
         };
 
       emit({ type: "assistant-snapshot", text: payload.reply });
@@ -420,7 +513,7 @@ export async function POST(request: Request) {
         readyToGenerate: payload.readyToGenerate,
         hasBrief: Boolean(payload.brief),
         blockedForConfirmation: shouldBlockGeneration,
-        routedToStyleDiscovery: shouldDiscoverStyle,
+        routedToStyleDiscovery: shouldDiscoverStyle || shouldRequireInitialStyle,
       });
     } catch (error) {
       if (request.signal.aborted) {
@@ -454,4 +547,3 @@ export async function POST(request: Request) {
     }
   });
 }
-

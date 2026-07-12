@@ -15,7 +15,7 @@ import { getQuickActionDefinition, type AgentQuickActionChoice, type AgentQuickC
 import { appendCompletionMessage } from "./agent-message-model";
 import { dispatchAgentChatUIChunk, type AgentChatStreamCallbacks } from "./agent-chat-ui-stream";
 import { requestsCancelledGenerationRetry } from "./cancelled-generation-retry";
-import { discoverFrontendSlideStyles, type FrontendSlidesStylePreview, type FrontendSlidesStyleSpec } from "@/src/services/frontend-slides/style-catalog";
+import { discoverFrontendSlideStyles, listFrontendSlideStyles, type FrontendSlidesStylePreview, type FrontendSlidesStyleSpec } from "@/src/services/frontend-slides/style-catalog";
 import { isStructureChangingRevision } from "./revision-routing";
 import type { AgentChatResponse, AgentChatUIChunk, AgentChatUIMessage } from "@/src/types/agent-chat";
 import PresentationPreviewPane from "./presentation-preview-pane";
@@ -132,6 +132,9 @@ export default function PresentationStudio() {
   const [selectedStyle, setSelectedStyle] = useState<FrontendSlidesStyleSpec | null>(null);
   const [styleDiscoveryBrief, setStyleDiscoveryBrief] = useState<AgentBriefData | null>(null);
   const [isDiscoveringStyles, setIsDiscoveringStyles] = useState(false);
+  const [shownStyleIds, setShownStyleIds] = useState<string[]>([]);
+  const [styleBatch, setStyleBatch] = useState(0);
+  const [remainingStyleCount, setRemainingStyleCount] = useState(0);
   const agentChatAbortRef = useRef<AbortController | null>(null);
   const deckIdRef = useRef(`deck-${makeId()}`);
   const publishedArtifactKeyRef = useRef<string | null>(null);
@@ -169,7 +172,7 @@ export default function PresentationStudio() {
         phase: "structure",
         message: "正在启动版本修改…",
         progress: 5,
-        lastUpdatedAt: Date.now(),
+        lastUpdatedAt: 0,
         artifact: {
           operationId: pendingArtifact.operation.operationId,
           deckId: pendingArtifact.operation.deckId,
@@ -393,17 +396,31 @@ export default function PresentationStudio() {
     }
   }, []);
 
-  const discoverStyles = useCallback((agentBrief: AgentBriefData) => {
+  const discoverStyles = useCallback((agentBrief: AgentBriefData, mode: "initial" | "more" = "initial") => {
     setStyleDiscoveryBrief(agentBrief);
     setSelectedStyle(null);
     setIsDiscoveringStyles(false);
-    setStylePreviews(discoverFrontendSlideStyles({
+    const excludedIds = mode === "more" ? shownStyleIds : [];
+    const previews = discoverFrontendSlideStyles({
       topic: agentBrief.topic,
       audience: agentBrief.audience,
       purpose: agentBrief.purpose ?? "teaching-tutorial",
       density: agentBrief.density ?? "speaker-led",
-    }));
-  }, []);
+    }, undefined, { excludeIds: excludedIds });
+    const nextShownIds = mode === "more"
+      ? [...new Set([...shownStyleIds, ...previews.map((preview) => preview.style.id)])]
+      : previews.map((preview) => preview.style.id);
+
+    setStylePreviews(previews);
+    setShownStyleIds(nextShownIds);
+    setStyleBatch(mode === "more" ? (current) => current + 1 : 1);
+    setRemainingStyleCount(Math.max(0, listFrontendSlideStyles().length - nextShownIds.length));
+  }, [shownStyleIds]);
+
+  const discoverMoreStyles = useCallback(() => {
+    if (!styleDiscoveryBrief || remainingStyleCount === 0) return;
+    discoverStyles(styleDiscoveryBrief, "more");
+  }, [discoverStyles, remainingStyleCount, styleDiscoveryBrief]);
 
   const handleSelectStyle = useCallback((style: FrontendSlidesStyleSpec) => {
     setSelectedStyle(style);
@@ -520,7 +537,7 @@ export default function PresentationStudio() {
     setHtmlWatchdogError(null);
     setChatMessages([
       ...history,
-      { id: assistantMessageId, role: "assistant", kind: "text", content: "", isStreaming: true },
+      { id: assistantMessageId, role: "assistant", kind: "text", content: "", streamState: "connecting", isStreaming: true },
     ]);
     setIsAgentReplying(true);
     setAgentProgressMessage("正在理解你的要求…");
@@ -534,7 +551,7 @@ export default function PresentationStudio() {
     const updateAssistantMessage = (contentUpdater: (content: string) => string, isStreaming = true) => {
       setChatMessages((current) => current.map((item) => (
         item.id === assistantMessageId && item.role === "assistant" && (item.kind === undefined || item.kind === "text")
-          ? { ...item, content: contentUpdater(item.content), isStreaming }
+          ? { ...item, content: contentUpdater(item.content), streamState: isStreaming ? "answering" : "done", isStreaming }
           : item
       )));
     };
@@ -546,6 +563,17 @@ export default function PresentationStudio() {
         onAssistantDelta: (delta) => {
           setAgentProgressMessage(null);
           updateAssistantMessage((content) => `${content}${delta}`);
+        },
+        onReasoningDelta: (delta, state) => {
+          setChatMessages((current) => current.map((item) => (
+            item.id === assistantMessageId && item.role === "assistant" && (item.kind === undefined || item.kind === "text")
+              ? {
+                  ...item,
+                  reasoningSummary: state === "start" ? "" : `${item.reasoningSummary ?? ""}${delta}`,
+                  streamState: state === "end" ? (item.content ? "answering" : "finalizing") : "reasoning",
+                }
+              : item
+          )));
         },
         onAssistantSnapshot: (text) => {
           if (text) setAgentProgressMessage(null);
@@ -560,6 +588,9 @@ export default function PresentationStudio() {
         startGenerationFromBrief(data.brief, message);
       } else if (data.nextAction === "discover-styles" && data.brief) {
         await discoverStyles(data.brief);
+      } else if (data.nextAction === "more-styles") {
+        const discoveryBrief = data.brief ?? styleDiscoveryBrief;
+        if (discoveryBrief) discoverStyles(discoveryBrief, "more");
       }
     } catch (error) {
       if (abortController.signal.aborted) return;
@@ -578,7 +609,7 @@ export default function PresentationStudio() {
         setAgentProgressMessage(null);
       }
     }
-  }, [chatMessages, discoverStyles, generatedHtml, lastCancelledArtifact, phase, sendAgentRequest, sendRevision, sendToAgentChat, startGenerationFromBrief]);
+  }, [chatMessages, discoverStyles, generatedHtml, lastCancelledArtifact, phase, sendAgentRequest, sendRevision, sendToAgentChat, startGenerationFromBrief, styleDiscoveryBrief]);
 
   const handleQuickAction = useCallback((command: AgentQuickCommand) => {
     if (phase === "generating" || isAgentReplying) return;
@@ -767,8 +798,12 @@ export default function PresentationStudio() {
     if (phase !== "previewing" || !queuedGenerationMessage) return;
 
     const message = queuedGenerationMessage;
-    setQueuedGenerationMessage(null);
-    void handleAgentSend(message, { force: true });
+    const timeout = window.setTimeout(() => {
+      setQueuedGenerationMessage(null);
+      void handleAgentSend(message, { force: true });
+    }, 0);
+
+    return () => window.clearTimeout(timeout);
   }, [handleAgentSend, phase, queuedGenerationMessage]);
 
   const systemMessages = useMemo<AgentMessage[]>(() => {
@@ -828,7 +863,7 @@ export default function PresentationStudio() {
 
   return (
     <PresentationWorkspace
-      previewContent={<PresentationPreviewPane currentStep={previewStep} generatedHtml={generatedHtml} outline={outline} outlineGeneration={outlineStep?.data} htmlGeneration={activeHtmlGenerationStepData} preservePreviewDuringGeneration={Boolean(activeArtifact && pendingArtifact)} stylePreviews={stylePreviews} selectedStyleId={selectedStyle?.id} isDiscoveringStyles={isDiscoveringStyles} onSelectStyle={handleSelectStyle} />}
+      previewContent={<PresentationPreviewPane currentStep={previewStep} generatedHtml={generatedHtml} outline={outline} outlineGeneration={outlineStep?.data} htmlGeneration={activeHtmlGenerationStepData} preservePreviewDuringGeneration={Boolean(activeArtifact && pendingArtifact)} stylePreviews={stylePreviews} selectedStyleId={selectedStyle?.id} isDiscoveringStyles={isDiscoveringStyles} styleBatch={styleBatch} remainingStyleCount={remainingStyleCount} onSelectStyle={handleSelectStyle} onMoreStyles={discoverMoreStyles} />}
       agentContent={agentContent}
     />
   );

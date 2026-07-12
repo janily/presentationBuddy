@@ -8,6 +8,11 @@ export type FrontendSlidesDiscoveryInput = {
   density: FrontendSlidesDensity;
 };
 
+export type FrontendSlidesDiscoveryOptions = {
+  limit?: number;
+  excludeIds?: string[];
+};
+
 const styles: FrontendSlidesStyleSpec[] = [
   { id: "bold-signal", name: "Bold Signal", source: "frontend-slides-preset", vibe: "自信、现代、高冲击力", layout: "深色渐变舞台上的高饱和焦点卡片", typography: { display: "Archivo Black", body: "Space Grotesk" }, palette: { background: "#1a1a1a", surface: "#2d2d2d", text: "#ffffff", accent: "#ff5722", secondary: "#ffd166" }, signatureElements: ["bold colored card", "large section numbers", "navigation breadcrumbs"] },
   { id: "electric-studio", name: "Electric Studio", source: "frontend-slides-preset", vibe: "大胆、干净、专业、高对比", layout: "白色与电光蓝上下分屏", typography: { display: "Manrope", body: "Manrope" }, palette: { background: "#ffffff", surface: "#4361ee", text: "#0a0a0a", accent: "#4361ee", secondary: "#ffffff" }, signatureElements: ["two-panel split", "accent edge bar", "hero quote typography"] },
@@ -49,7 +54,15 @@ export function getFrontendSlideStyle(id: string) {
   return styles.find((style) => style.id === id);
 }
 
-export function discoverFrontendSlideStyles(input: FrontendSlidesDiscoveryInput, catalogSource?: string): FrontendSlidesStylePreview[] {
+export function listFrontendSlideStyles() {
+  return [...styles];
+}
+
+export function discoverFrontendSlideStyles(
+  input: FrontendSlidesDiscoveryInput,
+  catalogSource?: string,
+  options: FrontendSlidesDiscoveryOptions = {},
+): FrontendSlidesStylePreview[] {
   const technical = /developer|typescript|javascript|agent|framework|api|开发|技术|框架|代码/i.test(`${input.topic} ${input.audience}`);
   const preferredIds = technical
     ? ["terminal-green", "swiss-modern", "circuit-blueprint"]
@@ -59,7 +72,13 @@ export function discoverFrontendSlideStyles(input: FrontendSlidesDiscoveryInput,
         ? ["creative-voltage", "vintage-editorial", "circuit-blueprint"]
         : ["notebook-tabs", "paper-ink", "circuit-blueprint"];
 
-  return preferredIds.map((id) => {
+  const excludeIds = new Set(options.excludeIds ?? []);
+  const rankedIds = [...preferredIds, ...styles.map((style) => style.id)]
+    .filter((id, index, all) => all.indexOf(id) === index)
+    .filter((id) => !excludeIds.has(id))
+    .slice(0, options.limit ?? 3);
+
+  return rankedIds.map((id) => {
     const style = getFrontendSlideStyle(id)!;
     if (style.source === "frontend-slides-preset" && catalogSource) {
       const requiredTokens = [style.name, style.typography.display, style.typography.body];

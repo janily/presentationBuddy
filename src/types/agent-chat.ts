@@ -11,11 +11,29 @@ export type AgentBriefData = {
   contentReadiness?: "ready" | "rough-notes" | "topic-only";
 };
 
+export type AgentChatAction =
+  | "chat"
+  | "revise-content"
+  | "revise-structure"
+  | "change-palette"
+  | "discover-styles"
+  | "more-styles"
+  | "select-style"
+  | "generate";
+
+export type AgentRevisionData = {
+  instruction: string;
+  targetSlides?: number[];
+  requiresOutlineReview: boolean;
+};
+
 export type AgentChatResponse = {
   reply?: string;
   readyToGenerate?: boolean;
   brief?: AgentBriefData | null;
-  nextAction?: "chat" | "discover-styles" | "generate";
+  nextAction?: AgentChatAction;
+  revision?: AgentRevisionData | null;
+  styleId?: string | null;
   error?: string;
 };
 
@@ -27,6 +45,11 @@ export type AgentChatDataParts = {
   assistantSnapshot: {
     operationId: string;
     text: string;
+  };
+  agentReasoning: {
+    operationId: string;
+    delta: string;
+    state: "start" | "delta" | "end";
   };
   agentDecision: {
     operationId: string;

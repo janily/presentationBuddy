@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, FileText, RefreshCcw, RotateCcw, Send, Sparkles, Square } from "lucide-react";
+import { AlertTriangle, Brain, FileText, RefreshCcw, RotateCcw, Send, Sparkles, Square } from "lucide-react";
 import type { StudioErrorSource, StudioPhase } from "./use-studio-phase";
 import type { AgentMessage } from "./agent-message-model";
 import type { AgentQuickActionChoice, AgentQuickCommand } from "./agent-quick-actions";
@@ -384,6 +384,15 @@ export default function AgentPanel({
             return (
               <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
                 <div className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-6 ${message.role === "user" ? "bg-[var(--accent-terracotta)] text-white" : "border border-[var(--border-light)] bg-[var(--bg-card)] text-[var(--text-secondary)]"}`}>
+                  {message.role === "assistant" && message.reasoningSummary ? (
+                    <details className="mb-3 whitespace-normal rounded-lg border border-[var(--border-light)] bg-[var(--bg-secondary)] px-3 py-2">
+                      <summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-medium text-[var(--text-muted)]">
+                        <Brain className="h-3.5 w-3.5" />
+                        思考摘要
+                      </summary>
+                      <p className="mt-2 whitespace-pre-wrap text-xs leading-5 text-[var(--text-muted)]">{message.reasoningSummary}</p>
+                    </details>
+                  ) : null}
                   {hasVisibleContent ? message.content : null}
                   {isStreamingText && !hasVisibleContent ? (
                     <div className="flex items-center gap-2">

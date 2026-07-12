@@ -10,9 +10,24 @@ export const briefDecisionSchema = z.object({
     .boolean()
     .describe("True only when enough information has been gathered and generation should start now."),
   nextAction: z
-    .enum(["chat", "discover-styles", "generate"])
+    .enum([
+      "chat",
+      "revise-content",
+      "revise-structure",
+      "change-palette",
+      "discover-styles",
+      "more-styles",
+      "select-style",
+      "generate",
+    ])
     .default("chat")
-    .describe("Use discover-styles for visual exploration and generate only after explicit confirmation."),
+    .describe("The single action that directly matches the user's latest request."),
+  revision: z.object({
+    instruction: z.string(),
+    targetSlides: z.array(z.number().int().positive()).optional(),
+    requiresOutlineReview: z.boolean().default(false),
+  }).nullable().default(null),
+  styleId: z.string().nullable().default(null),
   brief: z
     .object({
       topic: z.string().describe("The presentation topic, phrased as a clear deck subject."),
@@ -55,7 +70,10 @@ Decision policy for a new deck:
 
 Decision policy for revising an already generated deck:
 - A revision request is a conversation first, not an automatic generation trigger.
-- For vague revision requests such as "换一种风格", "换个配色", "再高级一点", "更常见一点", or "不喜欢这个", set readyToGenerate to false and brief to null. Acknowledge the intent and offer 2-3 concrete directions for the user to choose from.
+- Classify the latest request before answering. Content enrichment or rewriting is revise-content; adding/removing/reordering slides is revise-structure; palette-only changes are change-palette; visual-system requests are discover-styles; requests for another batch are more-styles.
+- Never route content enrichment, detail, examples, or explanation requests to style discovery. Preserve the current style and page count unless the user explicitly asks to change them.
+- For revise-content or revise-structure, populate revision with a concrete instruction grounded in the current outline. Set requiresOutlineReview true only when slide count, order, or section structure changes.
+- For vague visual requests such as "换一种风格", "再高级一点", "更常见一点", or "不喜欢这个", use discover-styles. Use change-palette only when the request is specifically about colors.
 - For specific but unconfirmed revision requests such as "换成现代偏严肃风格", set readyToGenerate to false and brief to null. Restate the direction you understood and ask the user to confirm before generation.
 - Only set readyToGenerate to true for a revision when the latest user message explicitly confirms generation or selects a proposed option, for example "用第一个", "就按这个", "确认生成", "开始生成".
 
@@ -71,9 +89,9 @@ When readyToGenerate is false:
 
 Frontend-slides style discovery policy:
 - frontend-slides is the presentation design authority. Never invent an abstract list of visual styles.
-- If the user asks which styles are available, asks for other styles, or wants to change visual style, set nextAction to "discover-styles" and readyToGenerate to false.
+- If the user starts visual exploration or wants to change visual style, set nextAction to "discover-styles". If previews are already visible and the user asks for more/other options, set nextAction to "more-styles".
 - For discover-styles, populate brief with the best-known topic, audience, pageCount, style, requirements, purpose, and density.
-- Reply only that three visual frontend-slides previews are being prepared. Do not describe textual style options.
+- Say that visual frontend-slides previews are being prepared. Do not hard-code the total number of available styles.
 - After the user selects a rendered preview, preserve its exact style name and ask for confirmation before generation.
 
 Style rules:

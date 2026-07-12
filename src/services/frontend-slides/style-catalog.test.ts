@@ -27,4 +27,20 @@ describe("frontend-slides style catalog", () => {
       signatureElements: expect.arrayContaining(["visible grid"]),
     });
   });
+
+  it("returns a non-repeating next batch when previous styles are excluded", () => {
+    const input = {
+      topic: "Mastra agent framework",
+      audience: "TypeScript developers",
+      purpose: "teaching-tutorial" as const,
+      density: "reading-first" as const,
+    };
+    const first = discoverFrontendSlideStyles(input);
+    const second = discoverFrontendSlideStyles(input, undefined, {
+      excludeIds: first.map((item) => item.style.id),
+    });
+
+    expect(second).toHaveLength(3);
+    expect(second.every((item) => !first.some((previous) => previous.style.id === item.style.id))).toBe(true);
+  });
 });

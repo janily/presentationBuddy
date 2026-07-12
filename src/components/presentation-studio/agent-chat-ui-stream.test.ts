@@ -7,11 +7,13 @@ function createCallbacks() {
     progress: [] as string[],
     text: "",
     decision: null as AgentChatResponse | null,
+    reasoning: "",
   };
   const callbacks: AgentChatStreamCallbacks = {
     signal: new AbortController().signal,
     onProgress: (message) => state.progress.push(message),
     onAssistantDelta: (delta) => { state.text += delta; },
+    onReasoningDelta: (delta) => { state.reasoning += delta; },
     onAssistantSnapshot: (text) => { state.text = text; },
     onDecision: (payload) => { state.decision = payload; },
   };
@@ -25,6 +27,7 @@ describe("agent chat UI stream", () => {
     const decision = { reply: "完成", readyToGenerate: false, brief: null };
     const chunks: AgentChatUIChunk[] = [
       { type: "data-agentStatus", data: { operationId: "op-1", message: "正在理解" } },
+      { type: "data-agentReasoning", data: { operationId: "op-1", delta: "检查上下文", state: "delta" }, transient: true },
       { type: "text-start", id: "text-1" },
       { type: "text-delta", id: "text-1", delta: "正在" },
       { type: "data-assistantSnapshot", data: { operationId: "op-1", text: "完成" } },
@@ -39,6 +42,7 @@ describe("agent chat UI stream", () => {
 
     expect(state.progress).toEqual(["正在理解"]);
     expect(state.text).toBe("完成");
+    expect(state.reasoning).toBe("检查上下文");
     expect(state.decision).toEqual(decision);
     expect(result).toEqual(decision);
   });
