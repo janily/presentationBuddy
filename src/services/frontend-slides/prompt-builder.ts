@@ -32,6 +32,11 @@ ${JSON.stringify(input.styleSpec, null, 2)}
 
 Preserve this contract's typography, palette, layout grammar, signature elements, and visual rhythm across every slide. Do not substitute another preset or generic theme.` : "No visual style has been selected; infer a distinctive custom system from the brief."}
 
+${input.revisionInstruction ? `Confirmed revision (NON-NEGOTIABLE):
+${input.revisionInstruction}
+${input.revisionTargetSlides?.length ? `Apply it specifically to slide(s): ${input.revisionTargetSlides.join(", ")}.` : "Apply it to the relevant slides only."}
+Preserve the approved outline and every unaffected slide. Do not reinterpret this content revision as a request to change the visual style.` : ""}
+
 Design guidance:
 ${input.designGuidance.map((item) => `- ${item}`).join("\n") || "- Create a refined, presentation-ready visual system."}
 

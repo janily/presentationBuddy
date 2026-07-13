@@ -19,6 +19,7 @@ export type AgentChatAction =
   | "discover-styles"
   | "more-styles"
   | "select-style"
+  | "execute-proposal"
   | "generate";
 
 export type AgentRevisionData = {
@@ -38,6 +39,7 @@ export type AgentActionProposal = {
   userFacingSummary: string;
   status: "pending" | "executing" | "consumed" | "cancelled" | "superseded";
   createdAt: string;
+  executionStartedAt?: string;
 };
 
 export type AgentChatResponse = {

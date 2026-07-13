@@ -6,6 +6,7 @@ export const artifactOperationSchema = z.object({
   deckId: z.string().trim().min(1, "Deck ID is required"),
   baseVersion: z.number().int().min(0),
   targetVersion: z.number().int().positive(),
+  proposalId: z.string().trim().min(1).optional(),
 }).superRefine((artifact, context) => {
   if (artifact.targetVersion !== artifact.baseVersion + 1) {
     context.addIssue({
@@ -14,24 +15,6 @@ export const artifactOperationSchema = z.object({
       message: "Target version must advance the base version by one",
     });
   }
-});
-
-export const presentationInputSchema = z.object({
-  topic: z.string().trim().min(1, "Topic is required"),
-  audience: z.string().optional(),
-  pageCount: z
-    .number()
-    .int("Page count must be a whole number")
-    .min(3, "Page count must be at least 3")
-    .max(12, "Page count must be at most 12")
-    .optional(),
-  style: z.string().optional(),
-  requirements: z.string().optional(),
-  purpose: z.enum(["pitch-deck", "teaching-tutorial", "conference-talk", "internal-presentation"]).optional(),
-  density: z.enum(["speaker-led", "reading-first"]).optional(),
-  contentReadiness: z.enum(["ready", "rough-notes", "topic-only"]).optional(),
-  styleSpec: frontendSlidesStyleSpecSchema.optional(),
-  artifact: artifactOperationSchema.optional(),
 });
 
 export const slideOutlineSchema = z.object({
@@ -58,6 +41,31 @@ export const revisionSpecSchema = z.object({
   palette: z.array(z.string().trim().min(1)).min(1).optional(),
   styleSpec: frontendSlidesStyleSpecSchema.optional(),
   requiresOutlineReview: z.boolean(),
+});
+
+export const presentationInputSchema = z.object({
+  topic: z.string().trim().min(1, "Topic is required"),
+  audience: z.string().optional(),
+  pageCount: z
+    .number()
+    .int("Page count must be a whole number")
+    .min(3, "Page count must be at least 3")
+    .max(12, "Page count must be at most 12")
+    .optional(),
+  style: z.string().optional(),
+  requirements: z.string().optional(),
+  purpose: z.enum(["pitch-deck", "teaching-tutorial", "conference-talk", "internal-presentation"]).optional(),
+  density: z.enum(["speaker-led", "reading-first"]).optional(),
+  contentReadiness: z.enum(["ready", "rough-notes", "topic-only"]).optional(),
+  styleSpec: frontendSlidesStyleSpecSchema.optional(),
+  artifact: artifactOperationSchema.optional(),
+  autoApproveOutline: z.boolean().optional(),
+  revision: revisionSpecSchema.optional(),
+  outlineRevisionContext: z.object({
+    instruction: z.string().trim().min(1),
+    targetSlides: z.array(z.number().int().positive()).optional(),
+    currentOutline: presentationOutlineSchema,
+  }).optional(),
 });
 
 export const presentationRevisionRequestSchema = z.object({

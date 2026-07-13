@@ -18,6 +18,7 @@ export const briefDecisionSchema = z.object({
       "discover-styles",
       "more-styles",
       "select-style",
+      "execute-proposal",
       "generate",
     ])
     .default("chat")

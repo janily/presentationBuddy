@@ -459,6 +459,15 @@ export default function AgentPanel({
                   {message.role === "assistant" && message.streamState === "cancelled" ? (
                     <span className="mt-2 block text-xs text-[var(--text-muted)]">已停止</span>
                   ) : null}
+                  {message.role === "assistant" && message.streamState === "error" && message.retryPrompt ? (
+                    <button
+                      type="button"
+                      onClick={() => onSend(message.retryPrompt!)}
+                      className="mt-3 block rounded-lg border border-[var(--border-light)] bg-white px-3 py-1.5 text-xs font-semibold text-[var(--accent-terracotta)] transition hover:border-[var(--accent-terracotta)]"
+                    >
+                      重试
+                    </button>
+                  ) : null}
                 </div>
               </div>
             );

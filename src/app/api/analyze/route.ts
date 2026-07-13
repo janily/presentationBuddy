@@ -6,6 +6,8 @@ import { NextResponse } from "next/server";
 import z from "zod";
 import { formatValidationErrors, validatePresentationWorkflowRequest } from "./request-validation";
 import { getPresentationArtifact } from "@/src/services/presentation-artifacts/artifact-store";
+import { buildRevisionWorkflowPlan } from "./revision-workflow-plan";
+import { getAgentProposal } from "@/src/services/agent-proposals/proposal-store";
 
 export const maxDuration = 300;
 
@@ -103,11 +105,18 @@ export async function POST(request: NextRequest) {
     }
 
     if (validation.action === "revise") {
-      const { presentationBrief, approvedOutline, revision, artifact } = validation.data;
+      const { revision, artifact } = validation.data;
       const currentArtifact = getPresentationArtifact(artifact.deckId);
       const currentVersion = currentArtifact?.version ?? 0;
 
       if (currentVersion !== artifact.baseVersion) {
+        console.warn("presentation_revision.artifact_version_conflict", {
+          operationId: artifact.operationId,
+          proposalId: artifact.proposalId ?? null,
+          deckId: artifact.deckId,
+          expectedVersion: currentVersion,
+          receivedVersion: artifact.baseVersion,
+        });
         return NextResponse.json({
           error: "The presentation changed before this revision started. Refresh the current version and try again.",
           code: "artifact_version_conflict",
@@ -115,30 +124,23 @@ export async function POST(request: NextRequest) {
         }, { status: 409 });
       }
 
-      const workflow = mastra.getWorkflow("presentationRevisionWorkflow");
+      const plan = buildRevisionWorkflowPlan(validation.data);
+      const workflow = plan.workflowKind === "outline-revision"
+        ? mastra.getWorkflow("presentationOutlineRevisionWorkflow")
+        : mastra.getWorkflow("presentationRevisionWorkflow");
       const run = await workflow.createRunAsync();
-      const revisedStyle = [
-        revision.style ?? presentationBrief.style,
-        revision.palette?.length ? `Palette: ${revision.palette.join(", ")}` : null,
-        revision.instruction,
-      ].filter(Boolean).join(". ");
-      const stream = run.stream({
-        inputData: {
-          ...presentationBrief,
-          style: revisedStyle,
-          requirements: [
-            presentationBrief.requirements,
-            `Revision request (${revision.kind}): ${revision.instruction}`,
-          ].filter(Boolean).join("\n\n"),
-          outline: approvedOutline,
-          revision,
-          artifact,
-        },
-      });
+      const stream = run.stream({ inputData: plan.inputData } as never);
 
       request.signal.addEventListener("abort", () => {
         void run.cancel();
       }, { once: true });
+
+      const proposalExecutionStartedAt = artifact.proposalId
+        ? getAgentProposal(artifact.proposalId)?.executionStartedAt
+        : undefined;
+      const proposalConfirmToWorkflowStartMs = proposalExecutionStartedAt
+        ? Date.now() - Date.parse(proposalExecutionStartedAt)
+        : null;
 
       console.log("Presentation revision workflow started", {
         operationId: artifact.operationId,
@@ -147,6 +149,8 @@ export async function POST(request: NextRequest) {
         baseVersion: artifact.baseVersion,
         targetVersion: artifact.targetVersion,
         revisionKind: revision.kind,
+        workflowKind: plan.workflowKind,
+        proposalConfirmToWorkflowStartMs,
       });
 
       return createUIMessageStreamResponse({
@@ -156,7 +160,7 @@ export async function POST(request: NextRequest) {
               type: "data-workflowRunId",
               data: run.runId,
             });
-            writer.merge(toAISdkFormat(stream, { from: "workflow" }));
+            writer.merge(toAISdkFormat(stream as never, { from: "workflow" }));
           },
           onError: streamErrorMessage,
         }),

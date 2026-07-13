@@ -10,8 +10,10 @@ import { loadFrontendSlidesFinalContext } from "@/src/services/frontend-slides/s
 import { buildFrontendSlidesMastraPrompt } from "@/src/services/frontend-slides/prompt-builder";
 import { saveHtmlToFile } from "@/src/utils/save-html-to-file";
 import { savePresentationArtifact } from "@/src/services/presentation-artifacts/artifact-store";
+import { markProposalConsumed } from "@/src/services/agent-proposals/proposal-store";
 import { mapOutlineToFrontendSlides } from "@/src/utils/outline-to-slides-mapper";
 import { presentationInputSchema, presentationOutlineSchema } from "./presentation-generation-schemas";
+import { validateOutlineRevisionResult } from "./outline-revision-validation";
 
 // Progress chunks are best-effort telemetry: if the underlying stream was already
 // closed/canceled (e.g. the client aborted the request), writer.write() throws
@@ -274,7 +276,43 @@ function assertOutlineHasSlides(
   }
 }
 
+function validateGeneratedOutline(
+  outline: z.infer<typeof presentationOutlineSchema>,
+  inputData: z.infer<typeof presentationInputSchema>,
+) {
+  assertOutlineHasSlides(outline, inputData.pageCount);
+  if (!inputData.outlineRevisionContext) return;
+
+  validateOutlineRevisionResult({
+    currentOutline: inputData.outlineRevisionContext.currentOutline,
+    revisedOutline: outline,
+    expectedSlideCount: inputData.pageCount ?? inputData.outlineRevisionContext.currentOutline.slides.length,
+    targetSlides: inputData.outlineRevisionContext.targetSlides,
+  });
+}
+
 function buildOutlinePrompt(inputData: z.infer<typeof presentationInputSchema>) {
+  if (inputData.outlineRevisionContext) {
+    return `Revise the current approved presentation outline according to the confirmed instruction.
+Preserve every unaffected slide, the narrative intent, and the existing visual direction.
+Return a complete replacement outline with exactly ${inputData.pageCount ?? 6} slides.
+
+Confirmed revision instruction:
+${inputData.outlineRevisionContext.instruction}
+
+Current approved outline:
+${JSON.stringify(inputData.outlineRevisionContext.currentOutline, null, 2)}
+
+Presentation brief:
+${JSON.stringify({
+      topic: inputData.topic,
+      audience: inputData.audience,
+      pageCount: inputData.pageCount,
+      style: inputData.style,
+      requirements: inputData.requirements,
+    }, null, 2)}`;
+  }
+
   return `Create a reviewable presentation outline for this request:
 ${JSON.stringify(inputData, null, 2)}`;
 }
@@ -459,7 +497,7 @@ export const presentationOutlineSuggestionStep = createStep({
           `Outline generation did not finish after the stream closed within ${Math.round(OUTLINE_STREAM_IDLE_TIMEOUT_MS / 1000)} seconds`,
         ),
       ]);
-      assertOutlineHasSlides(outline, inputData.pageCount);
+      validateGeneratedOutline(outline, inputData);
     } catch (error) {
       stopOutlineHeartbeat();
       console.warn("Presentation outline structured stream failed; retrying with JSON text fallback:", {
@@ -489,7 +527,7 @@ export const presentationOutlineSuggestionStep = createStep({
       );
       const fallbackText = typeof fallbackResult.text === "string" ? fallbackResult.text : "";
       outline = presentationOutlineSchema.parse(parseJsonObject(fallbackText));
-      assertOutlineHasSlides(outline, inputData.pageCount);
+      validateGeneratedOutline(outline, inputData);
     } finally {
       stopOutlineHeartbeat();
     }
@@ -508,6 +546,13 @@ export const presentationOutlineSuggestionStep = createStep({
       progress: 100,
       outline,
     });
+
+    if (inputData.autoApproveOutline) {
+      return {
+        ...inputData,
+        outline,
+      };
+    }
 
     await suspend({
       reason: "Awaiting user approval or edits for the presentation outline.",
@@ -580,6 +625,8 @@ export const presentationHtmlGenerationStep = createStep({
     const frontendSlidesInput = mapOutlineToFrontendSlides(inputData.outline, inputData.style, {
       density: inputData.density,
       styleSpec: inputData.styleSpec,
+      revisionInstruction: inputData.revision?.instruction ?? inputData.outlineRevisionContext?.instruction,
+      revisionTargetSlides: inputData.revision?.targetSlides ?? inputData.outlineRevisionContext?.targetSlides,
     });
 
     writeHtmlProgress({
@@ -844,6 +891,8 @@ export const presentationHtmlGenerationStep = createStep({
       htmlUrl,
     });
 
+    abortSignal?.throwIfAborted();
+
     if (inputData.artifact) {
       savePresentationArtifact({
         operation: inputData.artifact,
@@ -853,11 +902,18 @@ export const presentationHtmlGenerationStep = createStep({
           pageCount: inputData.pageCount ?? inputData.outline.slides.length,
           style: inputData.style ?? "Polished modern presentation",
           requirements: inputData.requirements,
+          purpose: inputData.purpose,
+          density: inputData.density,
+          contentReadiness: inputData.contentReadiness,
+          styleSpec: inputData.styleSpec,
         },
         approvedOutline: inputData.outline,
         html,
         htmlUrl,
       });
+      if (inputData.artifact.proposalId) {
+        markProposalConsumed(inputData.artifact.proposalId);
+      }
     }
 
     safeWrite(writer, {

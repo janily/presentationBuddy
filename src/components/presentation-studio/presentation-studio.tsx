@@ -35,7 +35,6 @@ type PendingArtifact = {
   outline: PresentationOutlineData;
   revision?: RevisionSpec;
   mode: "generation" | "revision" | "structure-revision";
-  workflowRunIdAtStart?: string | null;
 };
 
 const getErrorMessage = (error: Error | undefined, fallback: string) => {
@@ -53,6 +52,14 @@ const getErrorMessage = (error: Error | undefined, fallback: string) => {
 };
 
 const makeId = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+function persistCancelledProposal(proposalId: string) {
+  void fetch("/api/agent-chat/proposal-status", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ proposalId, status: "cancelled" }),
+  });
+}
 
 function toPreviewStep(phase: StudioPhase): PreviewPaneStep {
   switch (phase) {
@@ -142,7 +149,6 @@ export default function PresentationStudio() {
   const agentChatAbortRef = useRef<AbortController | null>(null);
   const deckIdRef = useRef(`deck-${makeId()}`);
   const publishedArtifactKeyRef = useRef<string | null>(null);
-  const autoApprovedRunRef = useRef<string | null>(null);
 
   const workflowOutline = useMemo(() => {
     return outlineStep?.data?.outline ?? suspenseData?.outline ?? null;
@@ -270,7 +276,7 @@ export default function PresentationStudio() {
     return () => window.clearTimeout(timeout);
   }, [htmlGenerationStep?.data?.lastUpdatedAt, htmlGenerationStep?.data?.status, stop]);
 
-  const beginRevision = useCallback((revision: RevisionSpec) => {
+  const beginRevision = useCallback((revision: RevisionSpec, proposalId?: string) => {
     const baselineOutline = activeArtifact?.outline ?? baseOutline;
     const baselineBrief = activeArtifact?.brief ?? brief;
     if (!baselineOutline || !baselineBrief || revision.requiresOutlineReview) return false;
@@ -281,6 +287,7 @@ export default function PresentationStudio() {
       deckId: activeArtifact?.deckId ?? activeHtmlGenerationStepData?.artifact?.deckId ?? deckIdRef.current,
       baseVersion,
       targetVersion: baseVersion + 1,
+      proposalId,
     };
     const revisedBrief: PresentationBrief = {
       ...baselineBrief,
@@ -309,6 +316,7 @@ export default function PresentationStudio() {
       deckId: activeArtifact.deckId,
       baseVersion: activeArtifact.version,
       targetVersion: activeArtifact.version + 1,
+      proposalId: proposal.proposalId,
     };
     const slideCount = resolveStructureRevisionPageCount(
       activeArtifact.outline.slides.length,
@@ -321,7 +329,6 @@ export default function PresentationStudio() {
         activeArtifact.brief.requirements,
         `Apply this confirmed structural revision: ${proposal.instruction}`,
         "Preserve every unaffected slide and the current visual style.",
-        `Current approved outline: ${JSON.stringify(activeArtifact.outline)}`,
       ].filter(Boolean).join("\n\n"),
     };
 
@@ -339,11 +346,20 @@ export default function PresentationStudio() {
         requiresOutlineReview: true,
       },
       mode: "structure-revision",
-      workflowRunIdAtStart: activeRunId,
     });
-    sendAgentRequest(proposal.instruction, toBriefData(revisedBrief, operation));
+    sendRevision({
+      presentationBrief: toBriefData(revisedBrief),
+      approvedOutline: activeArtifact.outline,
+      revision: {
+        kind: "structure",
+        instruction: proposal.instruction,
+        targetSlides: proposal.targetSlides,
+        requiresOutlineReview: true,
+      },
+      artifact: operation,
+    });
     return true;
-  }, [activeArtifact, activeRunId, sendAgentRequest]);
+  }, [activeArtifact, sendRevision]);
 
   const executeProposal = useCallback((proposal: AgentActionProposal) => {
     const revision: RevisionSpec = {
@@ -354,22 +370,11 @@ export default function PresentationStudio() {
     };
     const started = proposal.requiresOutlineReview
       ? beginStructureRevision(proposal)
-      : beginRevision(revision);
+      : beginRevision(revision, proposal.proposalId);
 
     if (!started) return false;
 
-    setPendingProposal({ ...proposal, status: "consumed" });
-    setChatMessages((current) => [
-      ...current,
-      {
-        id: makeId(),
-        role: "assistant",
-        kind: "text",
-        content: proposal.requiresOutlineReview
-          ? "已开始应用刚才确认的大纲修改，正在生成并校验新版大纲。"
-          : "已开始应用刚才确认的内容修改，当前视觉方向保持不变。",
-      },
-    ]);
+    setPendingProposal({ ...proposal, status: "executing" });
     return true;
   }, [beginRevision, beginStructureRevision]);
 
@@ -521,6 +526,7 @@ export default function PresentationStudio() {
         messages: textHistory(history),
         hasGeneratedDeck,
         hasSelectedStyle: Boolean(selectedStyle ?? activeArtifact?.brief.styleSpec),
+          pendingProposalId: pendingProposal?.status === "pending" ? pendingProposal.proposalId : undefined,
           operationId,
         deckContext: activeArtifact ? {
           deckId: activeArtifact.deckId,
@@ -553,7 +559,7 @@ export default function PresentationStudio() {
     if (!streamState.result?.reply) throw new Error("Agent chat stream ended without a result");
 
     return streamState.result;
-  }, [activeArtifact, selectedStyle]);
+  }, [activeArtifact, pendingProposal, selectedStyle]);
 
   const handleAgentSend = useCallback(async (message: string, options: { force?: boolean } = {}) => {
     const userMessage: AgentMessage = { id: makeId(), role: "user", kind: "text", content: message };
@@ -563,11 +569,6 @@ export default function PresentationStudio() {
       pendingProposal,
       activeArtifact ? { deckId: activeArtifact.deckId, version: activeArtifact.version } : null,
     );
-    if (proposalResolution.kind === "execute") {
-      setChatMessages((current) => [...current, userMessage]);
-      executeProposal(proposalResolution.proposal);
-      return;
-    }
     if (proposalResolution.kind === "consumed") {
       setChatMessages((current) => [
         ...current,
@@ -599,6 +600,7 @@ export default function PresentationStudio() {
       setLastCancelledArtifact(null);
       setHtmlWatchdogError(null);
       setPendingArtifact(resumedArtifact);
+      setPendingProposal((current) => current ? { ...current, status: "executing" } : null);
       setChatMessages((current) => [
         ...current,
         userMessage,
@@ -689,7 +691,9 @@ export default function PresentationStudio() {
         setPendingProposal(data.proposal);
       }
 
-      if (data.readyToGenerate && data.brief) {
+      if (data.nextAction === "execute-proposal" && data.proposal) {
+        executeProposal(data.proposal);
+      } else if (data.readyToGenerate && data.brief) {
         startGenerationFromBrief(data.brief, message);
       } else if (data.nextAction === "discover-styles" && data.brief) {
         await discoverStyles(data.brief);
@@ -701,10 +705,17 @@ export default function PresentationStudio() {
       if (abortController.signal.aborted) return;
 
       const detail = error instanceof Error ? error.message : String(error);
-      updateAssistantMessage(
-        () => `遇到了一点问题：${detail}\n\n请稍后重试；如果反复出现，请检查模型或 API Key 配置。`,
-        false,
-      );
+      setChatMessages((current) => current.map((item) => (
+        item.id === assistantMessageId && item.role === "assistant" && item.kind === "text"
+          ? {
+              ...item,
+              content: `遇到了一点问题：${detail}\n\n本次处理未执行任何修改。`,
+              streamState: "error",
+              isStreaming: false,
+              retryPrompt: message,
+            }
+          : item
+      )));
     } finally {
       if (agentChatAbortRef.current === abortController) {
         agentChatAbortRef.current = null;
@@ -716,12 +727,8 @@ export default function PresentationStudio() {
 
   const handleExecuteProposal = useCallback((proposalId: string) => {
     if (!pendingProposal || pendingProposal.proposalId !== proposalId) return;
-    setChatMessages((current) => [
-      ...current,
-      { id: makeId(), role: "user", kind: "text", content: "按此方案执行" },
-    ]);
-    executeProposal(pendingProposal);
-  }, [executeProposal, pendingProposal]);
+    void handleAgentSend("按此方案执行");
+  }, [handleAgentSend, pendingProposal]);
 
   const handleQuickAction = useCallback((command: AgentQuickCommand) => {
     if (phase === "generating" || isAgentReplying) return;
@@ -780,6 +787,10 @@ export default function PresentationStudio() {
     }
 
     if (phase === "generating") {
+      if (pendingProposal?.status === "executing") {
+        persistCancelledProposal(pendingProposal.proposalId);
+        setPendingProposal({ ...pendingProposal, status: "cancelled" });
+      }
       setLastCancelledArtifact(pendingArtifact);
       resetWorkflow();
       setPendingArtifact(null);
@@ -789,20 +800,13 @@ export default function PresentationStudio() {
         { id: makeId(), role: "assistant", kind: "text", content: "已停止生成，当前预览保持不变。" },
       ]);
     }
-  }, [pendingArtifact, phase, resetWorkflow]);
+  }, [pendingArtifact, pendingProposal, phase, resetWorkflow]);
 
   useEffect(() => {
-    if (
-      pendingArtifact?.mode !== "structure-revision"
-      || !suspenseData?.outline
-      || !activeRunId
-      || activeRunId === pendingArtifact.workflowRunIdAtStart
-      || autoApprovedRunRef.current === activeRunId
-    ) return;
-
-    autoApprovedRunRef.current = activeRunId;
-    approveOutline(suspenseData.outline);
-  }, [activeRunId, approveOutline, pendingArtifact?.mode, pendingArtifact?.workflowRunIdAtStart, suspenseData?.outline]);
+    if (!workflowError || pendingProposal?.status !== "executing") return;
+    persistCancelledProposal(pendingProposal.proposalId);
+    setPendingProposal({ ...pendingProposal, status: "cancelled" });
+  }, [pendingProposal, workflowError]);
 
   useEffect(() => {
     const data = htmlGenerationStep?.data;
@@ -831,6 +835,9 @@ export default function PresentationStudio() {
     }
 
     setPendingArtifact(null);
+    setPendingProposal((current) => current?.status === "executing"
+      ? { ...current, status: "consumed" }
+      : current);
     setChatMessages((current) => appendCompletionMessage(current, {
       artifactId: artifactKey,
       slideCount: completedOutline?.slides.length ?? selectedSlides.length ?? outline.length,

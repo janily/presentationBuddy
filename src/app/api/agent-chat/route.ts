@@ -14,6 +14,12 @@ import type { AgentChatStatusState } from "@/src/types/agent-chat";
 import { applyIntentGuard, createActionProposal } from "./intent-routing";
 import { NextResponse } from "next/server";
 import z from "zod";
+import { classifyProposalConfirmation } from "@/src/utils/proposal-confirmation";
+import {
+  beginProposalExecution,
+  getAgentProposal,
+  saveAgentProposal,
+} from "@/src/services/agent-proposals/proposal-store";
 
 export const maxDuration = 300;
 
@@ -27,6 +33,7 @@ const agentChatRequestSchema = z.object({
   hasGeneratedDeck: z.boolean().optional(),
   hasSelectedStyle: z.boolean().optional(),
   operationId: z.string().trim().min(1).optional(),
+  pendingProposalId: z.string().trim().min(1).optional(),
   deckContext: z.object({
     deckId: z.string().trim().min(1),
     version: z.number().int().positive(),
@@ -110,7 +117,8 @@ function createChildDeadline(parentSignal: AbortSignal, timeoutMs: number) {
 }
 
 export function explicitlyConfirmedGeneration(message: string) {
-  return /(^|\s)(开始|开始生成|确认|确认生成|可以|可以生成|直接生成|生成吧|就这样|就按这个|按这个|按这个生成|(?:就)?按(?:你(?:的)?|上述|上面|刚才(?:的)?)?(?:方案|建议|大纲|方向)(?:来)?(?:执行|生成|修改|改)|用这个|用第[一二三四五六七八九十123456789]|选第[一二三四五六七八九十123456789]|go ahead|yes|ok)(\s|。|！|!|$)/i.test(message);
+  return classifyProposalConfirmation(message) === "confirm"
+    || /(^|\s)(开始|开始生成|确认|确认生成|可以|可以生成|直接生成|生成吧|就这样|就按这个|按这个|按这个生成|用这个|用第[一二三四五六七八九十123456789]|选第[一二三四五六七八九十123456789]|go ahead|yes|ok)(\s|。|！|!|$)/i.test(message);
 }
 
 export function buildRevisionConfirmationReply(decision: BriefDecision) {
@@ -256,27 +264,34 @@ async function streamConversationalReply(
 ) {
   const stream = await conversationAgent.stream(history, { abortSignal });
   let reply = "";
-  let firstVisibleEventAt: number | null = null;
+  let firstReasoningDeltaAt: number | null = null;
+  let firstTextDeltaAt: number | null = null;
 
   for await (const chunk of stream.fullStream) {
     if (chunk.type === "reasoning-start") {
       emit({ type: "reasoning", delta: "", state: "start" });
     } else if (chunk.type === "reasoning-delta" && chunk.payload.text) {
-      if (!firstVisibleEventAt) firstVisibleEventAt = Date.now();
+      if (!firstReasoningDeltaAt) firstReasoningDeltaAt = Date.now();
       emit({ type: "reasoning", delta: chunk.payload.text, state: "delta" });
     } else if (chunk.type === "reasoning-end") {
       emit({ type: "reasoning", delta: "", state: "end" });
     } else if (chunk.type === "text-delta" && chunk.payload.text) {
-      if (!firstVisibleEventAt) firstVisibleEventAt = Date.now();
+      if (!firstTextDeltaAt) firstTextDeltaAt = Date.now();
       reply += chunk.payload.text;
       emit({ type: "assistant-delta", delta: chunk.payload.text });
     }
   }
 
-  if (firstVisibleEventAt) {
-    console.log("agent_chat.first_model_delta", {
+  if (firstReasoningDeltaAt) {
+    console.log("agent_chat.first_reasoning_delta", {
       operationId,
-      firstDeltaLatencyMs: firstVisibleEventAt - requestStartedAt,
+      latencyMs: firstReasoningDeltaAt - requestStartedAt,
+    });
+  }
+  if (firstTextDeltaAt) {
+    console.log("agent_chat.first_text_delta", {
+      operationId,
+      latencyMs: firstTextDeltaAt - requestStartedAt,
     });
   }
 
@@ -414,7 +429,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid agent chat request" }, { status: 400 });
   }
 
-  const { messages, hasGeneratedDeck, hasSelectedStyle, deckContext } = validation.data;
+  const { messages, hasGeneratedDeck, hasSelectedStyle, deckContext, pendingProposalId } = validation.data;
   const operationId = validation.data.operationId ?? crypto.randomUUID();
 
   return createAgentChatStreamResponse(operationId, async (emit) => {
@@ -425,7 +440,7 @@ export async function POST(request: Request) {
     const emitModelEvent = (event: AgentChatStreamEvent) => {
       if (
         event.type === "assistant-delta"
-        || (event.type === "reasoning" && event.state === "delta" && event.delta.length > 0)
+        || (event.type === "reasoning" && (event.state === "start" || (event.state === "delta" && event.delta.length > 0)))
       ) {
         clearTimeout(verySlowStatusTimer);
       }
@@ -458,6 +473,109 @@ export async function POST(request: Request) {
         durationMs: Date.now() - requestStartedAt,
       });
       console.log("agent_chat.provider_call_started", { operationId });
+
+      if (pendingProposalId && classifyProposalConfirmation(getLastUserMessage(messages)) === "confirm") {
+        const storedProposal = getAgentProposal(pendingProposalId);
+        if (!deckContext || !storedProposal) {
+          const reply = "刚才的待执行方案已失效，请基于当前版本重新整理后再执行。";
+          emit({ type: "assistant-snapshot", text: reply });
+          emit({
+            type: "decision",
+            payload: {
+              reply,
+              readyToGenerate: false,
+              brief: null,
+              nextAction: "chat",
+              revision: null,
+              styleId: null,
+              proposal: null,
+              executeProposalId: null,
+            },
+          });
+          return;
+        }
+
+        if (storedProposal.status === "executing" || storedProposal.status === "consumed") {
+          console.log("agent_chat.proposal_confirmation_deduplicated", {
+            operationId,
+            proposalId: storedProposal.proposalId,
+            status: storedProposal.status,
+          });
+          const reply = "刚才确认的方案已经在执行或已执行，不会重复启动。";
+          emit({ type: "assistant-snapshot", text: reply });
+          emit({
+            type: "decision",
+            payload: {
+              reply,
+              readyToGenerate: false,
+              brief: null,
+              nextAction: "chat",
+              revision: null,
+              styleId: null,
+              proposal: storedProposal,
+              executeProposalId: null,
+            },
+          });
+          return;
+        }
+
+        if (
+          storedProposal.status !== "pending"
+          || storedProposal.deckId !== deckContext.deckId
+          || storedProposal.baseVersion !== deckContext.version
+        ) {
+          const reply = "刚才的待执行方案已失效，请基于当前版本重新整理后再执行。";
+          emit({ type: "assistant-snapshot", text: reply });
+          emit({
+            type: "decision",
+            payload: {
+              reply,
+              readyToGenerate: false,
+              brief: null,
+              nextAction: "chat",
+              revision: null,
+              styleId: null,
+              proposal: storedProposal,
+              executeProposalId: null,
+            },
+          });
+          return;
+        }
+
+        const proposal = beginProposalExecution(pendingProposalId, {
+          deckId: deckContext.deckId,
+          version: deckContext.version,
+        });
+        console.log("agent_chat.proposal_confirmed", {
+          operationId,
+          proposalId: proposal.proposalId,
+          action: proposal.action,
+          proposalAgeMs: Date.now() - Date.parse(proposal.createdAt),
+        });
+        const reply = proposal.requiresOutlineReview
+          ? "已确认，正在应用刚才的大纲修改并生成新版本。"
+          : "已确认，正在应用刚才的内容修改，当前视觉方向保持不变。";
+        emit({ type: "assistant-snapshot", text: reply });
+        emit({
+          type: "decision",
+          payload: {
+            reply,
+            readyToGenerate: false,
+            brief: null,
+            nextAction: "execute-proposal",
+            revision: {
+              instruction: proposal.instruction,
+              targetSlides: proposal.targetSlides,
+              requiresOutlineReview: proposal.requiresOutlineReview,
+            },
+            styleId: null,
+            proposal,
+            executeProposalId: proposal.proposalId,
+          },
+        });
+        return;
+      }
+
       const rawDecision = await generateBriefDecision(
         conversationAgent,
         history,
@@ -527,6 +645,7 @@ export async function POST(request: Request) {
             createdAt: new Date().toISOString(),
           })
         : null;
+      if (proposal) saveAgentProposal(proposal);
       const payload: AgentChatResultPayload = {
         ...basePayload,
         proposal,
@@ -543,6 +662,7 @@ export async function POST(request: Request) {
         hasBrief: Boolean(payload.brief),
         blockedForConfirmation: shouldBlockGeneration,
         routedToStyleDiscovery: shouldDiscoverStyle || shouldRequireInitialStyle,
+        proposalAction: proposal?.action ?? null,
       });
     } catch (error) {
       if (request.signal.aborted) {

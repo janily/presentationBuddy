@@ -16,13 +16,20 @@ export type FrontendSlidesInput = {
   designGuidance: string[];
   density?: FrontendSlidesDensity;
   styleSpec?: FrontendSlidesStyleSpec;
+  revisionInstruction?: string;
+  revisionTargetSlides?: number[];
   slides: FrontendSlide[];
 };
 
 export function mapOutlineToFrontendSlides(
   outline: PresentationOutlineData,
   style?: string,
-  options?: { density?: FrontendSlidesDensity; styleSpec?: FrontendSlidesStyleSpec },
+  options?: {
+    density?: FrontendSlidesDensity;
+    styleSpec?: FrontendSlidesStyleSpec;
+    revisionInstruction?: string;
+    revisionTargetSlides?: number[];
+  },
 ): FrontendSlidesInput {
   return {
     title: outline.title,
@@ -31,6 +38,8 @@ export function mapOutlineToFrontendSlides(
     designGuidance: outline.designGuidance,
     density: options?.density,
     styleSpec: options?.styleSpec,
+    revisionInstruction: options?.revisionInstruction,
+    revisionTargetSlides: options?.revisionTargetSlides,
     slides: outline.slides.map((slide, index) => ({
       title: slide.title,
       content: formatSlideContent(slide),

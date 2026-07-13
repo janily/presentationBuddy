@@ -61,4 +61,25 @@ describe("buildFrontendSlidesMastraPrompt", () => {
     expect(prompt).toContain('"id": "terminal-green"');
     expect(prompt).toContain("Content density: reading-first");
   });
+
+  it("applies a confirmed content revision without turning it into a style request", () => {
+    const prompt = buildFrontendSlidesMastraPrompt(
+      {
+        title: "Mastra",
+        narrativeGoal: "Teach workflows",
+        style: "Paper & Ink",
+        designGuidance: [],
+        slides: [{ title: "Workflow", content: "Existing content", layout: "content" }],
+        revisionInstruction: "丰富第 1 页的 Workflow 实战示例",
+        revisionTargetSlides: [1],
+      },
+      { skill: "rules", htmlTemplate: "template", viewportBaseCss: "viewport", animationPatterns: "motion" },
+    );
+
+    expect(prompt).toContain("Requested style: Paper & Ink");
+    expect(prompt).toContain("Confirmed revision (NON-NEGOTIABLE)");
+    expect(prompt).toContain("丰富第 1 页的 Workflow 实战示例");
+    expect(prompt).toContain("Apply it specifically to slide(s): 1");
+    expect(prompt).toContain("Do not reinterpret this content revision as a request to change the visual style");
+  });
 });

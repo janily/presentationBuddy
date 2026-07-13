@@ -7,6 +7,7 @@ import { presentationOutlineSuggestionAgent } from "./agents/presentation-outlin
 import { presentationGenerationWorkflow } from "./workflows/presentation-generation-workflow";
 import { presentationRevisionWorkflow } from "./workflows/presentation-revision-workflow";
 import { frontendSlidesStyleDiscoveryWorkflow } from "./workflows/frontend-slides-style-discovery-workflow";
+import { presentationOutlineRevisionWorkflow } from "./workflows/presentation-outline-revision-workflow";
 
 function createMastra() {
   return new Mastra({
@@ -19,6 +20,7 @@ function createMastra() {
     workflows: {
       presentationGenerationWorkflow,
       presentationRevisionWorkflow,
+      presentationOutlineRevisionWorkflow,
       frontendSlidesStyleDiscoveryWorkflow,
     },
 

@@ -1,4 +1,5 @@
 import type { AgentActionProposal } from "@/src/types/agent-chat";
+import { classifyProposalConfirmation } from "@/src/utils/proposal-confirmation";
 
 type CurrentArtifactIdentity = {
   deckId: string;
@@ -12,18 +13,6 @@ export type ProposalConfirmationResolution =
   | { kind: "consumed" }
   | { kind: "none" };
 
-const confirmationPatterns = [
-  /按(?:你(?:的)?|上述|上面|刚才(?:的)?)?(?:方案|建议|大纲|方向)?(?:来)?(?:执行|生成|修改|改)/i,
-  /就按(?:你(?:的)?|上述|上面|刚才(?:的)?)?(?:方案|建议|大纲|方向|这个|这样)(?:来)?(?:执行|生成|修改|改)?/i,
-  /(?:可以|确认)[，,、\s]*(?:就)?(?:这么|这样)?(?:执行|生成|修改|改|应用)/i,
-  /确认应用(?:这些|上述|刚才的)?修改/i,
-  /^(?:执行|生成|修改|应用)(?:吧|即可|就行)?[。！!\s]*$/i,
-];
-
-const amendmentPatterns = [
-  /(?:但是|但|不过|同时|另外|还要|不要|别|改成|除了|只要|保留)/i,
-];
-
 export function resolveProposalConfirmation(
   message: string,
   proposal: AgentActionProposal | null,
@@ -31,11 +20,11 @@ export function resolveProposalConfirmation(
 ): ProposalConfirmationResolution {
   if (!proposal) return { kind: "none" };
 
-  const normalized = message.trim();
-  if (!confirmationPatterns.some((pattern) => pattern.test(normalized))) return { kind: "none" };
+  const confirmationIntent = classifyProposalConfirmation(message);
+  if (confirmationIntent === "none") return { kind: "none" };
   if (proposal.status === "consumed" || proposal.status === "executing") return { kind: "consumed" };
   if (proposal.status !== "pending") return { kind: "none" };
-  if (amendmentPatterns.some((pattern) => pattern.test(normalized))) return { kind: "amend" };
+  if (confirmationIntent === "amend") return { kind: "amend" };
 
   if (
     !currentArtifact
@@ -62,9 +51,10 @@ const chineseNumbers: Record<string, number> = {
 };
 
 function extractSlideDelta(instruction: string, verbs: string) {
-  const match = instruction.match(new RegExp(`(?:${verbs}).{0,8}(?:(\\d+)|([一二三四五六七八九十]))(?:页|张)`, "i"));
-  if (!match) return 0;
-  return match[1] ? Number(match[1]) : chineseNumbers[match[2]] ?? 0;
+  const normalizedInstruction = instruction.replace(/第\s+(?=[一二三四五六七八九十\d])/g, "第");
+  const match = normalizedInstruction.match(new RegExp(`(?:${verbs}).{0,16}(?<![第\\d])(?:(\\d+)|([一二三四五六七八九十]))(?:个|张)?(?:.{0,12})?(?:页|页面|幻灯片|slide)`, "i"));
+  if (match) return match[1] ? Number(match[1]) : chineseNumbers[match[2]] ?? 0;
+  return new RegExp(`(?:${verbs}).{0,24}(?:页|页面|幻灯片|slide)`, "i").test(normalizedInstruction) ? 1 : 0;
 }
 
 export function resolveStructureRevisionPageCount(currentCount: number, instruction: string) {
