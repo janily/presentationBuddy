@@ -10,7 +10,8 @@ import {
   type ModelMessage,
 } from "ai";
 import type { AgentChatUIMessage } from "@/src/types/agent-chat";
-import { applyIntentGuard } from "./intent-routing";
+import type { AgentChatStatusState } from "@/src/types/agent-chat";
+import { applyIntentGuard, createActionProposal } from "./intent-routing";
 import { NextResponse } from "next/server";
 import z from "zod";
 
@@ -27,6 +28,8 @@ const agentChatRequestSchema = z.object({
   hasSelectedStyle: z.boolean().optional(),
   operationId: z.string().trim().min(1).optional(),
   deckContext: z.object({
+    deckId: z.string().trim().min(1),
+    version: z.number().int().positive(),
     presentationBrief: presentationInputSchema,
     approvedOutline: presentationOutlineSchema,
   }).optional(),
@@ -36,7 +39,6 @@ const agentChatRequestSchema = z.object({
 const MAX_HISTORY_MESSAGES = 20;
 const AGENT_CHAT_TOTAL_TIMEOUT_MS = 90_000;
 const AGENT_CHAT_CLASSIFICATION_TIMEOUT_MS = 20_000;
-const AGENT_CHAT_SLOW_STATUS_MS = 3_000;
 const AGENT_CHAT_VERY_SLOW_STATUS_MS = 8_000;
 
 type BriefDecision = z.infer<typeof briefDecisionSchema>;
@@ -49,10 +51,12 @@ type AgentChatResultPayload = {
   nextAction: BriefDecision["nextAction"];
   revision: BriefDecision["revision"];
   styleId: BriefDecision["styleId"];
+  proposal: import("@/src/types/agent-chat").AgentActionProposal | null;
+  executeProposalId: string | null;
 };
 
 type AgentChatStreamEvent =
-  | { type: "progress"; message: string }
+  | { type: "progress"; state: AgentChatStatusState; message: string }
   | { type: "reasoning"; delta: string; state: "start" | "delta" | "end" }
   | { type: "assistant-delta"; delta: string }
   | { type: "assistant-snapshot"; text: string }
@@ -105,11 +109,16 @@ function createChildDeadline(parentSignal: AbortSignal, timeoutMs: number) {
   };
 }
 
-function explicitlyConfirmedGeneration(message: string) {
-  return /(^|\s)(开始|开始生成|确认|确认生成|可以|可以生成|直接生成|生成吧|就这样|就按这个|按这个|按这个生成|用这个|用第[一二三四五六七八九十123456789]|选第[一二三四五六七八九十123456789]|go ahead|yes|ok)(\s|。|！|!|$)/i.test(message);
+export function explicitlyConfirmedGeneration(message: string) {
+  return /(^|\s)(开始|开始生成|确认|确认生成|可以|可以生成|直接生成|生成吧|就这样|就按这个|按这个|按这个生成|(?:就)?按(?:你(?:的)?|上述|上面|刚才(?:的)?)?(?:方案|建议|大纲|方向)(?:来)?(?:执行|生成|修改|改)|用这个|用第[一二三四五六七八九十123456789]|选第[一二三四五六七八九十123456789]|go ahead|yes|ok)(\s|。|！|!|$)/i.test(message);
 }
 
-function buildRevisionConfirmationReply(decision: BriefDecision) {
+export function buildRevisionConfirmationReply(decision: BriefDecision) {
+  const instruction = decision.revision?.instruction.trim();
+  if (instruction) {
+    return `我先不直接执行。你是要应用刚才这项修改吗：${instruction}\n\n确认后我会保持当前视觉方向并开始处理。`;
+  }
+
   const style = decision.brief?.style?.trim();
 
   if (style) {
@@ -149,7 +158,7 @@ function createAgentChatStreamResponse(
           case "progress":
             writer.write({
               type: "data-agentStatus",
-              data: { operationId, message: event.message },
+              data: { operationId, state: event.state, message: event.message },
               transient: true,
             });
             break;
@@ -281,7 +290,7 @@ async function generateBriefDecisionFallback(
   abortSignal: AbortSignal,
   operationId: string,
 ): Promise<BriefDecision> {
-  emit({ type: "progress", message: "结构化回复失败，正在重试普通文本解析..." });
+  emit({ type: "progress", state: "retrying", message: "正在校验回复格式…" });
   console.warn("agent_chat.fallback_started", { operationId });
 
   const stream = await conversationAgent.stream([
@@ -410,12 +419,18 @@ export async function POST(request: Request) {
 
   return createAgentChatStreamResponse(operationId, async (emit) => {
     const deadline = createRequestDeadline(request.signal);
-    const slowStatusTimer = setTimeout(() => {
-      emit({ type: "progress", message: "仍在组织回复，已等待 3 秒…" });
-    }, AGENT_CHAT_SLOW_STATUS_MS);
     const verySlowStatusTimer = setTimeout(() => {
-      emit({ type: "progress", message: "模型响应较慢，可取消后重试。" });
+      emit({ type: "progress", state: "slow-active", message: "模型仍在处理，你可以继续等待或停止本次请求。" });
     }, AGENT_CHAT_VERY_SLOW_STATUS_MS);
+    const emitModelEvent = (event: AgentChatStreamEvent) => {
+      if (
+        event.type === "assistant-delta"
+        || (event.type === "reasoning" && event.state === "delta" && event.delta.length > 0)
+      ) {
+        clearTimeout(verySlowStatusTimer);
+      }
+      emit(event);
+    };
     const conversationAgent = mastra.getAgent("presentationBriefConversationAgent");
     const history: ModelMessage[] = messages
       .slice(-MAX_HISTORY_MESSAGES)
@@ -437,7 +452,7 @@ export async function POST(request: Request) {
         hasGeneratedDeck: Boolean(hasGeneratedDeck),
       });
 
-      emit({ type: "progress", message: "正在思考回复..." });
+      emit({ type: "progress", state: "connecting", message: "正在连接模型…" });
       console.log("agent_chat.first_event_written", {
         operationId,
         durationMs: Date.now() - requestStartedAt,
@@ -446,7 +461,7 @@ export async function POST(request: Request) {
       const rawDecision = await generateBriefDecision(
         conversationAgent,
         history,
-        emit,
+        emitModelEvent,
         deadline.signal,
         requestStartedAt,
         operationId,
@@ -475,7 +490,7 @@ export async function POST(request: Request) {
         && !hasSelectedStyle,
       );
 
-      const payload: AgentChatResultPayload = shouldRequireInitialStyle
+      const basePayload: Omit<AgentChatResultPayload, "proposal" | "executeProposalId"> = shouldRequireInitialStyle
         ? {
           reply: "内容方向已经确认。生成前先按 frontend-slides 为你准备一组真实标题页预览，请从中选择整套演示文稿的视觉系统。",
           readyToGenerate: false,
@@ -504,6 +519,20 @@ export async function POST(request: Request) {
           styleId: decision.styleId,
         };
 
+      const proposal = deckContext
+        ? createActionProposal(decision, {
+            deckId: deckContext.deckId,
+            version: deckContext.version,
+            proposalId: `proposal-${crypto.randomUUID()}`,
+            createdAt: new Date().toISOString(),
+          })
+        : null;
+      const payload: AgentChatResultPayload = {
+        ...basePayload,
+        proposal,
+        executeProposalId: null,
+      };
+
       emit({ type: "assistant-snapshot", text: payload.reply });
       emit({ type: "decision", payload });
 
@@ -525,7 +554,7 @@ export async function POST(request: Request) {
       }
 
       if (deadline.didTimeOut()) {
-        emit({ type: "error", error: "对话响应超时，请重试。" });
+        emit({ type: "error", error: "本次处理超时，未执行任何修改。请重试。" });
         console.warn("agent_chat.request_timed_out", {
           operationId,
           durationMs: Date.now() - requestStartedAt,
@@ -537,7 +566,6 @@ export async function POST(request: Request) {
       const message = error instanceof Error ? error.message : "Unknown error";
       emit({ type: "error", error: `对话模型调用失败：${message}` });
     } finally {
-      clearTimeout(slowStatusTimer);
       clearTimeout(verySlowStatusTimer);
       deadline.cleanup();
       console.log("agent_chat.stream_closed", {

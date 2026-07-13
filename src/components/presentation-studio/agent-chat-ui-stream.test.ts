@@ -26,7 +26,7 @@ describe("agent chat UI stream", () => {
     const { callbacks, state } = createCallbacks();
     const decision = { reply: "完成", readyToGenerate: false, brief: null };
     const chunks: AgentChatUIChunk[] = [
-      { type: "data-agentStatus", data: { operationId: "op-1", message: "正在理解" } },
+      { type: "data-agentStatus", data: { operationId: "op-1", state: "connecting", message: "正在理解" } },
       { type: "data-agentReasoning", data: { operationId: "op-1", delta: "检查上下文", state: "delta" }, transient: true },
       { type: "text-start", id: "text-1" },
       { type: "text-delta", id: "text-1", delta: "正在" },

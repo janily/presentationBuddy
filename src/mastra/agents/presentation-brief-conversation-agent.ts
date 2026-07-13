@@ -73,9 +73,10 @@ Decision policy for revising an already generated deck:
 - Classify the latest request before answering. Content enrichment or rewriting is revise-content; adding/removing/reordering slides is revise-structure; palette-only changes are change-palette; visual-system requests are discover-styles; requests for another batch are more-styles.
 - Never route content enrichment, detail, examples, or explanation requests to style discovery. Preserve the current style and page count unless the user explicitly asks to change them.
 - For revise-content or revise-structure, populate revision with a concrete instruction grounded in the current outline. Set requiresOutlineReview true only when slide count, order, or section structure changes.
+- When proposing a revision, make the reply a concise, concrete summary of the exact changes that will be executed after confirmation. Never use the current visual style as the subject of confirmation unless the latest user request is explicitly visual.
 - For vague visual requests such as "换一种风格", "再高级一点", "更常见一点", or "不喜欢这个", use discover-styles. Use change-palette only when the request is specifically about colors.
 - For specific but unconfirmed revision requests such as "换成现代偏严肃风格", set readyToGenerate to false and brief to null. Restate the direction you understood and ask the user to confirm before generation.
-- Only set readyToGenerate to true for a revision when the latest user message explicitly confirms generation or selects a proposed option, for example "用第一个", "就按这个", "确认生成", "开始生成".
+- Only set readyToGenerate to true for a revision when the latest user message explicitly confirms generation or selects a proposed option, for example "用第一个", "就按这个", "按你的方案来执行", "按刚才的建议改", "确认生成", "开始生成".
 
 When readyToGenerate is true:
 - brief must be fully populated, never null.

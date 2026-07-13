@@ -27,6 +27,19 @@ export type AgentRevisionData = {
   requiresOutlineReview: boolean;
 };
 
+export type AgentActionProposal = {
+  proposalId: string;
+  deckId: string;
+  baseVersion: number;
+  action: "revise-content" | "revise-structure" | "change-palette" | "change-style" | "mixed";
+  instruction: string;
+  targetSlides?: number[];
+  requiresOutlineReview: boolean;
+  userFacingSummary: string;
+  status: "pending" | "executing" | "consumed" | "cancelled" | "superseded";
+  createdAt: string;
+};
+
 export type AgentChatResponse = {
   reply?: string;
   readyToGenerate?: boolean;
@@ -34,12 +47,17 @@ export type AgentChatResponse = {
   nextAction?: AgentChatAction;
   revision?: AgentRevisionData | null;
   styleId?: string | null;
+  proposal?: AgentActionProposal | null;
+  executeProposalId?: string | null;
   error?: string;
 };
+
+export type AgentChatStatusState = "connecting" | "slow-active" | "retrying";
 
 export type AgentChatDataParts = {
   agentStatus: {
     operationId: string;
+    state: AgentChatStatusState;
     message: string;
   };
   assistantSnapshot: {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { BriefDecision } from "@/src/mastra/agents/presentation-brief-conversation-agent";
-import { applyIntentGuard, detectExplicitAction } from "./intent-routing";
+import { applyIntentGuard, createActionProposal, detectExplicitAction } from "./intent-routing";
+import { buildRevisionConfirmationReply, explicitlyConfirmedGeneration } from "./route";
 
 const baseDecision: BriefDecision = {
   reply: "正在准备视觉风格预览。",
@@ -31,5 +32,89 @@ describe("agent chat intent guard", () => {
 
   it("does not intercept an ordinary question", () => {
     expect(detectExplicitAction("Mastra 和 LangGraph 有什么区别？", true)).toBeNull();
+  });
+});
+
+describe("agent action proposal policy", () => {
+  it("binds a structural revision proposal to the current artifact version", () => {
+    const decision: BriefDecision = {
+      ...baseDecision,
+      reply: "我会增加一页实战案例，确认后执行。",
+      nextAction: "revise-structure",
+      revision: {
+        instruction: "增加一页 Mastra Workflow 实战案例",
+        targetSlides: [6],
+        requiresOutlineReview: true,
+      },
+    };
+
+    expect(createActionProposal(decision, {
+      deckId: "deck-1",
+      version: 4,
+      proposalId: "proposal-1",
+      createdAt: "2026-07-13T00:00:00.000Z",
+    })).toEqual({
+      proposalId: "proposal-1",
+      deckId: "deck-1",
+      baseVersion: 4,
+      action: "revise-structure",
+      instruction: "增加一页 Mastra Workflow 实战案例",
+      targetSlides: [6],
+      requiresOutlineReview: true,
+      userFacingSummary: "我会增加一页实战案例，确认后执行。",
+      status: "pending",
+      createdAt: "2026-07-13T00:00:00.000Z",
+    });
+  });
+
+  it("does not create a proposal for ordinary chat", () => {
+    expect(createActionProposal({
+      ...baseDecision,
+      reply: "Mastra 的 Workflow 适合确定性的多步骤流程。",
+      nextAction: "chat",
+      revision: null,
+    }, {
+      deckId: "deck-1",
+      version: 4,
+      proposalId: "proposal-1",
+      createdAt: "2026-07-13T00:00:00.000Z",
+    })).toBeNull();
+  });
+});
+
+describe("generation confirmation policy", () => {
+  it.each([
+    "按你的方案来执行",
+    "按上述方案生成",
+    "就按刚才的建议改",
+  ])("recognizes a proposal-referencing confirmation: %s", (message) => {
+    expect(explicitlyConfirmedGeneration(message)).toBe(true);
+  });
+
+  it("does not confirm when the user adds a new constraint", () => {
+    expect(explicitlyConfirmedGeneration("按你的方案来执行，但不要新增页面")).toBe(false);
+  });
+
+  it("confirms the pending revision rather than the existing visual style", () => {
+    const reply = buildRevisionConfirmationReply({
+      ...baseDecision,
+      brief: {
+        topic: "Mastra 教程",
+        audience: "开发者",
+        pageCount: 8,
+        style: "Paper & Ink",
+        requirements: "",
+        purpose: "teaching-tutorial",
+        density: "speaker-led",
+        contentReadiness: "ready",
+      },
+      revision: {
+        instruction: "增加一页 Workflow 实战",
+        requiresOutlineReview: true,
+      },
+    });
+
+    expect(reply).toContain("增加一页 Workflow 实战");
+    expect(reply).not.toContain("Paper & Ink");
   });
 });

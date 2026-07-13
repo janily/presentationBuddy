@@ -1,9 +1,11 @@
 import type { StudioErrorSource } from "./use-studio-phase";
 import type { AgentQuickActionDefinition } from "./agent-quick-actions";
+import type { AgentActionProposal } from "@/src/types/agent-chat";
 
 export type AgentMessage =
-  | { id: string; role: "assistant" | "user"; kind?: "text"; content: string; reasoningSummary?: string; streamState?: "connecting" | "reasoning" | "answering" | "finalizing" | "done" | "error"; isStreaming?: boolean }
+  | { id: string; role: "assistant" | "user"; kind?: "text"; content: string; reasoningSummary?: string; streamState?: "connecting" | "reasoning" | "answering" | "finalizing" | "done" | "cancelled" | "error"; isStreaming?: boolean }
   | { id: string; role: "system"; kind: "quick-choice"; action: AgentQuickActionDefinition }
+  | { id: string; role: "system"; kind: "action-proposal"; proposal: AgentActionProposal }
   | { id: string; role: "system"; kind: "outline-review"; slideCount: number; canGenerate: boolean; disabledReason?: string | null }
   | { id: string; role: "system"; kind: "complete"; slideCount: number; htmlUrl?: string; generator?: "frontend-slides" | "backup"; fallbackReason?: string }
   | { id: string; role: "system"; kind: "error"; message: string; retryKind: StudioErrorSource }

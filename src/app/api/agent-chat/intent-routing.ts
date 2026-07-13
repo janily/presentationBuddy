@@ -1,8 +1,41 @@
 import type { BriefDecision } from "@/src/mastra/agents/presentation-brief-conversation-agent";
+import type { AgentActionProposal } from "@/src/types/agent-chat";
 
 type IntentRoutingOptions = {
   explicitlyConfirmedGeneration: (message: string) => boolean;
 };
+
+type ActionProposalContext = {
+  deckId: string;
+  version: number;
+  proposalId: string;
+  createdAt: string;
+};
+
+export function createActionProposal(
+  decision: BriefDecision,
+  context: ActionProposalContext,
+): AgentActionProposal | null {
+  if (
+    (decision.nextAction !== "revise-content" && decision.nextAction !== "revise-structure")
+    || !decision.revision?.instruction.trim()
+  ) {
+    return null;
+  }
+
+  return {
+    proposalId: context.proposalId,
+    deckId: context.deckId,
+    baseVersion: context.version,
+    action: decision.nextAction,
+    instruction: decision.revision.instruction.trim(),
+    targetSlides: decision.revision.targetSlides,
+    requiresOutlineReview: decision.revision.requiresOutlineReview,
+    userFacingSummary: decision.reply,
+    status: "pending",
+    createdAt: context.createdAt,
+  };
+}
 
 export function detectExplicitAction(message: string, hasGeneratedDeck: boolean): BriefDecision["nextAction"] | null {
   if (/(更多|还有|其他|其它|再来|换一批).{0,8}(风格|样式|视觉)|(?:风格|样式|视觉).{0,8}(更多|还有|其他|其它|再来|换一批)/i.test(message)) {

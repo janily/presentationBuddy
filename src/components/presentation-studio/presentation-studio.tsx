@@ -14,10 +14,12 @@ import AgentPanel, { type AgentMessage } from "./agent-panel";
 import { getQuickActionDefinition, type AgentQuickActionChoice, type AgentQuickCommand } from "./agent-quick-actions";
 import { appendCompletionMessage } from "./agent-message-model";
 import { dispatchAgentChatUIChunk, type AgentChatStreamCallbacks } from "./agent-chat-ui-stream";
+import { applyReasoningEvent, stopStreamingAssistantMessage } from "./agent-message-stream-state";
 import { requestsCancelledGenerationRetry } from "./cancelled-generation-retry";
 import { discoverFrontendSlideStyles, listFrontendSlideStyles, type FrontendSlidesStylePreview, type FrontendSlidesStyleSpec } from "@/src/services/frontend-slides/style-catalog";
 import { isStructureChangingRevision } from "./revision-routing";
-import type { AgentChatResponse, AgentChatUIChunk, AgentChatUIMessage } from "@/src/types/agent-chat";
+import type { AgentActionProposal, AgentChatResponse, AgentChatUIChunk, AgentChatUIMessage } from "@/src/types/agent-chat";
+import { resolveProposalConfirmation, resolveStructureRevisionPageCount } from "./proposal-routing";
 import PresentationPreviewPane from "./presentation-preview-pane";
 import PresentationWorkspace from "./presentation-workspace";
 import { emptyOutline, toApprovedOutline, toSlideItem, type PresentationBrief, type SlideOutlineItem } from "./presentation-outline-utils";
@@ -32,7 +34,8 @@ type PendingArtifact = {
   brief: PresentationBrief;
   outline: PresentationOutlineData;
   revision?: RevisionSpec;
-  mode: "generation" | "revision";
+  mode: "generation" | "revision" | "structure-revision";
+  workflowRunIdAtStart?: string | null;
 };
 
 const getErrorMessage = (error: Error | undefined, fallback: string) => {
@@ -128,6 +131,7 @@ export default function PresentationStudio() {
   } | null>(null);
   const [pendingArtifact, setPendingArtifact] = useState<PendingArtifact | null>(null);
   const [lastCancelledArtifact, setLastCancelledArtifact] = useState<PendingArtifact | null>(null);
+  const [pendingProposal, setPendingProposal] = useState<AgentActionProposal | null>(null);
   const [stylePreviews, setStylePreviews] = useState<FrontendSlidesStylePreview[]>([]);
   const [selectedStyle, setSelectedStyle] = useState<FrontendSlidesStyleSpec | null>(null);
   const [styleDiscoveryBrief, setStyleDiscoveryBrief] = useState<AgentBriefData | null>(null);
@@ -138,6 +142,7 @@ export default function PresentationStudio() {
   const agentChatAbortRef = useRef<AbortController | null>(null);
   const deckIdRef = useRef(`deck-${makeId()}`);
   const publishedArtifactKeyRef = useRef<string | null>(null);
+  const autoApprovedRunRef = useRef<string | null>(null);
 
   const workflowOutline = useMemo(() => {
     return outlineStep?.data?.outline ?? suspenseData?.outline ?? null;
@@ -296,6 +301,78 @@ export default function PresentationStudio() {
     return true;
   }, [activeArtifact, activeHtmlGenerationStepData?.artifact?.deckId, activeHtmlGenerationStepData?.artifact?.version, baseOutline, brief, sendRevision]);
 
+  const beginStructureRevision = useCallback((proposal: AgentActionProposal) => {
+    if (!activeArtifact) return false;
+
+    const operation: ArtifactOperation = {
+      operationId: `operation-${makeId()}`,
+      deckId: activeArtifact.deckId,
+      baseVersion: activeArtifact.version,
+      targetVersion: activeArtifact.version + 1,
+    };
+    const slideCount = resolveStructureRevisionPageCount(
+      activeArtifact.outline.slides.length,
+      proposal.instruction,
+    );
+    const revisedBrief: PresentationBrief = {
+      ...activeArtifact.brief,
+      slideCount,
+      requirements: [
+        activeArtifact.brief.requirements,
+        `Apply this confirmed structural revision: ${proposal.instruction}`,
+        "Preserve every unaffected slide and the current visual style.",
+        `Current approved outline: ${JSON.stringify(activeArtifact.outline)}`,
+      ].filter(Boolean).join("\n\n"),
+    };
+
+    setHtmlWatchdogError(null);
+    setLastCancelledArtifact(null);
+    setBrief(revisedBrief);
+    setPendingArtifact({
+      operation,
+      brief: revisedBrief,
+      outline: emptyOutline(revisedBrief),
+      revision: {
+        kind: "structure",
+        instruction: proposal.instruction,
+        targetSlides: proposal.targetSlides,
+        requiresOutlineReview: true,
+      },
+      mode: "structure-revision",
+      workflowRunIdAtStart: activeRunId,
+    });
+    sendAgentRequest(proposal.instruction, toBriefData(revisedBrief, operation));
+    return true;
+  }, [activeArtifact, activeRunId, sendAgentRequest]);
+
+  const executeProposal = useCallback((proposal: AgentActionProposal) => {
+    const revision: RevisionSpec = {
+      kind: proposal.action === "revise-structure" ? "structure" : "content",
+      instruction: proposal.instruction,
+      targetSlides: proposal.targetSlides,
+      requiresOutlineReview: proposal.requiresOutlineReview,
+    };
+    const started = proposal.requiresOutlineReview
+      ? beginStructureRevision(proposal)
+      : beginRevision(revision);
+
+    if (!started) return false;
+
+    setPendingProposal({ ...proposal, status: "consumed" });
+    setChatMessages((current) => [
+      ...current,
+      {
+        id: makeId(),
+        role: "assistant",
+        kind: "text",
+        content: proposal.requiresOutlineReview
+          ? "已开始应用刚才确认的大纲修改，正在生成并校验新版大纲。"
+          : "已开始应用刚才确认的内容修改，当前视觉方向保持不变。",
+      },
+    ]);
+    return true;
+  }, [beginRevision, beginStructureRevision]);
+
   const startGenerationFromBrief = useCallback((agentBrief: AgentBriefData, revisionMessage?: string) => {
     setStylePreviews([]);
     setIsDiscoveringStyles(false);
@@ -446,6 +523,8 @@ export default function PresentationStudio() {
         hasSelectedStyle: Boolean(selectedStyle ?? activeArtifact?.brief.styleSpec),
           operationId,
         deckContext: activeArtifact ? {
+          deckId: activeArtifact.deckId,
+          version: activeArtifact.version,
           presentationBrief: toBriefData(activeArtifact.brief),
           approvedOutline: activeArtifact.outline,
         } : undefined,
@@ -478,6 +557,37 @@ export default function PresentationStudio() {
 
   const handleAgentSend = useCallback(async (message: string, options: { force?: boolean } = {}) => {
     const userMessage: AgentMessage = { id: makeId(), role: "user", kind: "text", content: message };
+
+    const proposalResolution = resolveProposalConfirmation(
+      message,
+      pendingProposal,
+      activeArtifact ? { deckId: activeArtifact.deckId, version: activeArtifact.version } : null,
+    );
+    if (proposalResolution.kind === "execute") {
+      setChatMessages((current) => [...current, userMessage]);
+      executeProposal(proposalResolution.proposal);
+      return;
+    }
+    if (proposalResolution.kind === "consumed") {
+      setChatMessages((current) => [
+        ...current,
+        userMessage,
+        { id: makeId(), role: "assistant", kind: "text", content: "刚才确认的方案已经在执行或已执行，不会重复启动。" },
+      ]);
+      return;
+    }
+    if (proposalResolution.kind === "stale") {
+      setChatMessages((current) => [
+        ...current,
+        userMessage,
+        { id: makeId(), role: "assistant", kind: "text", content: "当前演示文稿已经更新，刚才的方案基于旧版本，不能直接覆盖。我会基于当前版本重新整理。" },
+      ]);
+      setPendingProposal(null);
+      return;
+    }
+    if (proposalResolution.kind === "amend") {
+      setPendingProposal((current) => current ? { ...current, status: "superseded" } : null);
+    }
 
     if (lastCancelledArtifact && requestsCancelledGenerationRetry(message)) {
       const operation: ArtifactOperation = {
@@ -540,13 +650,7 @@ export default function PresentationStudio() {
       { id: assistantMessageId, role: "assistant", kind: "text", content: "", streamState: "connecting", isStreaming: true },
     ]);
     setIsAgentReplying(true);
-    setAgentProgressMessage("正在理解你的要求…");
-    const slowTimer = window.setTimeout(() => {
-      setAgentProgressMessage("仍在组织回复，已等待 3 秒…");
-    }, 3_000);
-    const verySlowTimer = window.setTimeout(() => {
-      setAgentProgressMessage("模型响应较慢，可取消后重试。");
-    }, 8_000);
+    setAgentProgressMessage("正在连接模型…");
 
     const updateAssistantMessage = (contentUpdater: (content: string) => string, isStreaming = true) => {
       setChatMessages((current) => current.map((item) => (
@@ -559,19 +663,16 @@ export default function PresentationStudio() {
     try {
       const data = await sendToAgentChat(history, Boolean(generatedHtml), {
         signal: abortController.signal,
-        onProgress: setAgentProgressMessage,
+        onProgress: (progressMessage) => setAgentProgressMessage(progressMessage),
         onAssistantDelta: (delta) => {
           setAgentProgressMessage(null);
           updateAssistantMessage((content) => `${content}${delta}`);
         },
         onReasoningDelta: (delta, state) => {
+          setAgentProgressMessage(null);
           setChatMessages((current) => current.map((item) => (
             item.id === assistantMessageId && item.role === "assistant" && (item.kind === undefined || item.kind === "text")
-              ? {
-                  ...item,
-                  reasoningSummary: state === "start" ? "" : `${item.reasoningSummary ?? ""}${delta}`,
-                  streamState: state === "end" ? (item.content ? "answering" : "finalizing") : "reasoning",
-                }
+              ? applyReasoningEvent(item, delta, state)
               : item
           )));
         },
@@ -583,6 +684,10 @@ export default function PresentationStudio() {
       });
 
       updateAssistantMessage(() => data.reply!, false);
+
+      if (data.proposal) {
+        setPendingProposal(data.proposal);
+      }
 
       if (data.readyToGenerate && data.brief) {
         startGenerationFromBrief(data.brief, message);
@@ -601,15 +706,22 @@ export default function PresentationStudio() {
         false,
       );
     } finally {
-      window.clearTimeout(slowTimer);
-      window.clearTimeout(verySlowTimer);
       if (agentChatAbortRef.current === abortController) {
         agentChatAbortRef.current = null;
         setIsAgentReplying(false);
         setAgentProgressMessage(null);
       }
     }
-  }, [chatMessages, discoverStyles, generatedHtml, lastCancelledArtifact, phase, sendAgentRequest, sendRevision, sendToAgentChat, startGenerationFromBrief, styleDiscoveryBrief]);
+  }, [activeArtifact, chatMessages, discoverStyles, executeProposal, generatedHtml, lastCancelledArtifact, pendingProposal, phase, sendAgentRequest, sendRevision, sendToAgentChat, startGenerationFromBrief, styleDiscoveryBrief]);
+
+  const handleExecuteProposal = useCallback((proposalId: string) => {
+    if (!pendingProposal || pendingProposal.proposalId !== proposalId) return;
+    setChatMessages((current) => [
+      ...current,
+      { id: makeId(), role: "user", kind: "text", content: "按此方案执行" },
+    ]);
+    executeProposal(pendingProposal);
+  }, [executeProposal, pendingProposal]);
 
   const handleQuickAction = useCallback((command: AgentQuickCommand) => {
     if (phase === "generating" || isAgentReplying) return;
@@ -661,7 +773,7 @@ export default function PresentationStudio() {
       setAgentProgressMessage(null);
       setChatMessages((current) => current.map((message) => (
         message.role === "assistant" && message.kind === "text" && message.isStreaming
-          ? { ...message, content: message.content || "已取消当前请求。", isStreaming: false }
+          ? stopStreamingAssistantMessage(message)
           : message
       )));
       return;
@@ -674,10 +786,23 @@ export default function PresentationStudio() {
       setHtmlWatchdogError(null);
       setChatMessages((current) => [
         ...current,
-        { id: makeId(), role: "assistant", kind: "text", content: "已取消生成，当前预览保持不变。" },
+        { id: makeId(), role: "assistant", kind: "text", content: "已停止生成，当前预览保持不变。" },
       ]);
     }
   }, [pendingArtifact, phase, resetWorkflow]);
+
+  useEffect(() => {
+    if (
+      pendingArtifact?.mode !== "structure-revision"
+      || !suspenseData?.outline
+      || !activeRunId
+      || activeRunId === pendingArtifact.workflowRunIdAtStart
+      || autoApprovedRunRef.current === activeRunId
+    ) return;
+
+    autoApprovedRunRef.current = activeRunId;
+    approveOutline(suspenseData.outline);
+  }, [activeRunId, approveOutline, pendingArtifact?.mode, pendingArtifact?.workflowRunIdAtStart, suspenseData?.outline]);
 
   useEffect(() => {
     const data = htmlGenerationStep?.data;
@@ -734,6 +859,7 @@ export default function PresentationStudio() {
     setActiveArtifact(null);
     setPendingArtifact(null);
     setLastCancelledArtifact(null);
+    setPendingProposal(null);
     setStylePreviews([]);
     setSelectedStyle(null);
     setStyleDiscoveryBrief(null);
@@ -820,6 +946,15 @@ export default function PresentationStudio() {
       return messages;
     }
 
+    if (pendingProposal?.status === "pending") {
+      messages.push({
+        id: `proposal-card-${pendingProposal.proposalId}`,
+        role: "system",
+        kind: "action-proposal",
+        proposal: pendingProposal,
+      });
+    }
+
     if (phase === "reviewing" && outline.length > 0) {
       messages.push({
         id: "outline-review-card",
@@ -836,6 +971,7 @@ export default function PresentationStudio() {
     canApproveOutline,
     generateDisabledReason,
     outline.length,
+    pendingProposal,
     phase,
     selectedSlides.length,
     workflowError,
@@ -852,6 +988,7 @@ export default function PresentationStudio() {
       onSend={handleAgentSend}
       onQuickAction={handleQuickAction}
       onApplyRevision={handleApplyRevision}
+      onExecuteProposal={handleExecuteProposal}
       onCancel={handleCancelCurrentOperation}
       onGenerate={handleGenerate}
       onRetry={handleRetry}

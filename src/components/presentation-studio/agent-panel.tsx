@@ -16,6 +16,7 @@ interface AgentPanelProps {
   onSend: (message: string) => void;
   onQuickAction: (command: AgentQuickCommand) => void;
   onApplyRevision: (choice: AgentQuickActionChoice) => void;
+  onExecuteProposal: (proposalId: string) => void;
   onCancel: () => void;
   onGenerate: () => void;
   onRetry: (kind: StudioErrorSource) => void;
@@ -96,14 +97,69 @@ function StatusRow({ text, onCancel }: { text: string; onCancel?: () => void }) 
             type="button"
             onClick={onCancel}
             className="ml-1 flex h-7 w-7 items-center justify-center rounded-lg text-[var(--text-muted)] transition hover:bg-white hover:text-[var(--accent-terracotta)]"
-            aria-label="取消生成"
-            title="取消生成"
+            aria-label="停止生成"
+            title="停止生成"
           >
             <Square className="h-3.5 w-3.5" />
           </button>
         ) : null}
       </div>
     </div>
+  );
+}
+
+function ActionProposalCard({
+  message,
+  onExecute,
+}: {
+  message: Extract<AgentMessage, { kind: "action-proposal" }>;
+  onExecute: (proposalId: string) => void;
+}) {
+  return (
+    <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-card)] p-4">
+      <div className="flex items-center gap-2 text-xs font-medium text-[var(--text-muted)]">
+        <FileText className="h-3.5 w-3.5" />
+        待执行方案
+      </div>
+      <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
+        {message.proposal.userFacingSummary}
+      </p>
+      <button
+        type="button"
+        onClick={() => onExecute(message.proposal.proposalId)}
+        className="mt-3 rounded-xl bg-[var(--accent-terracotta)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--accent-terracotta-light)]"
+      >
+        按此方案执行
+      </button>
+    </div>
+  );
+}
+
+function ReasoningSummary({
+  summary,
+  state,
+}: {
+  summary?: string;
+  state?: Extract<AgentMessage, { role: "assistant" | "user" }>["streamState"];
+}) {
+  const isActive = state === "reasoning" || state === "finalizing";
+
+  return (
+    <details
+      open={isActive ? true : undefined}
+      className={`relative mb-3 overflow-hidden whitespace-normal rounded-lg border border-[var(--border-light)] bg-[var(--bg-secondary)] px-3 py-2 ${isActive ? "animate-pulse-subtle motion-reduce:animate-none" : ""}`}
+    >
+      <summary
+        className="flex cursor-pointer list-none items-center gap-2 text-xs font-medium text-[var(--text-muted)]"
+        aria-live="polite"
+      >
+        <Brain className={`h-3.5 w-3.5 ${isActive ? "animate-pulse motion-reduce:animate-none" : ""}`} />
+        {isActive ? (state === "finalizing" ? "正在整理回复" : "思考中") : "思考摘要"}
+        {isActive ? <TypingDots /> : null}
+      </summary>
+      {summary ? <p className="mt-2 max-h-24 overflow-y-auto whitespace-pre-wrap text-xs leading-5 text-[var(--text-muted)]">{summary}</p> : null}
+      {isActive ? <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-px animate-pulse bg-gradient-to-r from-transparent via-[var(--accent-terracotta)]/50 to-transparent motion-reduce:animate-none" /> : null}
+    </details>
   );
 }
 
@@ -278,6 +334,7 @@ export default function AgentPanel({
   onSend,
   onQuickAction,
   onApplyRevision,
+  onExecuteProposal,
   onCancel,
   onGenerate,
   onRetry,
@@ -355,6 +412,10 @@ export default function AgentPanel({
               return <QuickChoiceCard key={message.id} message={message} onApplyRevision={onApplyRevision} />;
             }
 
+            if (message.kind === "action-proposal") {
+              return <ActionProposalCard key={message.id} message={message} onExecute={onExecuteProposal} />;
+            }
+
             if (message.kind === "outline-review") {
               return <OutlineReviewCard key={message.id} message={message} onGenerate={onGenerate} />;
             }
@@ -384,14 +445,8 @@ export default function AgentPanel({
             return (
               <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
                 <div className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-6 ${message.role === "user" ? "bg-[var(--accent-terracotta)] text-white" : "border border-[var(--border-light)] bg-[var(--bg-card)] text-[var(--text-secondary)]"}`}>
-                  {message.role === "assistant" && message.reasoningSummary ? (
-                    <details className="mb-3 whitespace-normal rounded-lg border border-[var(--border-light)] bg-[var(--bg-secondary)] px-3 py-2">
-                      <summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-medium text-[var(--text-muted)]">
-                        <Brain className="h-3.5 w-3.5" />
-                        思考摘要
-                      </summary>
-                      <p className="mt-2 whitespace-pre-wrap text-xs leading-5 text-[var(--text-muted)]">{message.reasoningSummary}</p>
-                    </details>
+                  {message.role === "assistant" && (message.reasoningSummary !== undefined || message.streamState === "reasoning" || message.streamState === "finalizing") ? (
+                    <ReasoningSummary summary={message.reasoningSummary} state={message.streamState} />
                   ) : null}
                   {hasVisibleContent ? message.content : null}
                   {isStreamingText && !hasVisibleContent ? (
@@ -401,6 +456,9 @@ export default function AgentPanel({
                     </div>
                   ) : null}
                   {isStreamingText && hasVisibleContent ? <span className="ml-1 inline-block h-4 w-1 animate-pulse rounded bg-[var(--text-muted)] align-[-2px]" /> : null}
+                  {message.role === "assistant" && message.streamState === "cancelled" ? (
+                    <span className="mt-2 block text-xs text-[var(--text-muted)]">已停止</span>
+                  ) : null}
                 </div>
               </div>
             );
@@ -458,8 +516,8 @@ export default function AgentPanel({
               type="button"
               onClick={onCancel}
               className="self-end rounded-xl border border-[var(--border-light)] bg-white p-3 text-[var(--text-secondary)] transition hover:border-[var(--accent-terracotta)] hover:text-[var(--accent-terracotta)]"
-              aria-label="取消当前请求"
-              title="取消当前请求"
+              aria-label="停止本次请求"
+              title="停止本次请求"
             >
               <Square className="h-5 w-5" />
             </button>

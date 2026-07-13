@@ -1,8 +1,8 @@
-import type { AgentChatResponse, AgentChatUIChunk } from "@/src/types/agent-chat";
+import type { AgentChatResponse, AgentChatStatusState, AgentChatUIChunk } from "@/src/types/agent-chat";
 
 export type AgentChatStreamCallbacks = {
   signal: AbortSignal;
-  onProgress: (message: string) => void;
+  onProgress: (message: string, state: AgentChatStatusState) => void;
   onAssistantDelta: (delta: string) => void;
   onReasoningDelta: (delta: string, state: "start" | "delta" | "end") => void;
   onAssistantSnapshot: (text: string) => void;
@@ -23,7 +23,7 @@ export function dispatchAgentChatUIChunk(
       callbacks.onAssistantDelta(chunk.delta);
       return {};
     case "data-agentStatus":
-      callbacks.onProgress(chunk.data.message);
+      callbacks.onProgress(chunk.data.message, chunk.data.state);
       return {};
     case "data-agentReasoning":
       callbacks.onReasoningDelta(chunk.data.delta, chunk.data.state);
