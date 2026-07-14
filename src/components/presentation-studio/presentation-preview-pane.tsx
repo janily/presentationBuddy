@@ -57,7 +57,7 @@ function StyleDiscovery({ previews, selectedStyleId, isLoading, batch, remaining
               return (
                 <button key={style.id} type="button" onClick={() => onSelect?.(style)} className={`overflow-hidden rounded-2xl border-2 bg-white text-left shadow-sm transition hover:-translate-y-1 hover:shadow-xl ${selected ? "border-[var(--accent-terracotta)] ring-4 ring-[var(--accent-terracotta)]/10" : "border-transparent"}`}>
                   <div className="aspect-video w-full overflow-hidden bg-black">
-                    <Image src={previewImage} alt={`${style.name} 风格预览`} width={960} height={540} className="h-full w-full object-cover" />
+                    <Image src={previewImage} alt={`${style.name} 风格预览`} width={960} height={540} unoptimized className="h-full w-full object-cover" />
                   </div>
                   <div className="p-4">
                     <div className="flex items-center justify-between gap-3"><h3 className="font-semibold text-[var(--text-primary)]">{style.name}</h3>{selected ? <CheckCircle2 className="h-5 w-5 text-[var(--accent-terracotta)]" /> : null}</div>

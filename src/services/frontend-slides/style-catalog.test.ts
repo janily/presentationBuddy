@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { discoverFrontendSlideStyles, getFrontendSlideStyle } from "./style-catalog";
+import { existsSync } from "node:fs";
+import path from "node:path";
+import { discoverFrontendSlideStyles, getFrontendSlideStyle, listFrontendSlideStyles } from "./style-catalog";
 
 describe("frontend-slides style catalog", () => {
   it("returns three distinct local static image previews for a technical tutorial", () => {
@@ -13,9 +15,32 @@ describe("frontend-slides style catalog", () => {
     expect(result).toHaveLength(3);
     expect(new Set(result.map((item) => item.style.id)).size).toBe(3);
     expect(result.map((item) => item.style.id)).toContain("terminal-green");
+    expect(result.some((item) => item.style.source === "frontend-slides-bold-template")).toBe(true);
     expect(result.some((item) => item.style.source === "frontend-slides-custom")).toBe(true);
     expect(result.every((item) => item.previewImage.startsWith("/style-previews/"))).toBe(true);
     expect(new Set(result.map((item) => item.previewImage)).size).toBe(3);
+  });
+
+  it("exposes bold template metadata needed for final generation", () => {
+    expect(getFrontendSlideStyle("bold-template-blue-professional")).toMatchObject({
+      id: "bold-template-blue-professional",
+      name: "Blue Professional",
+      source: "frontend-slides-bold-template",
+      boldTemplate: {
+        slug: "blue-professional",
+        previewMd: "bold-template-pack/templates/blue-professional/preview.md",
+        designMd: "bold-template-pack/templates/blue-professional/design.md",
+      },
+    });
+  });
+
+  it("has static preview images for every bold template style", () => {
+    const boldTemplateStyles = listFrontendSlideStyles().filter((style) => style.source === "frontend-slides-bold-template");
+
+    expect(boldTemplateStyles).toHaveLength(34);
+    for (const style of boldTemplateStyles) {
+      expect(existsSync(path.join(process.cwd(), "public", "style-previews", `${style.id}.svg`))).toBe(true);
+    }
   });
 
   it("returns the complete preset contract by stable style id", () => {

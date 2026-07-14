@@ -64,6 +64,57 @@ describe("buildFrontendSlidesMastraPrompt", () => {
     expect(prompt).toContain("Content density: reading-first");
   });
 
+  it("includes the selected bold template design recipe when present", () => {
+    const prompt = buildFrontendSlidesMastraPrompt(
+      {
+        title: "Market Update",
+        narrativeGoal: "Brief executives",
+        style: "Blue Professional",
+        designGuidance: [],
+        slides: [{ title: "Intro", content: "Welcome", layout: "title" }],
+        styleSpec: {
+          id: "bold-template-blue-professional",
+          name: "Blue Professional",
+          source: "frontend-slides-bold-template",
+          vibe: "professional",
+          layout: "Cream paper background with electric cobalt blue accents",
+          typography: { display: "Space Grotesk", body: "Inter" },
+          palette: { background: "#fdfae7", surface: "#f4f1e8", text: "#111111", accent: "#1e2bfa", secondary: "#6b6b6b" },
+          signatureElements: ["executive report structure"],
+          boldTemplate: {
+            slug: "blue-professional",
+            tagline: "Cream paper background with electric cobalt blue accents; clean modern professional.",
+            mood: ["professional"],
+            tone: ["clean"],
+            formality: "medium-high",
+            density: "medium",
+            scheme: "light",
+            bestFor: "Executive briefings",
+            avoidFor: "Playful decks",
+            previewMd: "bold-template-pack/templates/blue-professional/preview.md",
+            designMd: "bold-template-pack/templates/blue-professional/design.md",
+          },
+        },
+      },
+      {
+        skill: "rules",
+        htmlTemplate: "template",
+        viewportBaseCss: "viewport",
+        animationPatterns: "motion",
+        boldTemplateDesign: {
+          name: "Blue Professional",
+          slug: "blue-professional",
+          path: "bold-template-pack/templates/blue-professional/design.md",
+          content: "Use warm cream canvas and saturated cobalt accents.",
+        },
+      },
+    );
+
+    expect(prompt).toContain("Selected bold template design recipe (NON-NEGOTIABLE)");
+    expect(prompt).toContain("frontend-slides/bold-template-pack/templates/blue-professional/design.md");
+    expect(prompt).toContain("Use warm cream canvas and saturated cobalt accents.");
+  });
+
   it("applies a confirmed content revision without turning it into a style request", () => {
     const prompt = buildFrontendSlidesMastraPrompt(
       {

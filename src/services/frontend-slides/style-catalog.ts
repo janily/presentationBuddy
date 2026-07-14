@@ -1,5 +1,6 @@
 import type { FrontendSlidesDensity, FrontendSlidesPurpose, FrontendSlidesStylePreview, FrontendSlidesStyleSpec } from "./style-schema";
 export type { FrontendSlidesDensity, FrontendSlidesPurpose, FrontendSlidesStylePreview, FrontendSlidesStyleSpec } from "./style-schema";
+import boldTemplateSelectionIndex from "../../../.claude/skills/frontend-slides/bold-template-pack/selection-index.json";
 
 export type FrontendSlidesDiscoveryInput = {
   topic: string;
@@ -13,7 +14,22 @@ export type FrontendSlidesDiscoveryOptions = {
   excludeIds?: string[];
 };
 
-const styles: FrontendSlidesStyleSpec[] = [
+type BoldTemplateIndexItem = {
+  slug: string;
+  name: string;
+  tagline: string;
+  mood: string[];
+  tone: string[];
+  formality: string;
+  density: string;
+  scheme: string;
+  best_for: string;
+  avoid_for: string;
+  preview_md: string;
+  design_md: string;
+};
+
+const presetAndCustomStyles: FrontendSlidesStyleSpec[] = [
   { id: "bold-signal", name: "Bold Signal", source: "frontend-slides-preset", vibe: "自信、现代、高冲击力", layout: "深色渐变舞台上的高饱和焦点卡片", typography: { display: "Archivo Black", body: "Space Grotesk" }, palette: { background: "#1a1a1a", surface: "#2d2d2d", text: "#ffffff", accent: "#ff5722", secondary: "#ffd166" }, signatureElements: ["bold colored card", "large section numbers", "navigation breadcrumbs"] },
   { id: "electric-studio", name: "Electric Studio", source: "frontend-slides-preset", vibe: "大胆、干净、专业、高对比", layout: "白色与电光蓝上下分屏", typography: { display: "Manrope", body: "Manrope" }, palette: { background: "#ffffff", surface: "#4361ee", text: "#0a0a0a", accent: "#4361ee", secondary: "#ffffff" }, signatureElements: ["two-panel split", "accent edge bar", "hero quote typography"] },
   { id: "creative-voltage", name: "Creative Voltage", source: "frontend-slides-preset", vibe: "创意、活力、复古未来感", layout: "电光蓝与深靛双栏构图", typography: { display: "Syne", body: "Space Mono" }, palette: { background: "#0066ff", surface: "#1a1a2e", text: "#ffffff", accent: "#d4ff00", secondary: "#1a1a2e" }, signatureElements: ["halftone texture", "neon badges", "script accents"] },
@@ -28,6 +44,83 @@ const styles: FrontendSlidesStyleSpec[] = [
   { id: "paper-ink", name: "Paper & Ink", source: "frontend-slides-preset", vibe: "文学、克制、深思熟虑", layout: "温暖纸张上的衬线排版与细线", typography: { display: "Cormorant Garamond", body: "Source Serif 4" }, palette: { background: "#faf9f7", surface: "#fffdf9", text: "#1a1a1a", accent: "#c41e3a", secondary: "#6b625b" }, signatureElements: ["drop caps", "pull quotes", "elegant rules"] },
   { id: "circuit-blueprint", name: "Circuit Blueprint", source: "frontend-slides-custom", vibe: "为当前技术主题定制的工程蓝图语言", layout: "非对称技术图纸、坐标标记与模块连线", typography: { display: "Chakra Petch", body: "IBM Plex Mono" }, palette: { background: "#071a2b", surface: "#0d2942", text: "#e8f5ff", accent: "#4de3ff", secondary: "#ffb84d" }, signatureElements: ["circuit traces", "coordinate labels", "blueprint annotations"] },
 ];
+
+const boldTemplatePalettes: Record<string, FrontendSlidesStyleSpec["palette"]> = {
+  dark: { background: "#0a0e27", surface: "#111827", text: "#ffffff", accent: "#5edcf4", secondary: "#f0a6ca" },
+  light: { background: "#fdfae7", surface: "#ffffff", text: "#111111", accent: "#1e2bfa", secondary: "#6b6b6b" },
+  mixed: { background: "#111111", surface: "#f7f1e1", text: "#fff8e8", accent: "#ff5b2e", secondary: "#99e885" },
+};
+
+const boldTemplateTypographyByMood: Array<{ tokens: string[]; typography: FrontendSlidesStyleSpec["typography"] }> = [
+  { tokens: ["retro-tech", "cyberpunk", "geeky", "tech-print"], typography: { display: "Tektur", body: "Chakra Petch" } },
+  { tokens: ["editorial", "literary", "archival", "scholarly"], typography: { display: "Playfair Display", body: "Source Serif 4" } },
+  { tokens: ["professional", "institutional", "trustworthy"], typography: { display: "Space Grotesk", body: "Inter" } },
+  { tokens: ["playful", "graphic", "bold", "pop"], typography: { display: "Inter", body: "Space Grotesk" } },
+  { tokens: ["crafted", "handmade", "tactile"], typography: { display: "Fraunces", body: "DM Sans" } },
+];
+
+function getBoldTemplateTypography(template: BoldTemplateIndexItem) {
+  const tokens = [...template.mood, ...template.tone].map((token) => token.toLowerCase());
+  return boldTemplateTypographyByMood.find((candidate) => candidate.tokens.some((token) => tokens.includes(token)))?.typography
+    ?? { display: "Space Grotesk", body: "Inter" };
+}
+
+function getBoldTemplatePalette(template: BoldTemplateIndexItem) {
+  if (template.slug === "block-frame" || template.slug === "raw-grid") {
+    return { background: "#fffdf5", surface: "#ffffff", text: "#000000", accent: "#fe90e8", secondary: "#f7cb46" };
+  }
+  if (template.slug === "blue-professional" || template.slug === "signal") {
+    return { background: "#fdfae7", surface: "#f4f1e8", text: "#111111", accent: "#1e2bfa", secondary: "#6b6b6b" };
+  }
+  if (template.slug === "8-bit-orbit") {
+    return { background: "#0a0e27", surface: "#0f1b3d", text: "#ffffff", accent: "#5edcf4", secondary: "#f4d03f" };
+  }
+  if (template.slug === "bold-poster" || template.slug === "broadside") {
+    return { background: "#f8f3e8", surface: "#111111", text: "#111111", accent: "#f0442f", secondary: "#222222" };
+  }
+  return boldTemplatePalettes[template.scheme] ?? boldTemplatePalettes.light;
+}
+
+function getBoldTemplateSignatureElements(template: BoldTemplateIndexItem) {
+  const signatures = new Set<string>();
+  const haystack = `${template.tagline} ${template.mood.join(" ")} ${template.tone.join(" ")}`.toLowerCase();
+
+  if (/grid|graph|ledger/.test(haystack)) signatures.add("grid-led composition");
+  if (/poster|broadside|editorial|zine|literary/.test(haystack)) signatures.add("editorial type hierarchy");
+  if (/pixel|crt|retro|windows|8-bit/.test(haystack)) signatures.add("retro digital chrome");
+  if (/brutalist|border|block|raw/.test(haystack)) signatures.add("hard borders and offsets");
+  if (/warm|paper|parchment|vellum|crafted|tactile/.test(haystack)) signatures.add("paper texture rhythm");
+  if (/professional|institutional|trustworthy|consulting/.test(haystack)) signatures.add("executive report structure");
+
+  signatures.add(template.tagline);
+  return [...signatures].slice(0, 4);
+}
+
+const boldTemplateStyles: FrontendSlidesStyleSpec[] = (boldTemplateSelectionIndex.templates as BoldTemplateIndexItem[]).map((template) => ({
+  id: `bold-template-${template.slug}`,
+  name: template.name,
+  source: "frontend-slides-bold-template",
+  vibe: [...template.mood.slice(0, 3), ...template.tone.slice(0, 2)].join("、"),
+  layout: template.tagline,
+  typography: getBoldTemplateTypography(template),
+  palette: getBoldTemplatePalette(template),
+  signatureElements: getBoldTemplateSignatureElements(template),
+  boldTemplate: {
+    slug: template.slug,
+    tagline: template.tagline,
+    mood: template.mood,
+    tone: template.tone,
+    formality: template.formality,
+    density: template.density,
+    scheme: template.scheme,
+    bestFor: template.best_for,
+    avoidFor: template.avoid_for,
+    previewMd: template.preview_md,
+    designMd: template.design_md,
+  },
+}));
+
+const styles: FrontendSlidesStyleSpec[] = [...presetAndCustomStyles, ...boldTemplateStyles];
 
 const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]!);
 
@@ -58,25 +151,84 @@ export function listFrontendSlideStyles() {
   return [...styles];
 }
 
+function getPreferredPresetIds(input: FrontendSlidesDiscoveryInput) {
+  const technical = /developer|typescript|javascript|agent|framework|api|开发|技术|框架|代码/i.test(`${input.topic} ${input.audience}`);
+
+  if (technical) return ["terminal-green", "swiss-modern"];
+  if (input.purpose === "pitch-deck") return ["bold-signal", "electric-studio"];
+  if (input.purpose === "conference-talk") return ["creative-voltage", "vintage-editorial"];
+  if (input.purpose === "internal-presentation") return ["notebook-tabs", "paper-ink", "swiss-modern"];
+  return ["notebook-tabs", "paper-ink"];
+}
+
+function getPreferredBoldTemplateIds(input: FrontendSlidesDiscoveryInput) {
+  const haystack = `${input.topic} ${input.audience}`.toLowerCase();
+  const formal = /board|investor|legal|regulatory|healthcare|finance|executive|cfo|ceo|董事会|投资人|法务|合规|医疗|金融|高管/.test(haystack)
+    || input.purpose === "internal-presentation";
+  const technical = /developer|typescript|javascript|agent|framework|api|开发|技术|框架|代码/.test(haystack);
+
+  const slugs = technical
+    ? ["8-bit-orbit", "cobalt-grid", "blue-professional", "neo-grid-bold", "studio"]
+    : formal
+      ? ["blue-professional", "signal", "cartesian", "monochrome", "cobalt-grid"]
+      : input.purpose === "pitch-deck"
+        ? ["bold-poster", "block-frame", "blue-professional", "coral", "neo-grid-bold"]
+        : input.purpose === "conference-talk"
+          ? ["broadside", "bold-poster", "8-bit-orbit", "studio", "biennale-yellow"]
+          : ["blue-professional", "cartesian", "cobalt-grid", "block-frame", "signal"];
+
+  const densitySlugs = input.density === "reading-first"
+    ? ["signal", "monochrome", "neo-grid-bold", "raw-grid", "block-frame"]
+    : ["bold-poster", "cartesian", "soft-editorial", "vellum"];
+
+  return [...slugs, ...densitySlugs].map((slug) => `bold-template-${slug}`);
+}
+
+function getWildcardIds(input: FrontendSlidesDiscoveryInput) {
+  const technical = /developer|typescript|javascript|agent|framework|api|开发|技术|框架|代码/i.test(`${input.topic} ${input.audience}`);
+  if (technical) return ["circuit-blueprint", "creative-voltage", "bold-template-cobalt-grid"];
+  if (input.purpose === "pitch-deck") return ["dark-botanical", "circuit-blueprint", "bold-template-block-frame"];
+  if (input.purpose === "conference-talk") return ["circuit-blueprint", "neon-cyber", "bold-template-studio"];
+  return ["swiss-modern", "dark-botanical", "bold-template-cartesian"];
+}
+
+function pushFirstAvailable(target: string[], ids: string[], excludeIds: Set<string>) {
+  const candidate = ids.find((id) => !excludeIds.has(id) && !target.includes(id) && getFrontendSlideStyle(id));
+  if (candidate) target.push(candidate);
+}
+
+function buildRankedStyleIds(input: FrontendSlidesDiscoveryInput, excludeIds: Set<string>, limit: number) {
+  const selectedIds: string[] = [];
+  const presetIds = getPreferredPresetIds(input);
+  const boldIds = getPreferredBoldTemplateIds(input);
+  const wildcardIds = getWildcardIds(input);
+
+  if (excludeIds.size === 0) {
+    pushFirstAvailable(selectedIds, presetIds, excludeIds);
+    pushFirstAvailable(selectedIds, boldIds, excludeIds);
+    pushFirstAvailable(selectedIds, wildcardIds, excludeIds);
+  }
+
+  const rankedIds = [
+    ...selectedIds,
+    ...presetIds,
+    ...boldIds,
+    ...wildcardIds,
+    ...styles.map((style) => style.id),
+  ].filter((id, index, all) => all.indexOf(id) === index);
+
+  return rankedIds
+    .filter((id) => !excludeIds.has(id))
+    .slice(0, limit);
+}
+
 export function discoverFrontendSlideStyles(
   input: FrontendSlidesDiscoveryInput,
   catalogSource?: string,
   options: FrontendSlidesDiscoveryOptions = {},
 ): FrontendSlidesStylePreview[] {
-  const technical = /developer|typescript|javascript|agent|framework|api|开发|技术|框架|代码/i.test(`${input.topic} ${input.audience}`);
-  const preferredIds = technical
-    ? ["terminal-green", "swiss-modern", "circuit-blueprint"]
-    : input.purpose === "pitch-deck"
-      ? ["bold-signal", "dark-botanical", "circuit-blueprint"]
-      : input.purpose === "conference-talk"
-        ? ["creative-voltage", "vintage-editorial", "circuit-blueprint"]
-        : ["notebook-tabs", "paper-ink", "circuit-blueprint"];
-
   const excludeIds = new Set(options.excludeIds ?? []);
-  const rankedIds = [...preferredIds, ...styles.map((style) => style.id)]
-    .filter((id, index, all) => all.indexOf(id) === index)
-    .filter((id) => !excludeIds.has(id))
-    .slice(0, options.limit ?? 3);
+  const rankedIds = buildRankedStyleIds(input, excludeIds, options.limit ?? 3);
 
   return rankedIds.map((id) => {
     const style = getFrontendSlideStyle(id)!;
@@ -87,6 +239,9 @@ export function discoverFrontendSlideStyles(
         throw new Error(`frontend-slides preset ${style.name} drifted from STYLE_PRESETS.md; missing: ${missingTokens.join(", ")}`);
       }
     }
-    return { style, previewImage: `/style-previews/${style.id}.svg` };
+    return {
+      style,
+      previewImage: `/style-previews/${style.id}.svg`,
+    };
   });
 }

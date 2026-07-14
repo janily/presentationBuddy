@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import type { FrontendSlidesStyleSpec } from "./style-schema";
 
 export type FrontendSlidesFinalContext = {
   skill: string;
@@ -7,6 +8,12 @@ export type FrontendSlidesFinalContext = {
   viewportBaseCss: string;
   animationPatterns: string;
   stylePresets?: string;
+  boldTemplateDesign?: {
+    name: string;
+    slug: string;
+    path: string;
+    content: string;
+  };
 };
 
 export type FrontendSlidesDiscoveryContext = {
@@ -41,7 +48,20 @@ async function readOptionalSkillFile(relativePath: string) {
   }
 }
 
-export async function loadFrontendSlidesFinalContext(): Promise<FrontendSlidesFinalContext> {
+async function loadSelectedBoldTemplateDesign(styleSpec?: FrontendSlidesStyleSpec) {
+  if (styleSpec?.source !== "frontend-slides-bold-template" || !styleSpec.boldTemplate?.designMd) {
+    return undefined;
+  }
+
+  return {
+    name: styleSpec.name,
+    slug: styleSpec.boldTemplate.slug,
+    path: styleSpec.boldTemplate.designMd,
+    content: await readSkillFile(styleSpec.boldTemplate.designMd),
+  };
+}
+
+export async function loadFrontendSlidesFinalContext(styleSpec?: FrontendSlidesStyleSpec): Promise<FrontendSlidesFinalContext> {
   const [skill, htmlTemplate, viewportBaseCss, animationPatterns, stylePresets] = await Promise.all([
     readSkillFile("SKILL.md"),
     readSkillFile("html-template.md"),
@@ -49,6 +69,7 @@ export async function loadFrontendSlidesFinalContext(): Promise<FrontendSlidesFi
     readSkillFile("animation-patterns.md"),
     readOptionalSkillFile("STYLE_PRESETS.md"),
   ]);
+  const boldTemplateDesign = await loadSelectedBoldTemplateDesign(styleSpec);
 
   return {
     skill,
@@ -56,6 +77,7 @@ export async function loadFrontendSlidesFinalContext(): Promise<FrontendSlidesFi
     viewportBaseCss,
     animationPatterns,
     stylePresets,
+    boldTemplateDesign,
   };
 }
 

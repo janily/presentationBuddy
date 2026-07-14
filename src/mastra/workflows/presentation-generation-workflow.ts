@@ -694,7 +694,7 @@ export const presentationHtmlGenerationStep = createStep({
 
     const frontendSlidesStartedAt = Date.now();
     try {
-      const frontendSlidesContext = await loadFrontendSlidesFinalContext();
+      const frontendSlidesContext = await loadFrontendSlidesFinalContext(frontendSlidesInput.styleSpec);
       const frontendSlidesAgent = mastra.getAgent("frontendSlidesComposerAgent");
 
       const runFrontendSlidesAttempt = async (prompt: string, attempt: "initial" | "repair") => {

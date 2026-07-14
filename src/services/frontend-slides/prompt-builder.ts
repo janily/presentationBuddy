@@ -32,6 +32,16 @@ ${JSON.stringify(input.styleSpec, null, 2)}
 
 Preserve this contract's typography, palette, layout grammar, signature elements, and visual rhythm across every slide. Do not substitute another preset or generic theme.` : "No visual style has been selected; infer a distinctive custom system from the brief."}
 
+${context.boldTemplateDesign ? `Selected bold template design recipe (NON-NEGOTIABLE):
+Name: ${context.boldTemplateDesign.name}
+Slug: ${context.boldTemplateDesign.slug}
+Source: frontend-slides/${context.boldTemplateDesign.path}
+
+Use this design.md as the final deck's style recipe. Preserve its fonts, palette, decorative vocabulary, spacing rhythm, and component grammar, translated into the fixed 1920x1080 frontend-slides stage. Do not copy demo content from the template.
+
+=== frontend-slides/${context.boldTemplateDesign.path} ===
+${context.boldTemplateDesign.content}` : ""}
+
 ${input.revisionInstruction ? `Confirmed revision (NON-NEGOTIABLE):
 ${input.revisionInstruction}
 ${input.revisionTargetSlides?.length ? `Apply it specifically to slide(s): ${input.revisionTargetSlides.join(", ")}.` : "Apply it to the relevant slides only."}

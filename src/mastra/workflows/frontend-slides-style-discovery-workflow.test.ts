@@ -18,6 +18,7 @@ describe("frontendSlidesStyleDiscoveryWorkflow", () => {
     if (result.status === "success") {
       expect(result.result.previews).toHaveLength(3);
       expect(result.result.previews[0].style.source).toBe("frontend-slides-preset");
+      expect(result.result.previews.some((preview) => preview.style.source === "frontend-slides-bold-template")).toBe(true);
       expect(result.result.remaining).toBeGreaterThan(0);
     }
   });

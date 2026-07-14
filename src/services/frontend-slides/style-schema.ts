@@ -6,7 +6,7 @@ export const frontendSlidesDensitySchema = z.enum(["speaker-led", "reading-first
 export const frontendSlidesStyleSpecSchema = z.object({
   id: z.string(),
   name: z.string(),
-  source: z.enum(["frontend-slides-preset", "frontend-slides-custom"]),
+  source: z.enum(["frontend-slides-preset", "frontend-slides-custom", "frontend-slides-bold-template"]),
   vibe: z.string(),
   layout: z.string(),
   typography: z.object({ display: z.string(), body: z.string() }),
@@ -18,6 +18,19 @@ export const frontendSlidesStyleSpecSchema = z.object({
     secondary: z.string(),
   }),
   signatureElements: z.array(z.string()),
+  boldTemplate: z.object({
+    slug: z.string(),
+    tagline: z.string(),
+    mood: z.array(z.string()),
+    tone: z.array(z.string()),
+    formality: z.string(),
+    density: z.string(),
+    scheme: z.string(),
+    bestFor: z.string(),
+    avoidFor: z.string(),
+    previewMd: z.string(),
+    designMd: z.string(),
+  }).optional(),
 });
 
 export const frontendSlidesStylePreviewSchema = z.object({
