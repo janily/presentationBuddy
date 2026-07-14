@@ -86,7 +86,17 @@ function setTerminalStatus(
   return updated;
 }
 
-export function markProposalConsumed(proposalId: string) {
+export function assertProposalExecution(proposalId: string, expectedExecutionId: string) {
+  const proposal = getAgentProposal(proposalId);
+  if (!proposal) throw new Error("Proposal not found");
+  if (proposal.status !== "executing" || proposal.executionId !== expectedExecutionId) {
+    throw new Error("Proposal execution attempt no longer matches the publishing workflow");
+  }
+  return proposal;
+}
+
+export function markProposalConsumed(proposalId: string, expectedExecutionId?: string) {
+  if (expectedExecutionId) assertProposalExecution(proposalId, expectedExecutionId);
   return setTerminalStatus(proposalId, "consumed");
 }
 

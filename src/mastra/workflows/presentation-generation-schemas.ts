@@ -7,6 +7,7 @@ export const artifactOperationSchema = z.object({
   baseVersion: z.number().int().min(0),
   targetVersion: z.number().int().positive(),
   proposalId: z.string().trim().min(1).optional(),
+  executionId: z.string().trim().min(1).optional(),
 }).superRefine((artifact, context) => {
   if (artifact.targetVersion !== artifact.baseVersion + 1) {
     context.addIssue({

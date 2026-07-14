@@ -1,5 +1,6 @@
 import z from "zod";
 import { presentationRevisionRequestSchema } from "@/src/mastra/workflows/presentation-generation-schemas";
+import { applyPaletteRevision } from "@/src/services/frontend-slides/palette-revision";
 
 type ValidatedRevisionRequest = z.infer<typeof presentationRevisionRequestSchema>;
 
@@ -28,7 +29,9 @@ export function buildRevisionWorkflowPlan(request: ValidatedRevisionRequest) {
       presentationBrief.requirements,
       `Revision request (${revision.kind}): ${revision.instruction}`,
     ].filter(Boolean).join("\n\n"),
-    styleSpec: revision.kind === "palette" ? undefined : presentationBrief.styleSpec,
+    styleSpec: revision.kind === "palette"
+      ? applyPaletteRevision(presentationBrief.styleSpec, revision.instruction)
+      : presentationBrief.styleSpec,
     artifact,
   };
 

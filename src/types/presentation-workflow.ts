@@ -49,6 +49,7 @@ export type ArtifactOperation = {
   baseVersion: number;
   targetVersion: number;
   proposalId?: string;
+  executionId?: string;
 };
 
 export type DeckArtifact = {

@@ -104,7 +104,12 @@ describe("revision workflow planning", () => {
     expect(plan.workflowKind).toBe("html-revision");
     if (plan.workflowKind !== "html-revision") throw new Error("Expected HTML revision plan");
     expect(plan.inputData.style).toContain("把配色改成深蓝和青色");
-    expect(plan.inputData.styleSpec).toBeUndefined();
+    expect(plan.inputData.styleSpec).toMatchObject({
+      layout: "Paper layout",
+      typography: { display: "Fraunces", body: "Source Serif 4" },
+      palette: { accent: "#123b6d", secondary: "#16c7c7" },
+      signatureElements: ["rules"],
+    });
     expect(plan.inputData.outline).toBe(outline);
   });
 });

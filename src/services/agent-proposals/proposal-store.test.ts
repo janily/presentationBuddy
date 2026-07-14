@@ -104,4 +104,13 @@ describe("agent proposal store", () => {
     expect(() => markProposalCancelled("proposal-1", firstExecution.executionId!)).toThrow(/execution attempt/i);
     expect(getAgentProposal("proposal-1")).toEqual(retriedExecution);
   });
+
+  it("does not let an older execution attempt consume a retried proposal", () => {
+    saveAgentProposal(proposal);
+    const firstExecution = beginProposalExecution("proposal-1", { deckId: "deck-1", version: 2 });
+    const retriedExecution = resumeProposalExecution("proposal-1", { deckId: "deck-1", version: 2 });
+
+    expect(() => markProposalConsumed("proposal-1", firstExecution.executionId)).toThrow(/publishing workflow/i);
+    expect(markProposalConsumed("proposal-1", retriedExecution.executionId).status).toBe("consumed");
+  });
 });

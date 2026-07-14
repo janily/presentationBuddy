@@ -17,6 +17,7 @@ import { dispatchAgentChatUIChunk, type AgentChatStreamCallbacks } from "./agent
 import { applyReasoningEvent, stopStreamingAssistantMessage } from "./agent-message-stream-state";
 import { requestsCancelledGenerationRetry } from "./cancelled-generation-retry";
 import { discoverFrontendSlideStyles, listFrontendSlideStyles, type FrontendSlidesStylePreview, type FrontendSlidesStyleSpec } from "@/src/services/frontend-slides/style-catalog";
+import { applyPaletteRevision } from "@/src/services/frontend-slides/palette-revision";
 import { isStructureChangingRevision } from "./revision-routing";
 import type { AgentActionProposal, AgentChatResponse, AgentChatUIChunk, AgentChatUIMessage } from "@/src/types/agent-chat";
 import {
@@ -302,7 +303,7 @@ export default function PresentationStudio() {
     return () => window.clearTimeout(timeout);
   }, [htmlGenerationStep?.data?.lastUpdatedAt, htmlGenerationStep?.data?.status, stop]);
 
-  const beginRevision = useCallback((revision: RevisionSpec, proposalId?: string) => {
+  const beginRevision = useCallback((revision: RevisionSpec, proposal?: AgentActionProposal) => {
     const baselineOutline = activeArtifact?.outline ?? baseOutline;
     const baselineBrief = activeArtifact?.brief ?? brief;
     if (!baselineOutline || !baselineBrief || revision.requiresOutlineReview) return false;
@@ -313,7 +314,8 @@ export default function PresentationStudio() {
       deckId: activeArtifact?.deckId ?? activeHtmlGenerationStepData?.artifact?.deckId ?? deckIdRef.current,
       baseVersion,
       targetVersion: baseVersion + 1,
-      proposalId,
+      proposalId: proposal?.proposalId,
+      executionId: proposal?.executionId,
     };
     const isPaletteRevision = revision.kind === "palette";
     const revisedBrief: PresentationBrief = {
@@ -323,7 +325,7 @@ export default function PresentationStudio() {
           ? `${baselineBrief.style}. Palette revision: ${revision.instruction}`
           : baselineBrief.style),
       styleSpec: isPaletteRevision
-        ? undefined
+        ? applyPaletteRevision(baselineBrief.styleSpec, revision.instruction)
         : revision.styleSpec ?? baselineBrief.styleSpec,
       requirements: [baselineBrief.requirements, revision.instruction].filter(Boolean).join("\n\n"),
     };
@@ -349,6 +351,7 @@ export default function PresentationStudio() {
       baseVersion: activeArtifact.version,
       targetVersion: activeArtifact.version + 1,
       proposalId: proposal.proposalId,
+      executionId: proposal.executionId,
     };
     const slideCount = resolveStructureRevisionPageCount(
       activeArtifact.outline.slides.length,
@@ -397,7 +400,7 @@ export default function PresentationStudio() {
     const revision = buildRevisionFromProposal(proposal);
     const started = proposal.requiresOutlineReview
       ? beginStructureRevision(proposal)
-      : beginRevision(revision, proposal.proposalId);
+      : beginRevision(revision, proposal);
 
     if (!started) return false;
 
@@ -618,11 +621,11 @@ export default function PresentationStudio() {
     }
 
     if (lastCancelledArtifact && requestsCancelledGenerationRetry(message)) {
-      const operation: ArtifactOperation = {
+      let operation: ArtifactOperation = {
         ...lastCancelledArtifact.operation,
         operationId: `operation-${makeId()}`,
       };
-      const resumedArtifact: PendingArtifact = { ...lastCancelledArtifact, operation };
+      let resumedArtifact: PendingArtifact = { ...lastCancelledArtifact, operation };
 
       setLastCancelledArtifact(null);
       setHtmlWatchdogError(null);
@@ -642,6 +645,9 @@ export default function PresentationStudio() {
       try {
         if (pendingProposal?.proposalId) {
           const resumedProposal = await persistResumedProposal(pendingProposal.proposalId, operation);
+          operation = { ...operation, executionId: resumedProposal.executionId };
+          resumedArtifact = { ...resumedArtifact, operation };
+          setPendingArtifact(resumedArtifact);
           setPendingProposal(resumedProposal);
         }
 
@@ -944,7 +950,10 @@ export default function PresentationStudio() {
               pendingProposal.proposalId,
               retryOperation,
             );
-            retryArtifact = { ...pendingArtifact, operation: retryOperation };
+            retryArtifact = {
+              ...pendingArtifact,
+              operation: { ...retryOperation, executionId: resumedProposal.executionId },
+            };
             setPendingArtifact(retryArtifact);
             setPendingProposal(resumedProposal);
           } catch (error) {

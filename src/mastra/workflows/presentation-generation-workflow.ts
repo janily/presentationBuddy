@@ -10,7 +10,10 @@ import { loadFrontendSlidesFinalContext } from "@/src/services/frontend-slides/s
 import { buildFrontendSlidesMastraPrompt } from "@/src/services/frontend-slides/prompt-builder";
 import { saveHtmlToFile } from "@/src/utils/save-html-to-file";
 import { savePresentationArtifact } from "@/src/services/presentation-artifacts/artifact-store";
-import { markProposalConsumed } from "@/src/services/agent-proposals/proposal-store";
+import {
+  assertProposalExecution,
+  markProposalConsumed,
+} from "@/src/services/agent-proposals/proposal-store";
 import { mapOutlineToFrontendSlides } from "@/src/utils/outline-to-slides-mapper";
 import { presentationInputSchema, presentationOutlineSchema } from "./presentation-generation-schemas";
 import { validateOutlineRevisionResult } from "./outline-revision-validation";
@@ -894,6 +897,9 @@ export const presentationHtmlGenerationStep = createStep({
     abortSignal?.throwIfAborted();
 
     if (inputData.artifact) {
+      if (inputData.artifact.proposalId && inputData.artifact.executionId) {
+        assertProposalExecution(inputData.artifact.proposalId, inputData.artifact.executionId);
+      }
       savePresentationArtifact({
         operation: inputData.artifact,
         brief: {
@@ -912,7 +918,7 @@ export const presentationHtmlGenerationStep = createStep({
         htmlUrl,
       });
       if (inputData.artifact.proposalId) {
-        markProposalConsumed(inputData.artifact.proposalId);
+        markProposalConsumed(inputData.artifact.proposalId, inputData.artifact.executionId);
       }
     }
 
