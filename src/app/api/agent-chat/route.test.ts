@@ -33,6 +33,33 @@ describe("agent chat intent guard", () => {
   it("does not intercept an ordinary question", () => {
     expect(detectExplicitAction("Mastra 和 LangGraph 有什么区别？", true)).toBeNull();
   });
+
+  it("turns a concrete palette request into a confirmable revision", () => {
+    const result = applyIntentGuard(baseDecision, "把配色改成深蓝和青色", true, {
+      explicitlyConfirmedGeneration: () => false,
+    });
+
+    expect(result.nextAction).toBe("change-palette");
+    expect(result.revision).toEqual({
+      instruction: "把配色改成深蓝和青色",
+      requiresOutlineReview: false,
+    });
+  });
+
+  it("fills a missing palette revision even when the model classified the action correctly", () => {
+    const result = applyIntentGuard({
+      ...baseDecision,
+      nextAction: "change-palette",
+      revision: null,
+    }, "把配色改成深蓝和青色", true, {
+      explicitlyConfirmedGeneration: () => false,
+    });
+
+    expect(result.revision).toEqual({
+      instruction: "把配色改成深蓝和青色",
+      requiresOutlineReview: false,
+    });
+  });
 });
 
 describe("agent action proposal policy", () => {
@@ -79,6 +106,28 @@ describe("agent action proposal policy", () => {
       proposalId: "proposal-1",
       createdAt: "2026-07-13T00:00:00.000Z",
     })).toBeNull();
+  });
+
+  it("creates a version-bound proposal for a palette revision", () => {
+    expect(createActionProposal({
+      ...baseDecision,
+      reply: "将配色改为深蓝和青色，保持内容与版式不变。",
+      nextAction: "change-palette",
+      revision: {
+        instruction: "把配色改成深蓝和青色",
+        requiresOutlineReview: false,
+      },
+    }, {
+      deckId: "deck-1",
+      version: 4,
+      proposalId: "proposal-palette",
+      createdAt: "2026-07-13T00:00:00.000Z",
+    })).toMatchObject({
+      action: "change-palette",
+      instruction: "把配色改成深蓝和青色",
+      baseVersion: 4,
+      status: "pending",
+    });
   });
 });
 

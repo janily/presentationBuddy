@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { AgentActionProposal } from "@/src/types/agent-chat";
-import { resolveProposalConfirmation, resolveStructureRevisionPageCount } from "./proposal-routing";
+import {
+  buildRevisionFromProposal,
+  resolveProposalConfirmation,
+  resolveStructureRevisionPageCount,
+} from "./proposal-routing";
 
 const proposal: AgentActionProposal = {
   proposalId: "proposal-1",
@@ -76,5 +80,21 @@ describe("structure revision page count", () => {
 
   it("keeps the count when the instruction only reorders sections", () => {
     expect(resolveStructureRevisionPageCount(8, "调整章节顺序，把案例放到结尾")).toBe(8);
+  });
+});
+
+describe("proposal workflow mapping", () => {
+  it("maps a palette proposal to a palette-only HTML revision", () => {
+    expect(buildRevisionFromProposal({
+      ...proposal,
+      action: "change-palette",
+      instruction: "把配色改成深蓝和青色",
+      requiresOutlineReview: false,
+    })).toEqual({
+      kind: "palette",
+      instruction: "把配色改成深蓝和青色",
+      targetSlides: undefined,
+      requiresOutlineReview: false,
+    });
   });
 });

@@ -17,7 +17,11 @@ export function createActionProposal(
   context: ActionProposalContext,
 ): AgentActionProposal | null {
   if (
-    (decision.nextAction !== "revise-content" && decision.nextAction !== "revise-structure")
+    (
+      decision.nextAction !== "revise-content"
+      && decision.nextAction !== "revise-structure"
+      && decision.nextAction !== "change-palette"
+    )
     || !decision.revision?.instruction.trim()
   ) {
     return null;
@@ -61,15 +65,27 @@ export function applyIntentGuard(
   const explicitAction = detectExplicitAction(lastUserMessage, hasGeneratedDeck);
   if (!explicitAction || options.explicitlyConfirmedGeneration(lastUserMessage)) return decision;
 
-  if (explicitAction === decision.nextAction) return decision;
+  const actionNeedsRevision = explicitAction === "revise-content"
+    || explicitAction === "revise-structure"
+    || explicitAction === "change-palette";
+  if (
+    explicitAction === decision.nextAction
+    && (!actionNeedsRevision || Boolean(decision.revision?.instruction.trim()))
+  ) return decision;
 
-  if (explicitAction === "revise-content" || explicitAction === "revise-structure") {
+  if (
+    explicitAction === "revise-content"
+    || explicitAction === "revise-structure"
+    || explicitAction === "change-palette"
+  ) {
     const requiresOutlineReview = explicitAction === "revise-structure";
     return {
       ...decision,
-      reply: requiresOutlineReview
-        ? "明白，你想调整现有内容结构。我会先基于当前大纲整理需要增删或重排的页面，确认新版大纲后再生成。"
-        : "明白，你想在保持当前视觉方向和页数的基础上丰富内容。我会结合现有大纲补充论点、示例和必要细节，确认后再应用修改。",
+      reply: explicitAction === "change-palette"
+        ? `明白，我会按「${lastUserMessage}」调整配色，并保持当前内容、页数和版式不变。确认后应用修改。`
+        : requiresOutlineReview
+          ? "明白，你想调整现有内容结构。我会先基于当前大纲整理需要增删或重排的页面，确认新版大纲后再生成。"
+          : "明白，你想在保持当前视觉方向和页数的基础上丰富内容。我会结合现有大纲补充论点、示例和必要细节，确认后再应用修改。",
       readyToGenerate: false,
       nextAction: explicitAction,
       revision: { instruction: lastUserMessage, requiresOutlineReview },
@@ -81,9 +97,7 @@ export function applyIntentGuard(
     ...decision,
     reply: explicitAction === "more-styles"
       ? "好的，我会避开已经展示过的方案，再推荐一批不同的 frontend-slides 视觉方向。"
-      : explicitAction === "change-palette"
-        ? "明白，你想调整配色。我会保留现有内容与版式方向，先确认新的色彩倾向。"
-        : "好的，我会根据当前主题重新准备一组 frontend-slides 视觉方向供你比较。",
+      : "好的，我会根据当前主题重新准备一组 frontend-slides 视觉方向供你比较。",
     readyToGenerate: false,
     nextAction: explicitAction,
     revision: null,

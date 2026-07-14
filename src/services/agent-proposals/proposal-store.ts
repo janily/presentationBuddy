@@ -48,6 +48,27 @@ export function beginProposalExecution(proposalId: string, artifact: ArtifactIde
   return executing;
 }
 
+export function resumeProposalExecution(proposalId: string, artifact: ArtifactIdentity) {
+  const store = getStore();
+  const proposal = store.get(proposalId);
+  if (!proposal) throw new Error("Proposal not found");
+  if (proposal.deckId !== artifact.deckId || proposal.baseVersion !== artifact.version) {
+    throw new Error("Proposal artifact version does not match the current presentation");
+  }
+  if (proposal.status === "executing") return proposal;
+  if (proposal.status !== "cancelled") {
+    throw new Error(`Only a cancelled proposal can be resumed; proposal is ${proposal.status}`);
+  }
+
+  const executing: AgentActionProposal = {
+    ...proposal,
+    status: "executing",
+    executionStartedAt: new Date().toISOString(),
+  };
+  store.set(proposalId, executing);
+  return executing;
+}
+
 function setTerminalStatus(
   proposalId: string,
   status: Extract<AgentActionProposal["status"], "consumed" | "cancelled">,

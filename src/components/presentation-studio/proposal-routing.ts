@@ -1,4 +1,5 @@
 import type { AgentActionProposal } from "@/src/types/agent-chat";
+import type { RevisionSpec } from "@/src/types/presentation-workflow";
 import { classifyProposalConfirmation } from "@/src/utils/proposal-confirmation";
 
 type CurrentArtifactIdentity = {
@@ -35,6 +36,25 @@ export function resolveProposalConfirmation(
   }
 
   return { kind: "execute", proposal };
+}
+
+export function buildRevisionFromProposal(proposal: AgentActionProposal): RevisionSpec {
+  const kind = proposal.action === "revise-structure"
+    ? "structure"
+    : proposal.action === "change-palette"
+      ? "palette"
+      : proposal.action === "change-style"
+        ? "style"
+        : proposal.action === "mixed"
+          ? "mixed"
+          : "content";
+
+  return {
+    kind,
+    instruction: proposal.instruction,
+    targetSlides: proposal.targetSlides,
+    requiresOutlineReview: proposal.requiresOutlineReview,
+  };
 }
 
 const chineseNumbers: Record<string, number> = {

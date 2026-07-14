@@ -19,7 +19,11 @@ import { requestsCancelledGenerationRetry } from "./cancelled-generation-retry";
 import { discoverFrontendSlideStyles, listFrontendSlideStyles, type FrontendSlidesStylePreview, type FrontendSlidesStyleSpec } from "@/src/services/frontend-slides/style-catalog";
 import { isStructureChangingRevision } from "./revision-routing";
 import type { AgentActionProposal, AgentChatResponse, AgentChatUIChunk, AgentChatUIMessage } from "@/src/types/agent-chat";
-import { resolveProposalConfirmation, resolveStructureRevisionPageCount } from "./proposal-routing";
+import {
+  buildRevisionFromProposal,
+  resolveProposalConfirmation,
+  resolveStructureRevisionPageCount,
+} from "./proposal-routing";
 import PresentationPreviewPane from "./presentation-preview-pane";
 import PresentationWorkspace from "./presentation-workspace";
 import { emptyOutline, toApprovedOutline, toSlideItem, type PresentationBrief, type SlideOutlineItem } from "./presentation-outline-utils";
@@ -59,6 +63,22 @@ function persistCancelledProposal(proposalId: string) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ proposalId, status: "cancelled" }),
   });
+}
+
+async function persistResumedProposal(proposalId: string, operation: ArtifactOperation) {
+  const response = await fetch("/api/agent-chat/proposal-status", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      proposalId,
+      status: "executing",
+      deckId: operation.deckId,
+      baseVersion: operation.baseVersion,
+    }),
+  });
+  if (!response.ok) {
+    throw new Error("无法恢复刚才已停止的修改，请基于当前版本重新确认方案。");
+  }
 }
 
 function toPreviewStep(phase: StudioPhase): PreviewPaneStep {
@@ -362,12 +382,7 @@ export default function PresentationStudio() {
   }, [activeArtifact, sendRevision]);
 
   const executeProposal = useCallback((proposal: AgentActionProposal) => {
-    const revision: RevisionSpec = {
-      kind: proposal.action === "revise-structure" ? "structure" : "content",
-      instruction: proposal.instruction,
-      targetSlides: proposal.targetSlides,
-      requiresOutlineReview: proposal.requiresOutlineReview,
-    };
+    const revision = buildRevisionFromProposal(proposal);
     const started = proposal.requiresOutlineReview
       ? beginStructureRevision(proposal)
       : beginRevision(revision, proposal.proposalId);
@@ -612,7 +627,11 @@ export default function PresentationStudio() {
         },
       ]);
 
-      window.setTimeout(() => {
+      try {
+        if (pendingProposal?.proposalId) {
+          await persistResumedProposal(pendingProposal.proposalId, operation);
+        }
+
         if (resumedArtifact.revision) {
           sendRevision({
             presentationBrief: toBriefData(resumedArtifact.brief),
@@ -627,7 +646,20 @@ export default function PresentationStudio() {
           resumedArtifact.brief.requirements || resumedArtifact.brief.topic,
           toBriefData(resumedArtifact.brief, operation),
         );
-      }, 0);
+      } catch (error) {
+        setPendingArtifact(null);
+        setPendingProposal((current) => current ? { ...current, status: "cancelled" } : null);
+        setChatMessages((current) => [
+          ...current,
+          {
+            id: makeId(),
+            role: "assistant",
+            kind: "text",
+            content: error instanceof Error ? error.message : "恢复执行失败，请重新确认方案。",
+            streamState: "error",
+          },
+        ]);
+      }
       return;
     }
 

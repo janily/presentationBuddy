@@ -5,6 +5,7 @@ import {
   getAgentProposal,
   markProposalCancelled,
   markProposalConsumed,
+  resumeProposalExecution,
   resetAgentProposalStore,
   saveAgentProposal,
 } from "./proposal-store";
@@ -61,5 +62,26 @@ describe("agent proposal store", () => {
 
     expect(() => markProposalCancelled("proposal-1")).toThrow(/already consumed/i);
     expect(getAgentProposal("proposal-1")?.status).toBe("consumed");
+  });
+
+  it("resumes a cancelled proposal against the same artifact version before retrying", () => {
+    saveAgentProposal(proposal);
+    beginProposalExecution("proposal-1", { deckId: "deck-1", version: 2 });
+    markProposalCancelled("proposal-1");
+
+    expect(resumeProposalExecution("proposal-1", { deckId: "deck-1", version: 2 })).toMatchObject({
+      status: "executing",
+      executionStartedAt: expect.any(String),
+    });
+    expect(markProposalConsumed("proposal-1").status).toBe("consumed");
+  });
+
+  it("does not resume a cancelled proposal against a newer artifact version", () => {
+    saveAgentProposal(proposal);
+    beginProposalExecution("proposal-1", { deckId: "deck-1", version: 2 });
+    markProposalCancelled("proposal-1");
+
+    expect(() => resumeProposalExecution("proposal-1", { deckId: "deck-1", version: 3 })).toThrow(/version/i);
+    expect(getAgentProposal("proposal-1")?.status).toBe("cancelled");
   });
 });

@@ -1,11 +1,22 @@
-import { markProposalCancelled } from "@/src/services/agent-proposals/proposal-store";
+import {
+  markProposalCancelled,
+  resumeProposalExecution,
+} from "@/src/services/agent-proposals/proposal-store";
 import { NextResponse } from "next/server";
 import z from "zod";
 
-const requestSchema = z.object({
-  proposalId: z.string().trim().min(1),
-  status: z.literal("cancelled"),
-});
+const requestSchema = z.discriminatedUnion("status", [
+  z.object({
+    proposalId: z.string().trim().min(1),
+    status: z.literal("cancelled"),
+  }),
+  z.object({
+    proposalId: z.string().trim().min(1),
+    status: z.literal("executing"),
+    deckId: z.string().trim().min(1),
+    baseVersion: z.number().int().nonnegative(),
+  }),
+]);
 
 export async function POST(request: Request) {
   const validation = requestSchema.safeParse(await request.json().catch(() => null));
@@ -14,7 +25,13 @@ export async function POST(request: Request) {
   }
 
   try {
-    return NextResponse.json(markProposalCancelled(validation.data.proposalId));
+    const proposal = validation.data.status === "cancelled"
+      ? markProposalCancelled(validation.data.proposalId)
+      : resumeProposalExecution(validation.data.proposalId, {
+          deckId: validation.data.deckId,
+          version: validation.data.baseVersion,
+        });
+    return NextResponse.json(proposal);
   } catch (error) {
     return NextResponse.json({
       error: error instanceof Error ? error.message : "Proposal status update failed",
