@@ -70,7 +70,7 @@ export type AgentRequestData = {
 };
 
 export type OutlineStepData = {
-  status: "loading" | "streaming" | "completed";
+  status: "loading" | "streaming" | "completed" | "failed";
   outline?: Partial<PresentationOutlineData>;
   message?: string;
   progress?: number;
@@ -86,7 +86,7 @@ export type OutlineProgressStep = {
 };
 
 export type HtmlGenerationStepData = {
-  status: "in-progress" | "completed";
+  status: "in-progress" | "completed" | "failed";
   phase?: "structure" | "html" | "styles" | "bundle";
   message?: string;
   progress?: number;

@@ -69,6 +69,14 @@ describe("structure revision page count", () => {
     expect(resolveStructureRevisionPageCount(8, "新增一个 Mastra Workflow 实战案例页")).toBe(9);
   });
 
+  it("accumulates multiple additions in one confirmed proposal", () => {
+    expect(resolveStructureRevisionPageCount(
+      12,
+      "1) 新增一页天气查询 Agent 设计；2) 新增一页完整实现代码",
+    )).toBe(14);
+    expect(resolveStructureRevisionPageCount(12, "新增两页实战内容")).toBe(14);
+  });
+
   it("decrements for an explicit one-slide removal", () => {
     expect(resolveStructureRevisionPageCount(8, "删除一页重复的背景介绍")).toBe(7);
   });
@@ -76,6 +84,7 @@ describe("structure revision page count", () => {
   it("treats an ordinal page reference as one removed slide, not a quantity", () => {
     expect(resolveStructureRevisionPageCount(8, "删除第 5 页重复的背景介绍")).toBe(7);
     expect(resolveStructureRevisionPageCount(12, "删除第10页重复的背景介绍")).toBe(11);
+    expect(resolveStructureRevisionPageCount(14, "删除第12页重复的背景介绍")).toBe(13);
   });
 
   it("keeps the count when the instruction only reorders sections", () => {

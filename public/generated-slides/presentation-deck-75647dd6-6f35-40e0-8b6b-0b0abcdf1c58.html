@@ -1,0 +1,833 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mastra 教程：前端开发者构建带工具 AI Agent</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&display=swap">
+<style>
+/* ===========================================
+   FIXED 16:9 STAGE: MANDATORY BASE STYLES
+   Include this ENTIRE file in every presentation.
+   Slides are authored at 1920×1080 and scaled as a whole.
+   =========================================== */
+
+/* 1. Lock the browser viewport */
+html,
+body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+    background: var(--stage-bg, #000);
+}
+
+/* 2. Full-window deck viewport */
+.deck-viewport {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    background: var(--stage-bg, #000);
+}
+
+/* 3. Fixed 16:9 design canvas.
+   JavaScript sets transform: translate(...) scale(...). */
+.deck-stage {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    transform-origin: 0 0;
+    background: var(--slide-bg, #fff);
+}
+
+/* 4. Slides stack inside the fixed stage.
+   Content must be laid out at 1920×1080, not reflowed per device. */
+.slide {
+    position: absolute;
+    inset: 0;
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    display: block;
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+    background: var(--slide-bg, #fff);
+}
+
+.slide.active,
+.slide.visible {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+    z-index: 1;
+}
+
+/* 5. Keep media inside authored slide bounds */
+img,
+video,
+canvas,
+svg {
+    max-width: 100%;
+    max-height: 100%;
+}
+
+/* 6. Presentation chrome stays outside the slide design system */
+.deck-controls {
+    position: fixed;
+    left: 50%;
+    bottom: 22px;
+    transform: translateX(-50%);
+    z-index: 1000;
+}
+
+/* 7. Print one fixed-size slide per page */
+@media print {
+    html,
+    body {
+        width: 1920px;
+        height: auto;
+        overflow: visible;
+        background: #fff;
+    }
+
+    .deck-viewport {
+        position: static;
+        overflow: visible;
+        background: #fff;
+    }
+
+    .deck-stage {
+        position: static;
+        width: auto;
+        height: auto;
+        transform: none !important;
+        background: none;
+    }
+
+    .slide {
+        position: relative;
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+        width: 1920px;
+        height: 1080px;
+        break-after: page;
+        page-break-after: always;
+    }
+
+    .slide:last-child {
+        break-after: auto;
+        page-break-after: auto;
+    }
+
+    .deck-controls {
+        display: none !important;
+    }
+}
+
+/* 8. Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.2s !important;
+    }
+}
+
+/* ===========================================
+   TERMINAL GREEN THEME CUSTOM PROPERTIES
+   =========================================== */
+:root {
+    --bg-primary: #0A0A0A;
+    --slide-bg: #0A0A0A;
+    --stage-bg: #0A0A0A;
+    --text-primary: #00FF41;
+    --text-secondary: #00B32D;
+    --muted: #4A4A4A;
+    --error: #FF0033;
+    --warn: #FFB000;
+    --font-mono: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+    --title-size: 32px;
+    --body-size: 16px;
+    --code-size: 14px;
+    --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+    --duration-normal: 0.6s;
+}
+
+/* ===========================================
+   BASE TYPOGRAPHY & LAYOUT
+   =========================================== */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+.slide {
+    font-family: var(--font-mono);
+    color: var(--text-primary);
+    background-color: var(--bg-primary);
+    background-image:
+        linear-gradient(rgba(0,255,65,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,255,65,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+}
+
+.slide::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(0deg, rgba(0,0,0,0.15) 0px, rgba(0,0,0,0.15) 1px, transparent 1px, transparent 3px);
+    pointer-events: none;
+    z-index: 0;
+}
+
+.slide > * { position: relative; z-index: 1; }
+
+.slide-grid {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 24px;
+    padding: 40px;
+    height: 100%;
+    align-content: center;
+}
+
+.span-12 { grid-column: span 12; }
+.span-7 { grid-column: span 7; }
+.span-6 { grid-column: span 6; }
+.span-5 { grid-column: span 5; }
+
+.title {
+    font-size: var(--title-size);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-primary);
+    margin-bottom: 16px;
+}
+
+.section-header {
+    font-size: 28px;
+    text-transform: uppercase;
+    color: var(--text-primary);
+    margin-bottom: 20px;
+    border-left: 4px solid var(--text-primary);
+    padding-left: 12px;
+}
+
+.body-text {
+    font-size: var(--body-size);
+    line-height: 1.6;
+    color: var(--text-secondary);
+}
+
+.bullet {
+    list-style: none;
+    font-size: var(--body-size);
+    line-height: 1.8;
+    color: var(--text-secondary);
+}
+
+.bullet li::before {
+    content: "> ";
+    color: var(--text-primary);
+}
+
+/* ===========================================
+   TERMINAL MOCKUP COMPONENTS
+   =========================================== */
+.terminal {
+    border: 1px solid var(--text-primary);
+    border-radius: 4px;
+    background: #0d0d0d;
+    box-shadow: 0 0 12px rgba(0,255,65,0.15);
+    overflow: hidden;
+}
+
+.terminal-header {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    background: #111;
+    border-bottom: 1px solid var(--text-primary);
+}
+
+.dots { display: flex; gap: 6px; }
+.dot { width: 12px; height: 12px; border-radius: 50%; }
+.dot.red { background: #FF5F56; }
+.dot.yellow { background: #FFBD2E; }
+.dot.green { background: #27C93F; }
+
+.terminal-title {
+    margin-left: 12px;
+    color: var(--text-secondary);
+    font-size: var(--code-size);
+}
+
+.terminal-body {
+    padding: 16px;
+    font-size: var(--code-size);
+    line-height: 1.5;
+    color: var(--text-primary);
+    white-space: pre;
+    overflow: auto;
+}
+
+.term-line {
+    font-size: var(--code-size);
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+}
+
+.tok-com { color: var(--muted); }
+.tok-key { color: var(--text-primary); font-weight: 700; }
+.tok-fn { color: var(--text-secondary); }
+.tok-err { color: var(--error); }
+.tok-warn { color: var(--warn); }
+.tok-warn-box {
+    background: rgba(255,176,0,0.15);
+    border: 1px solid var(--warn);
+    padding: 0 4px;
+    color: var(--warn);
+}
+
+.cursor.blink {
+    font-size: 32px;
+    color: var(--text-primary);
+    animation: blink 1s step-end infinite;
+}
+
+@keyframes blink {
+    0%, 49% { opacity: 1; }
+    50%, 100% { opacity: 0; }
+}
+
+/* ===========================================
+   REVEAL ANIMATIONS
+   =========================================== */
+.reveal {
+    opacity: 0;
+    transform: translateY(30px);
+    transition: opacity var(--duration-normal) var(--ease-out-expo),
+                transform var(--duration-normal) var(--ease-out-expo);
+}
+
+.slide.visible .reveal {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.reveal:nth-child(1) { transition-delay: 0.1s; }
+.reveal:nth-child(2) { transition-delay: 0.2s; }
+.reveal:nth-child(3) { transition-delay: 0.3s; }
+.reveal:nth-child(4) { transition-delay: 0.4s; }
+
+/* ===========================================
+   DECK CONTROLS & EDIT TOGGLE
+   =========================================== */
+.deck-controls {
+    font-family: var(--font-mono);
+    color: var(--text-secondary);
+    font-size: 14px;
+    background: rgba(10,10,10,0.8);
+    padding: 6px 14px;
+    border: 1px solid var(--text-primary);
+    border-radius: 4px;
+}
+
+.edit-hotzone {
+    position: fixed; top: 0; left: 0;
+    width: 80px; height: 80px;
+    z-index: 10000;
+    cursor: pointer;
+}
+.edit-toggle {
+    position: fixed; top: 16px; left: 16px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+    z-index: 10001;
+    background: #111;
+    color: var(--text-primary);
+    border: 1px solid var(--text-primary);
+    font-family: var(--font-mono);
+    padding: 6px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+.edit-toggle.show,
+.edit-toggle.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+.editable[contenteditable="true"] {
+    outline: 1px dashed var(--warn);
+}
+</style>
+</head>
+<body>
+<div class="deck-viewport">
+    <main class="deck-stage" id="deckStage">
+
+        <!-- Slide 1 -->
+        <section class="slide active visible" data-slide="1">
+            <div class="slide-grid" style="align-content:start; padding-top:120px;">
+                <div class="span-12">
+                    <div class="term-line">$ ./start-mastra-tutorial.sh</div>
+                    <h1 class="title reveal" style="margin-top:40px;">Mastra 实战：构建带工具的 AI Agent</h1>
+                    <p class="body-text reveal" style="color:var(--text-secondary); font-size:20px;">面向前端开发者的 TypeScript AI 原生框架</p>
+                    <p class="body-text reveal" style="margin-top:20px; color:var(--muted);">TAGS: Node.js / AI Agent / Tool Use / Runnable Example</p>
+                    <div class="cursor blink" style="margin-top:60px;">_</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 2 -->
+        <section class="slide" data-slide="2">
+            <div class="slide-grid">
+                <div class="span-6">
+                    <div class="terminal">
+                        <div class="terminal-header"><div class="dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div><div class="terminal-title">legacy_stack.py</div></div>
+                        <div class="terminal-body"><span class="tok-com"># AI logic forced into Python</span>
+def ask_ai(prompt):
+    import openai
+    return openai.Completion.create(...)
+
+<span class="tok-err"># Frontend devs context-switch</span></div>
+                    </div>
+                </div>
+                <div class="span-6">
+                    <div class="terminal">
+                        <div class="terminal-header"><div class="dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div><div class="terminal-title">mastra_ts.ts</div></div>
+                        <div class="terminal-body"><span class="tok-com">// TS-native, type-safe</span>
+import { createAgent } from '@mastra/core';
+const agent = createAgent({ model: 'gpt-4o-mini' });
+<span class="tok-fn">// seamless Node.js ecosystem</span></div>
+                    </div>
+                </div>
+                <div class="span-12">
+                    <h2 class="section-header reveal">WHY FRONTEND NEEDS MASTRA?</h2>
+                    <ul class="bullet">
+                        <li class="reveal">前端痛点：AI 逻辑常被迫用 Python 写</li>
+                        <li class="reveal">Mastra 优势：TS 原生、与 Node.js 生态无缝、类型安全</li>
+                        <li class="reveal">受众定位：有 Node.js 基础即可上手</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 3 -->
+        <section class="slide" data-slide="3">
+            <div class="slide-grid">
+                <div class="span-7">
+                    <div class="terminal">
+                        <div class="terminal-header"><div class="dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div><div class="terminal-title">concepts.ascii</div></div>
+                        <div class="terminal-body">+---------+       +------+
+| AGENT   | ----> | LLM  |
++---------+       +------+
+    |
+    |  uses
+    v
++---------+
+| TOOL    |
++---------+
+
+<span class="tok-com">[Agent] = LLM + Instructions + Tools</span></div>
+                    </div>
+                </div>
+                <div class="span-5">
+                    <h2 class="section-header reveal">MASTRA 核心概念速览</h2>
+                    <ul class="bullet">
+                        <li class="reveal">Agent：LLM + 系统指令 + 工具绑定的实体</li>
+                        <li class="reveal">Tool：带有 Zod 参数校验的异步函数</li>
+                        <li class="reveal">Workflow：多步骤编排（本教程聚焦 Agent+Tool）</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 4 -->
+        <section class="slide" data-slide="4">
+            <div class="slide-grid">
+                <div class="span-7">
+                    <div class="terminal">
+                        <div class="terminal-header"><div class="dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div><div class="terminal-title">bash</div></div>
+                        <div class="terminal-body">$ node -v
+v18.19.0
+$ npm create mastra@latest
+✔ project name: my-agent
+✔ install deps: @mastra/core
+
+<span class="tok-com"># .env</span>
+OPENAI_API_KEY=sk-...
+
+<span class="tok-com"># generated tree</span>
+src/
+  agents/
+  tools/
+  index.ts</div>
+                    </div>
+                </div>
+                <div class="span-5">
+                    <h2 class="section-header reveal">环境准备与项目初始化</h2>
+                    <ul class="bullet">
+                        <li class="reveal">环境要求：Node.js >= 18, 配置 OpenAI Key 到 .env</li>
+                        <li class="reveal">初始化命令与生成的项目结构解析</li>
+                        <li class="reveal">安装依赖：@mastra/core</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 5 -->
+        <section class="slide" data-slide="5">
+            <div class="slide-grid">
+                <div class="span-7">
+                    <div class="terminal">
+                        <div class="terminal-header"><div class="dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div><div class="terminal-title">src/tools/weather.ts</div></div>
+                        <div class="terminal-body"><span class="tok-key">import</span> { createTool } <span class="tok-key">from</span> '@mastra/core';
+<span class="tok-key">import</span> { z } <span class="tok-key">from</span> 'zod';
+
+<span class="tok-fn">export const getWeather = createTool({</span>
+  name: 'getWeather',
+  description: 'Get weather for a city',
+  parameters: z.object({ city: z.string() }),
+  execute: <span class="tok-key">async</span> ({ city }) => {
+    <span class="tok-com">// call any Node.js API</span>
+    <span class="tok-key">return</span> { city, temp: 22 };
+  }
+});</div>
+                    </div>
+                </div>
+                <div class="span-5">
+                    <h2 class="section-header reveal">STEP 1: 定义你的第一个 TOOL</h2>
+                    <ul class="bullet">
+                        <li class="reveal">示例工具：获取城市天气 getWeather</li>
+                        <li class="reveal">使用 createTool 定义，用 zod 约束 city 参数</li>
+                        <li class="reveal">execute 函数内可调用任意 Node.js API</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 6 -->
+        <section class="slide" data-slide="6">
+            <div class="slide-grid">
+                <div class="span-7">
+                    <div class="terminal">
+                        <div class="terminal-header"><div class="dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div><div class="terminal-title">src/agents/index.ts</div></div>
+                        <div class="terminal-body"><span class="tok-key">import</span> { createAgent } <span class="tok-key">from</span> '@mastra/core';
+<span class="tok-key">import</span> { getWeather } <span class="tok-key">from</span> '../tools/weather';
+
+<span class="tok-fn">export const agent = createAgent({</span>
+  model: 'gpt-4o-mini',
+  instructions: 'You are a weather assistant',
+  <span class="tok-warn-box">tools: [getWeather]</span>
+});</div>
+                    </div>
+                </div>
+                <div class="span-5">
+                    <h2 class="section-header reveal">STEP 2: 创建带工具的 AGENT</h2>
+                    <ul class="bullet">
+                        <li class="reveal">使用 createAgent 实例化</li>
+                        <li class="reveal">配置 model（如 gpt-4o-mini）与 instructions</li>
+                        <li class="reveal">将上一步的 Tool 数组传入 agent</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 7 -->
+        <section class="slide" data-slide="7">
+            <div class="slide-grid">
+                <div class="span-6">
+                    <div class="terminal">
+                        <div class="terminal-header"><div class="dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div><div class="terminal-title">index.ts</div></div>
+                        <div class="terminal-body"><span class="tok-key">import</span> { agent } <span class="tok-key">from</span> './agents';
+
+<span class="tok-key">const</span> res = <span class="tok-key">await</span> agent.generate(
+  '北京天气如何？'
+);
+console.log(res.text);</div>
+                    </div>
+                </div>
+                <div class="span-6">
+                    <div class="terminal">
+                        <div class="terminal-header"><div class="dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div><div class="terminal-title">terminal output</div></div>
+                        <div class="terminal-body"><span class="tok-com">$ tsx index.ts</span>
+calling tool: getWeather({ city: '北京' })
+<span class="tok-fn">> 北京当前天气：22°C，晴。</span>
+
+<span class="tok-warn">[Runnable] Agent auto-triggered tool.</span></div>
+                    </div>
+                </div>
+                <div class="span-12">
+                    <h2 class="section-header reveal">STEP 3: 运行你的 AGENT（可运行示例）</h2>
+                    <ul class="bullet">
+                        <li class="reveal">脚本入口：agent.generate('北京天气如何？')</li>
+                        <li class="reveal">实际可运行：展示完整文件结构与 tsx index.ts 执行结果</li>
+                        <li class="reveal">验证：Agent 自动触发了 weatherTool 并返回整合答案</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 8 -->
+        <section class="slide" data-slide="8">
+            <div class="slide-grid">
+                <div class="span-7">
+                    <div class="terminal">
+                        <div class="terminal-header"><div class="dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div><div class="terminal-title">flow.seq</div></div>
+                        <div class="terminal-body">User → Agent → LLM → Tool → LLM → Agent → User
+
+<span class="tok-com"># green dashed communication</span>
+<span class="tok-fn">LLM</span> decides to call Tool
+<span class="tok-fn">Mastra runtime</span> executes safely
+<span class="tok-fn">Loop</span> converges to final answer</div>
+                    </div>
+                </div>
+                <div class="span-5">
+                    <h2 class="section-header reveal">深入执行流：AGENT-TOOL 通信机制</h2>
+                    <ul class="bullet">
+                        <li class="reveal">LLM 意图识别：决定是否需要调用 Tool</li>
+                        <li class="reveal">Mastra 运行时：安全执行 Tool 并回传结果</li>
+                        <li class="reveal">循环收敛：LLM 基于 Tool 结果生成最终响应</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 9 -->
+        <section class="slide" data-slide="9">
+            <div class="slide-grid">
+                <div class="span-7">
+                    <div class="terminal">
+                        <div class="terminal-header"><div class="dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div><div class="terminal-title">stream.ts</div></div>
+                        <div class="terminal-body"><span class="tok-key">for</span> <span class="tok-key">await</span> (const chunk <span class="tok-key">of</span> agent.stream('北京天气？')) {
+  process.stdout.write(chunk.text);
+}
+<span class="tok-com">// tokens streamed to UI</span>
+<span class="tok-fn">> 北京</span><span class="tok-fn">当前</span><span class="tok-fn">天气</span><span class="tok-fn">22°C</span></div>
+                    </div>
+                </div>
+                <div class="span-5">
+                    <h2 class="section-header reveal">流式响应：对接前端界面</h2>
+                    <ul class="bullet">
+                        <li class="reveal">前端关心点：用 agent.stream() 替代 generate</li>
+                        <li class="reveal">异步迭代器处理 token 流</li>
+                        <li class="reveal">轻松接入 React/Vue 的响应式状态</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 10 -->
+        <section class="slide" data-slide="10">
+            <div class="slide-grid">
+                <div class="span-7">
+                    <div class="terminal">
+                        <div class="terminal-header"><div class="dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div><div class="terminal-title">bash</div></div>
+                        <div class="terminal-body">$ mastra dev
+✔ Starting Playground on :4111
+<span class="tok-com"># .env (masked)</span>
+OPENAI_API_KEY=sk-****
+
+<span class="tok-err">Error: Zod validation failed for city</span>
+<span class="tok-com"># fix parameter schema</span></div>
+                    </div>
+                </div>
+                <div class="span-5">
+                    <h2 class="section-header reveal">本地调试与环境变量</h2>
+                    <ul class="bullet">
+                        <li class="reveal">本地调试命令：mastra dev 提供 Playground</li>
+                        <li class="reveal">密钥管理：严禁硬编码，使用 process.env</li>
+                        <li class="reveal">常见报错：Key 缺失或 Zod 校验失败提示</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 11 -->
+        <section class="slide" data-slide="11">
+            <div class="slide-grid">
+                <div class="span-12">
+                    <div class="terminal">
+                        <div class="terminal-header"><div class="dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div><div class="terminal-title">extensions.sh</div></div>
+                        <div class="terminal-body">$ cat roadmap.txt
+- [ ] 扩展 1：接入数据库查询 Tool
+- [ ] 扩展 2：用 Tool 调用自有后端 REST API
+- [ ] 扩展 3：组合多个 Agent 做复杂编排
+
+<span class="tok-com"># from demo to production</span></div>
+                    </div>
+                </div>
+                <div class="span-12">
+                    <h2 class="section-header reveal">实战扩展：从 DEMO 到生产</h2>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 12 -->
+        <section class="slide" data-slide="12">
+            <div class="slide-grid" style="align-content:center; text-align:center;">
+                <div class="span-12">
+                    <div class="terminal" style="border:none; background:transparent; box-shadow:none;">
+                        <div class="terminal-body" style="white-space:pre-wrap; text-align:center;">
+<span class="tok-com">Session ended. Docs: docs.mastra.ai</span>
+
+<span class="tok-fn">感谢观看 // THANKS</span>
+
+回顾：TS 原生、Tool 易定义、Agent 易运行
+资源：Mastra 官方文档与 Discord 社区
+行动号召：Fork 示例仓库自己跑一遍</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+</div>
+
+<div class="deck-controls"><span id="slideNum">01 / 12</span></div>
+
+<div class="edit-hotzone"></div>
+<button class="edit-toggle" id="editToggle" title="Edit mode (E)">✏️</button>
+
+<script>
+/* ===========================================
+   SLIDE PRESENTATION CONTROLLER
+   =========================================== */
+class SlidePresentation {
+    constructor() {
+        this.slides = document.querySelectorAll('.slide');
+        this.currentSlide = 0;
+        this.stage = document.getElementById('deckStage');
+        this.slideNum = document.getElementById('slideNum');
+        this.setupStageScale();
+        this.setupKeyboardNav();
+        this.setupTouchNav();
+        this.setupWheelNav();
+        this.showSlide(0);
+    }
+
+    setupStageScale() {
+        const scale = () => {
+            const factor = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+            const x = (window.innerWidth - 1920 * factor) / 2;
+            const y = (window.innerHeight - 1080 * factor) / 2;
+            this.stage.style.transform = `translate(${x}px, ${y}px) scale(${factor})`;
+        };
+        scale();
+        window.addEventListener('resize', scale);
+    }
+
+    setupKeyboardNav() {
+        document.addEventListener('keydown', (e) => {
+            if (e.target.getAttribute('contenteditable')) return;
+            if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
+                this.showSlide(this.currentSlide + 1);
+            } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+                this.showSlide(this.currentSlide - 1);
+            } else if (e.key === 'Home') {
+                this.showSlide(0);
+            } else if (e.key === 'End') {
+                this.showSlide(this.slides.length - 1);
+            }
+        });
+    }
+
+    setupTouchNav() {
+        let startX = 0;
+        this.stage.addEventListener('touchstart', (e) => {
+            startX = e.touches[0].clientX;
+        }, { passive: true });
+        this.stage.addEventListener('touchend', (e) => {
+            const diff = e.changedTouches[0].clientX - startX;
+            if (diff > 50) this.showSlide(this.currentSlide - 1);
+            else if (diff < -50) this.showSlide(this.currentSlide + 1);
+        }, { passive: true });
+    }
+
+    setupWheelNav() {
+        let debounce = false;
+        window.addEventListener('wheel', (e) => {
+            if (debounce) return;
+            if (e.deltaY > 30) {
+                this.showSlide(this.currentSlide + 1);
+                debounce = true;
+                setTimeout(() => debounce = false, 800);
+            } else if (e.deltaY < -30) {
+                this.showSlide(this.currentSlide - 1);
+                debounce = true;
+                setTimeout(() => debounce = false, 800);
+            }
+        }, { passive: true });
+    }
+
+    showSlide(index) {
+        this.currentSlide = Math.max(0, Math.min(index, this.slides.length - 1));
+        this.slides.forEach((slide, i) => {
+            slide.classList.toggle('active', i === this.currentSlide);
+            slide.classList.toggle('visible', i === this.currentSlide);
+        });
+        this.slideNum.textContent = String(this.currentSlide + 1).padStart(2, '0') + ' / ' + String(this.slides.length).padStart(2, '0');
+    }
+}
+
+/* ===========================================
+   INLINE EDITING (LIGHTWEIGHT)
+   =========================================== */
+class SlideEditor {
+    constructor() {
+        this.isActive = false;
+        this.toggleBtn = document.getElementById('editToggle');
+        this.hotzone = document.querySelector('.edit-hotzone');
+        this.editableEls = document.querySelectorAll('.title, .section-header, .body-text, .bullet li, .terminal-body, .term-line');
+        this.bindEvents();
+    }
+
+    bindEvents() {
+        this.toggleBtn.addEventListener('click', () => this.toggleEditMode());
+        this.hotzone.addEventListener('click', () => this.toggleEditMode());
+
+        let hideTimeout = null;
+        const show = () => { clearTimeout(hideTimeout); this.toggleBtn.classList.add('show'); };
+        const hide = () => { hideTimeout = setTimeout(() => { if (!this.isActive) this.toggleBtn.classList.remove('show'); }, 400); };
+
+        this.hotzone.addEventListener('mouseenter', show);
+        this.hotzone.addEventListener('mouseleave', hide);
+        this.toggleBtn.addEventListener('mouseenter', show);
+        this.toggleBtn.addEventListener('mouseleave', hide);
+
+        document.addEventListener('keydown', (e) => {
+            if ((e.key === 'e' || e.key === 'E') && !e.target.getAttribute('contenteditable')) {
+                this.toggleEditMode();
+            }
+        });
+    }
+
+    toggleEditMode() {
+        this.isActive = !this.isActive;
+        this.toggleBtn.classList.toggle('active', this.isActive);
+        this.editableEls.forEach(el => {
+            if (this.isActive) {
+                el.classList.add('editable');
+                el.setAttribute('contenteditable', 'true');
+            } else {
+                el.classList.remove('editable');
+                el.removeAttribute('contenteditable');
+            }
+        });
+    }
+}
+
+/* ===========================================
+   INITIALIZE
+   =========================================== */
+new SlidePresentation();
+new SlideEditor();
+</script>
+</body>
+</html>

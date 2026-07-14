@@ -35,7 +35,7 @@ function safeWrite(writer: { write: (chunk: unknown) => unknown }, chunk: unknow
 }
 
 type PresentationOutlineStepData = {
-  status: "loading" | "streaming" | "completed";
+  status: "loading" | "streaming" | "completed" | "failed";
   outline?: Partial<z.infer<typeof presentationOutlineSchema>>;
   message?: string;
   progress?: number;
@@ -53,7 +53,7 @@ type OutlineProgressStep = {
 };
 
 type PresentationHtmlStepData = {
-  status: "in-progress" | "completed";
+  status: "in-progress" | "completed" | "failed";
   phase?: "structure" | "html" | "styles" | "bundle";
   message?: string;
   progress?: number;
@@ -112,23 +112,6 @@ function logTimeoutConfiguration() {
     outlineStreamIdleTimeoutMs: OUTLINE_STREAM_IDLE_TIMEOUT_MS,
     htmlStreamIdleTimeoutMs: HTML_STREAM_IDLE_TIMEOUT_MS,
   });
-}
-
-function parseJsonObject(text: string) {
-  const trimmed = text.trim();
-  const fencedMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  const candidate = fencedMatch?.[1]?.trim() ?? trimmed;
-
-  try {
-    return JSON.parse(candidate);
-  } catch {
-    const objectMatch = candidate.match(/\{[\s\S]*\}/);
-    if (!objectMatch?.[0]) {
-      throw new Error("Model did not return a JSON object");
-    }
-
-    return JSON.parse(objectMatch[0]);
-  }
 }
 
 function timeoutAfter(ms: number, message: string) {
@@ -370,8 +353,14 @@ ${JSON.stringify({
 ${JSON.stringify(inputData, null, 2)}`;
 }
 
-function buildOutlineJsonFallbackPrompt(inputData: z.infer<typeof presentationInputSchema>) {
+function buildOutlineJsonFallbackPrompt(
+  inputData: z.infer<typeof presentationInputSchema>,
+  previousFailure: string,
+) {
   return `${buildOutlinePrompt(inputData)}
+
+The previous attempt was rejected for this reason: ${previousFailure}
+Correct that issue in this replacement result.
 
 Return strict JSON only. Do not wrap it in Markdown.
 The JSON shape must be:
@@ -391,7 +380,7 @@ The JSON shape must be:
   "designGuidance": ["string"]
 }
 
-The slides array must contain ${inputData.pageCount ?? 6} items unless the request clearly needs fewer.`;
+The slides array must contain exactly ${inputData.pageCount ?? 6} items.`;
 }
 
 export const presentationOutlineSuggestionStep = createStep({
@@ -553,8 +542,9 @@ export const presentationOutlineSuggestionStep = createStep({
       validateGeneratedOutline(outline, inputData);
     } catch (error) {
       stopOutlineHeartbeat();
-      console.warn("Presentation outline structured stream failed; retrying with JSON text fallback:", {
-        message: error instanceof Error ? error.message : String(error),
+      const initialFailure = error instanceof Error ? error.message : String(error);
+      console.warn("Presentation outline stream or validation failed; retrying with non-stream structured generation:", {
+        message: initialFailure,
       });
 
       writeOutlineProgress({
@@ -569,18 +559,31 @@ export const presentationOutlineSuggestionStep = createStep({
         },
       });
 
-      const fallbackResult = await outlineAgent.generate(
-        [
+      try {
+        const fallbackResult = await outlineAgent.generate(
+          [
+            {
+              role: "user",
+              content: buildOutlineJsonFallbackPrompt(inputData, initialFailure),
+            },
+          ],
           {
-            role: "user",
-            content: buildOutlineJsonFallbackPrompt(inputData),
+            structuredOutput: { schema: presentationOutlineSchema },
+            abortSignal,
           },
-        ],
-        { abortSignal },
-      );
-      const fallbackText = typeof fallbackResult.text === "string" ? fallbackResult.text : "";
-      outline = presentationOutlineSchema.parse(parseJsonObject(fallbackText));
-      validateGeneratedOutline(outline, inputData);
+        );
+        outline = presentationOutlineSchema.parse(fallbackResult.object);
+        validateGeneratedOutline(outline, inputData);
+      } catch (fallbackError) {
+        const fallbackFailure = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
+        writeOutlineProgress({
+          status: "failed",
+          activeStepId: "review",
+          message: `Outline generation failed after retry: ${fallbackFailure}`,
+          progress: 100,
+        });
+        throw new Error(`Outline generation failed after retry: ${fallbackFailure}`, { cause: fallbackError });
+      }
     } finally {
       stopOutlineHeartbeat();
     }
@@ -830,6 +833,15 @@ export const presentationHtmlGenerationStep = createStep({
       } else {
         console.error("frontend-slides Mastra generation failed; no alternate generator is allowed:", logContext);
       }
+      writeHtmlProgress({
+        status: "failed",
+        activeStepId: includeRegenerationStep ? "regenerate" : "compose",
+        phase: "html",
+        message: `Presentation HTML generation failed: ${message}`,
+        progress: 100,
+        generator: "frontend-slides",
+        regenerationReason,
+      });
       throw new Error(`frontend-slides generation failed: ${message}`);
     }
 

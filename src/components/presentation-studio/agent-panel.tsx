@@ -196,8 +196,8 @@ function OutlineReviewCard({
 }) {
   return (
     <div className="rounded-2xl border border-[var(--accent-terracotta)]/30 bg-[var(--accent-terracotta)]/10 p-4">
-      <div className="flex gap-3">
-        <div className="rounded-xl bg-white/70 p-2 text-[var(--accent-terracotta)]">
+      <div className="flex items-start gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/70 text-[var(--accent-terracotta)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.45)]">
           <FileText className="h-5 w-5" />
         </div>
         <div className="min-w-0 flex-1">
@@ -208,7 +208,7 @@ function OutlineReviewCard({
               type="button"
               onClick={onGenerate}
               disabled={!message.canGenerate}
-              className="rounded-xl bg-[var(--accent-terracotta)] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--accent-terracotta-light)] disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex min-h-10 items-center justify-center rounded-xl bg-[var(--accent-terracotta)] px-4 py-2 text-sm font-semibold text-white shadow-sm transition duration-200 hover:bg-[var(--accent-terracotta-light)] active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50 disabled:active:translate-y-0"
             >
               生成演示文稿
             </button>

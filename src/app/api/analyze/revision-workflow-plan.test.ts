@@ -72,6 +72,30 @@ describe("revision workflow planning", () => {
     });
   });
 
+  it("derives a multi-slide structural revision count from the approved outline on the server", () => {
+    const twelveSlideOutline = {
+      ...outline,
+      slides: Array.from({ length: 12 }, (_, index) => ({
+        ...outline.slides[0],
+        pageNumber: index + 1,
+        title: `Slide ${index + 1}`,
+      })),
+    };
+    const plan = buildRevisionWorkflowPlan({
+      ...baseRequest,
+      presentationBrief: { ...baseRequest.presentationBrief, pageCount: 12 },
+      approvedOutline: twelveSlideOutline,
+      revision: {
+        kind: "structure",
+        instruction: "1) 新增一页天气 Agent 设计；2) 新增一页完整实现代码",
+        requiresOutlineReview: true,
+      },
+    });
+
+    expect(plan.workflowKind).toBe("outline-revision");
+    expect(plan.inputData.pageCount).toBe(14);
+  });
+
   it("releases the old fixed palette while preserving layout for a palette revision", () => {
     const plan = buildRevisionWorkflowPlan({
       ...baseRequest,

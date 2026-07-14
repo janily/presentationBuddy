@@ -89,6 +89,30 @@ describe("analyze request validation", () => {
     }
   });
 
+  it("keeps the 12-slide limit for new decks but accepts a larger structural revision", () => {
+    const startResult = validatePresentationWorkflowRequest({ topic: "AI", pageCount: 14 });
+    expect(startResult).toMatchObject({ success: false, action: "start" });
+
+    const revisionResult = validatePresentationWorkflowRequest({
+      revisionRequest: {
+        presentationBrief: { topic: "AI", pageCount: 14 },
+        approvedOutline: outline,
+        revision: {
+          kind: "structure",
+          instruction: "新增两页案例",
+          requiresOutlineReview: true,
+        },
+        artifact: {
+          operationId: "operation-2",
+          deckId: "deck-1",
+          baseVersion: 1,
+          targetVersion: 2,
+        },
+      },
+    });
+    expect(revisionResult).toMatchObject({ success: true, action: "revise" });
+  });
+
   it("detects and validates resume requests", () => {
     expect(isResumeWorkflowRequest({ workflowRunId: "run-1" })).toBe(true);
 

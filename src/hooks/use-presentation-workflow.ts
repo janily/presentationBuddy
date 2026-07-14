@@ -8,6 +8,7 @@ import {
   PresentationOutlineData,
   PresentationRevisionRequestData,
 } from "../types/presentation-workflow";
+import { getWorkflowFailureInfo } from "../utils/workflow-failure";
 
 const getNonEmptyString = (value: unknown) => typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 
@@ -112,6 +113,11 @@ export const usePresentationWorkflow = () => {
   const lastWorkflowRunIdPart = messages
     .flatMap((m) => m.parts)
     .findLast((p) => p.type === "data-workflowRunId");
+
+  const workflowFailure = useMemo(
+    () => getWorkflowFailureInfo(lastWorkflowPart?.data),
+    [lastWorkflowPart],
+  );
 
   const activeRunId = useMemo(() => {
     const workflowPayloadRunId = getWorkflowPayloadRunId(lastWorkflowPart?.data);
@@ -239,5 +245,6 @@ export const usePresentationWorkflow = () => {
     canApproveOutline: Boolean(activeRunId),
     outlineStep,
     htmlGenerationStep,
+    workflowFailure,
   };
 };

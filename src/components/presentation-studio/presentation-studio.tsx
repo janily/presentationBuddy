@@ -143,6 +143,7 @@ export default function PresentationStudio() {
     suspenseData,
     outlineStep,
     htmlGenerationStep,
+    workflowFailure,
     status,
     activeRunId,
     approvalError,
@@ -259,6 +260,34 @@ export default function PresentationStudio() {
       };
     }
 
+    if (outlineStep?.data?.status === "failed") {
+      return {
+        kind: pendingArtifact?.revision ? "html" : "outline",
+        message: pendingArtifact?.revision
+          ? "新版本生成失败（大纲修改阶段），当前预览未变更。请重试本次修改。"
+          : "大纲生成失败，请重试。",
+      };
+    }
+
+    if (htmlGenerationStep?.data?.status === "failed") {
+      return {
+        kind: "html",
+        message: "新版本 HTML 生成失败，当前预览未变更。请重试本次生成。",
+      };
+    }
+
+    if (workflowFailure) {
+      const failedDuringOutline = workflowFailure.stepId === "presentation-outline-suggestion-step";
+      return {
+        kind: pendingArtifact?.revision ? "html" : failedDuringOutline ? "outline" : "html",
+        message: pendingArtifact?.revision
+          ? `新版本生成失败${failedDuringOutline ? "（大纲修改阶段）" : ""}，当前预览未变更。请重试本次修改。`
+          : failedDuringOutline
+            ? "大纲生成失败，请重试。"
+            : "演示文稿生成失败，请重试。",
+      };
+    }
+
     if (!error) return null;
 
     if (!activeRunId && baseOutline?.slides?.length) {
@@ -279,7 +308,7 @@ export default function PresentationStudio() {
       kind: "outline",
       message: getErrorMessage(error, "生成大纲失败，请重新描述你的需求后重试。"),
     };
-  }, [activeRunId, approvalError, baseOutline, error, htmlWatchdogError]);
+  }, [activeRunId, approvalError, baseOutline, error, htmlGenerationStep?.data?.status, htmlWatchdogError, outlineStep?.data?.status, pendingArtifact?.revision, workflowFailure]);
 
   const phaseState = useMemo(() => deriveStudioPhase({
     hasWorkflowError: Boolean(workflowError),

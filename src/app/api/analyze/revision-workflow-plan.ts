@@ -1,6 +1,7 @@
 import z from "zod";
 import { presentationRevisionRequestSchema } from "@/src/mastra/workflows/presentation-generation-schemas";
 import { applyPaletteRevision } from "@/src/services/frontend-slides/palette-revision";
+import { resolveStructureRevisionPageCount } from "@/src/utils/structure-revision-page-count";
 
 type ValidatedRevisionRequest = z.infer<typeof presentationRevisionRequestSchema>;
 
@@ -22,8 +23,12 @@ function resolveRevisionStyle({ presentationBrief, revision }: ValidatedRevision
 
 export function buildRevisionWorkflowPlan(request: ValidatedRevisionRequest) {
   const { presentationBrief, approvedOutline, revision, artifact } = request;
+  const revisedPageCount = revision.requiresOutlineReview
+    ? resolveStructureRevisionPageCount(approvedOutline.slides.length, revision.instruction)
+    : presentationBrief.pageCount;
   const commonInput = {
     ...presentationBrief,
+    pageCount: revisedPageCount,
     style: resolveRevisionStyle(request),
     requirements: [
       presentationBrief.requirements,

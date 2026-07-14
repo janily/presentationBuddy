@@ -31,7 +31,7 @@
 - **start**：`createRunAsync()` → `run.stream({ inputData })`，走主 workflow，先写 `data-workflowRunId`，再 merge `toAISdkFormat(fullStream)`。
 - **resume**：取 `workflowRunId` + `approvedOutline` → `createRunAsync({ runId: workflowRunId })` → `run.resumeStream({ step: "presentation-outline-suggestion-step", resumeData: { approvedOutline } })`。**step id 是硬编码字符串**，改 step 定义时必须同步这里。
 - **revise**：先校验 `artifact.baseVersion` 是否等于 `getPresentationArtifact(deckId).version`，不等则 409 `artifact_version_conflict`（乐观锁）。再 `buildRevisionWorkflowPlan` 分流：
-  - `revision.requiresOutlineReview === true` → `workflowKind: "outline-revision"`，input 带 `autoApproveOutline: true` + `outlineRevisionContext`，跑 `presentationOutlineRevisionWorkflow`。
+  - `revision.requiresOutlineReview === true` → `workflowKind: "outline-revision"`，input 带 `autoApproveOutline: true` + `outlineRevisionContext`，跑 `presentationOutlineRevisionWorkflow`。目标页数会由服务端基于当前已批准大纲和修订指令重新推导，支持同一提案中的多次新增/删除；新建 deck 仍限 12 页，结构修订可在上限 30 页内扩展。
   - 否则 → `workflowKind: "html-revision"`，input 带既有 `outline`，跑 `presentationRevisionWorkflow`。
   两者都用 `run.stream(...)`，无 suspend，端到端同步执行到完成或报错。
 
@@ -51,6 +51,7 @@
 ## Invariants
 - Step 1 的 suspend/resume 依赖硬编码 step id `presentation-outline-suggestion-step`，主 workflow 与 `/api/analyze` resume 分支必须保持一致。
 - HTML 生成阶段无备用生成器；只有一次 repair 重试，失败即整步报错，前端需处理该失败态。
+- Mastra workflow 正常以 `data-workflow.status: "failed"` 结束时不一定触发 AI SDK `useChat.error`。前端必须同时检查 workflow 终态与 outline/HTML 明确的 `failed` 进度事件，不能只依赖 transport error，否则 revision 的合成 `in-progress` 状态会一直显示“正在启动版本修改”。
 - `requiresOutlineReview` 是唯一决定 revise 走哪个 workflow（outline-revision vs html-revision）的开关，该字段由 `presentationBriefConversationAgent` 在 `briefDecisionSchema.revision` 中给出，经 proposal 持久化后带到 `/api/analyze`。
 - 意图分类完全在 agent instructions 里，服务端不做关键字/正则兜底；代码侧仅有两处确定性门禁：`shouldRequireInitialStyle`（新 deck 未选风格强制先风格发现）与 `resolveProposalExecution`（执行提案的结构校验）。
 - `artifact-store`、`proposal-store`、Mastra `LibSQLStore(":memory:")` 均是进程内内存单例（`globalThis` 缓存），只适合单实例部署；多实例/无状态部署下三者都会不一致或丢失。

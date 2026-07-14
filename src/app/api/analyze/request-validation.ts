@@ -1,6 +1,7 @@
 import {
   presentationRevisionRequestSchema,
   presentationInputSchema,
+  presentationStartInputSchema,
   presentationOutlineSchema,
 } from "@/src/mastra/workflows/presentation-generation-schemas";
 import z from "zod";
@@ -100,14 +101,14 @@ export function validatePresentationWorkflowRequest(body: unknown) {
       return { success: false as const, action: "start" as const, error: agentRequestResult.error };
     }
 
-    const normalizedResult = presentationInputSchema.safeParse(normalizeAgentRequestToPresentationInput(agentRequestResult.data));
+    const normalizedResult = presentationStartInputSchema.safeParse(normalizeAgentRequestToPresentationInput(agentRequestResult.data));
 
     return normalizedResult.success
       ? { success: true as const, action: "start" as const, data: normalizedResult.data }
       : { success: false as const, action: "start" as const, error: normalizedResult.error };
   }
 
-  const result = presentationInputSchema.safeParse(getPresentationBriefSource(body));
+  const result = presentationStartInputSchema.safeParse(getPresentationBriefSource(body));
 
   return result.success
     ? { success: true as const, action: "start" as const, data: result.data }
