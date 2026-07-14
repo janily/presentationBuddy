@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildFrontendSlidesMastraPrompt } from "./prompt-builder";
+import { buildFrontendSlidesMastraPrompt, buildFrontendSlidesRepairPrompt } from "./prompt-builder";
 
 describe("buildFrontendSlidesMastraPrompt", () => {
   it("includes the approved outline and mandatory frontend-slides context", () => {
@@ -81,5 +81,27 @@ describe("buildFrontendSlidesMastraPrompt", () => {
     expect(prompt).toContain("丰富第 1 页的 Workflow 实战示例");
     expect(prompt).toContain("Apply it specifically to slide(s): 1");
     expect(prompt).toContain("Do not reinterpret this content revision as a request to change the visual style");
+  });
+
+  it("builds a full frontend-slides regeneration prompt after validation failure", () => {
+    const prompt = buildFrontendSlidesRepairPrompt(
+      {
+        title: "Ten Slides",
+        narrativeGoal: "Complete the deck",
+        style: "Swiss Modern",
+        designGuidance: [],
+        slides: Array.from({ length: 10 }, (_, index) => ({
+          title: `Slide ${index + 1}`,
+          content: `Content ${index + 1}`,
+          layout: "content" as const,
+        })),
+      },
+      { skill: "rules", htmlTemplate: "template", viewportBaseCss: "viewport", animationPatterns: "motion" },
+      "output contains 4 slide(s), expected exactly 10",
+    );
+
+    expect(prompt).toContain("previous frontend-slides generation attempt failed before producing valid output");
+    expect(prompt).toContain("exactly 10 complete .slide elements");
+    expect(prompt).toContain("frontend-slides/SKILL.md");
   });
 });

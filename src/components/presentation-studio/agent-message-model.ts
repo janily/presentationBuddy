@@ -7,7 +7,7 @@ export type AgentMessage =
   | { id: string; role: "system"; kind: "quick-choice"; action: AgentQuickActionDefinition }
   | { id: string; role: "system"; kind: "action-proposal"; proposal: AgentActionProposal }
   | { id: string; role: "system"; kind: "outline-review"; slideCount: number; canGenerate: boolean; disabledReason?: string | null }
-  | { id: string; role: "system"; kind: "complete"; slideCount: number; htmlUrl?: string; generator?: "frontend-slides" | "backup"; fallbackReason?: string }
+  | { id: string; role: "system"; kind: "complete"; slideCount: number; htmlUrl?: string; generator?: "frontend-slides"; regenerationReason?: string }
   | { id: string; role: "system"; kind: "error"; message: string; retryKind: StudioErrorSource }
   | { id: string; role: "system"; kind: "generation-request"; message: string; queued?: boolean };
 
@@ -15,8 +15,8 @@ type CompletionMessageInput = {
   artifactId: string;
   slideCount: number;
   htmlUrl?: string;
-  generator?: "frontend-slides" | "backup";
-  fallbackReason?: string;
+  generator?: "frontend-slides";
+  regenerationReason?: string;
 };
 
 export function appendCompletionMessage(
@@ -35,7 +35,7 @@ export function appendCompletionMessage(
       slideCount: input.slideCount,
       htmlUrl: input.htmlUrl,
       generator: input.generator,
-      fallbackReason: input.fallbackReason,
+      regenerationReason: input.regenerationReason,
     },
   ];
 }

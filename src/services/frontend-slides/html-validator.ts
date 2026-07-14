@@ -28,70 +28,11 @@ export function countGeneratedSlides(html: string) {
   return slideClassCount || sectionCount;
 }
 
-type ApprovedSlideContent = {
-  title: string;
-  content: string;
-};
-
-function escapeHtml(value: string) {
-  return value.replace(/[&<>"']/g, (character) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;",
-  })[character]!);
-}
-
-export function completeMissingFrontendSlides(html: string, approvedSlides: ApprovedSlideContent[]) {
-  const generatedSlideCount = countGeneratedSlides(html);
-  if (generatedSlideCount >= approvedSlides.length) return html;
-
-  const isClosedDocument = /<\/html>\s*$/i.test(html.trim());
-  if (!isClosedDocument && (!/<\/style>/i.test(html) || !/<body(?:\s|>)/i.test(html))) {
-    return html;
-  }
-
-  const insertionMarker = /<\/main>/i.test(html) ? "</main>" : "</body>";
-  const insertionIndex = isClosedDocument
-    ? html.toLowerCase().lastIndexOf(insertionMarker)
-    : html.length;
-  if (insertionIndex < 0) return html;
-
-  const missingMarkup = approvedSlides
-    .slice(generatedSlideCount)
-    .map((slide, index) => {
-      const pageNumber = generatedSlideCount + index + 1;
-      return `
-<section class="slide auto-completed-slide" data-slide-number="${pageNumber}">
-  <div style="padding:96px 120px;max-width:1680px;margin:auto">
-    <div style="font-size:24px;letter-spacing:.12em;opacity:.65;margin-bottom:32px">${String(pageNumber).padStart(2, "0")}</div>
-    <h2 style="font-size:72px;line-height:1.08;margin:0 0 40px">${escapeHtml(slide.title)}</h2>
-    <div style="font-size:30px;line-height:1.55;white-space:pre-line">${escapeHtml(slide.content)}</div>
-  </div>
-</section>`;
-    })
-    .join("\n");
-
-  if (isClosedDocument) {
-    return `${html.slice(0, insertionIndex)}${missingMarkup}\n${html.slice(insertionIndex)}`;
-  }
-
-  const openSections = html.match(/<section(?:\s|>)/gi)?.length ?? 0;
-  const closedSections = html.match(/<\/section>/gi)?.length ?? 0;
-  const closeInterruptedSection = openSections > closedSections ? "\n</section>" : "";
-  const closeInterruptedMain = /<main(?:\s|>)/i.test(html) && !/<\/main>/i.test(html)
-    ? "\n</main>"
-    : "";
-
-  return `${html}${closeInterruptedSection}${missingMarkup}${closeInterruptedMain}\n</body>\n</html>`;
-}
-
 export function assertFrontendSlidesComplete(html: string, expectedSlideCount: number) {
   const slideCount = countGeneratedSlides(html);
 
-  if (slideCount < expectedSlideCount) {
-    throw new Error(`frontend-slides output only contains ${slideCount} slide(s), expected ${expectedSlideCount}`);
+  if (slideCount !== expectedSlideCount) {
+    throw new Error(`frontend-slides output contains ${slideCount} slide(s), expected exactly ${expectedSlideCount}`);
   }
 }
 
@@ -100,8 +41,17 @@ export function assertFrontendSlidesDocument(html: string, expectedSlideCount: n
 
   const checks = [
     {
+      passed: /(?:<!doctype html>|<html[\s>])[\s\S]*<\/html>\s*$/i.test(html.trim()),
+      message: "document is truncated or missing a closing html tag",
+    },
+    {
       passed: /\bwidth\s*:\s*1920px\b/i.test(html) && /\bheight\s*:\s*1080px\b/i.test(html),
       message: "missing fixed 1920x1080 stage rules",
+    },
+    {
+      passed: /class=["'][^"']*\bdeck-viewport\b[^"']*["']/i.test(html)
+        && /class=["'][^"']*\bdeck-stage\b[^"']*["']/i.test(html),
+      message: "missing frontend-slides viewport or fixed stage elements",
     },
     {
       passed: /class=["'][^"']*\bslide\b[^"']*["']/i.test(html),
@@ -118,6 +68,23 @@ export function assertFrontendSlidesDocument(html: string, expectedSlideCount: n
       passed: !/\.slide\s*\{[^}]*display\s*:\s*none/gi.test(html)
         && !/\.slide\.active\s*\{[^}]*display\s*:\s*block/gi.test(html),
       message: "uses display none/block for slide switching instead of viewport-base visibility rules",
+    },
+    {
+      passed: /prefers-reduced-motion\s*:\s*reduce/i.test(html),
+      message: "missing prefers-reduced-motion support",
+    },
+    {
+      passed: /Math\.min\s*\(\s*window\.innerWidth\s*\/\s*1920\s*,\s*window\.innerHeight\s*\/\s*1080\s*\)/i.test(html)
+        && /style\.transform\s*=/i.test(html),
+      message: "missing uniform 1920x1080 stage scaling",
+    },
+    {
+      passed: /addEventListener\s*\(\s*["']keydown["']/i.test(html),
+      message: "missing keyboard navigation",
+    },
+    {
+      passed: !/<script\b[^>]*\bsrc\s*=/i.test(html),
+      message: "uses an external script instead of a zero-dependency inline controller",
     },
   ];
 

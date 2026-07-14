@@ -59,34 +59,22 @@ PRESENTATION_HTML_PROVIDER=openrouter
 # Optional. Maximum output budget for full-deck HTML generation. Defaults to 32768.
 PRESENTATION_HTML_MAX_OUTPUT_TOKENS=32768
 
-# Optional. Enables the frontend-slides path through Claude Agent SDK.
-# The SDK must be able to discover .claude/skills/frontend-slides.
-ANTHROPIC_API_KEY=your-anthropic-api-key
-ANTHROPIC_MODEL=claude-sonnet-5
-
-# Optional. Use a dedicated model for the frontend-slides Agent SDK run.
-FRONTEND_SLIDES_MODEL=claude-sonnet-5
-
-# Optional. Defaults to 6.
-FRONTEND_SLIDES_AGENT_MAX_TURNS=6
-
-# Optional. When true, do not fall back to the backup HTML agent if
-# frontend-slides fails or is not discovered.
-FRONTEND_SLIDES_REQUIRED=false
-
-# Optional. Emits Claude Agent SDK stderr to the server log.
-FRONTEND_SLIDES_AGENT_DEBUG=false
+# Optional. Use a dedicated Mastra model/provider for frontend-slides generation.
+# When omitted, PRESENTATION_HTML_MODEL / PRESENTATION_HTML_PROVIDER are used.
+FRONTEND_SLIDES_MASTRA_MODEL=google/gemini-3-flash-preview
+FRONTEND_SLIDES_MASTRA_PROVIDER=openrouter
 ```
 
 Model values may be raw provider model IDs such as `google/gemini-3-flash-preview`. For backward compatibility, the helper also accepts `openrouter/`, `openai/`, `google/`, and `google-generative-ai/` prefixes and strips them before sending the model ID to the selected provider.
 
-The presentation workflow first tries the `frontend-slides` skill via `@anthropic-ai/claude-agent-sdk` when `ANTHROPIC_API_KEY` is configured. The SDK run writes the deck to `.frontend-slides-runs/<run-id>/deck.html`; the app reads that intermediate file, verifies that the SDK discovered the skill and that the HTML matches the fixed-stage frontend-slides rules, then saves the final preview through the normal generated-slides path. If the SDK path fails, the app records the fallback reason and uses the existing `PRESENTATION_HTML_MODEL` agent unless `FRONTEND_SLIDES_REQUIRED=true`.
+The presentation workflow always generates the final deck through the Mastra `frontendSlidesComposerAgent` with the full `frontend-slides` skill context. Output must be a complete document with exactly the approved slide count. If the first attempt fails or is incomplete, the same frontend-slides agent performs one full regeneration; the workflow never switches to another HTML generator.
 
 ## Main directories and files
 
 - `src/app/api/analyze/route.ts`: Next.js API route that accepts presentation chat/workflow requests, validates user input, starts or resumes the presentation workflow, and streams workflow events back to the client.
 - `src/mastra/workflows/`: Mastra workflow definitions. The presentation workflow handles the brief → outline review → HTML generation sequence.
-- `src/utils/frontend-slides-agent-runner.ts`: Claude Agent SDK integration that loads `.claude/skills/frontend-slides` and validates the generated HTML.
+- `src/mastra/agents/frontend-slides-composer-agent.ts`: The only agent used to generate final presentation HTML.
+- `src/services/frontend-slides/`: Loads the complete `.claude/skills/frontend-slides` contract, builds generation prompts, and validates fixed-stage output.
 - `src/utils/outline-to-slides-mapper.ts`: Converts approved presentation outlines into structured frontend-slides input.
 - `src/components/presentation-studio/`: React components for the presentation creation UI, including the brief form, outline review panel, processing view, and HTML preview.
 

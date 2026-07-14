@@ -3,7 +3,6 @@ import {
   assertFrontendSlidesComplete,
   assertFrontendSlidesDocument,
   countGeneratedSlides,
-  completeMissingFrontendSlides,
   extractHtmlFromAgentResult,
   stripHtmlCodeFence,
 } from "./html-validator";
@@ -12,14 +11,26 @@ const validHtml = `<!doctype html>
 <html>
 <head>
   <style>
-    .stage { width: 1920px; height: 1080px; }
+    .deck-viewport { position: fixed; inset: 0; }
+    .deck-stage { width: 1920px; height: 1080px; }
     .slide { visibility: hidden; opacity: 0; pointer-events: none; }
     .slide.active { visibility: visible; opacity: 1; pointer-events: auto; }
+    @media (prefers-reduced-motion: reduce) { * { animation-duration: 0.01ms !important; } }
   </style>
 </head>
 <body>
-  <section class="slide active">One</section>
-  <section class="slide">Two</section>
+  <div class="deck-viewport">
+    <main class="deck-stage" id="deckStage">
+      <section class="slide active">One</section>
+      <section class="slide">Two</section>
+    </main>
+  </div>
+  <script>
+    const stage = document.getElementById('deckStage');
+    const factor = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = 'scale(' + factor + ')';
+    document.addEventListener('keydown', () => {});
+  </script>
 </body>
 </html>`;
 
@@ -42,40 +53,18 @@ describe("frontend-slides html validator", () => {
   });
 
   it("rejects documents with too few slides", () => {
-    expect(() => assertFrontendSlidesComplete(validHtml, 3)).toThrow("only contains 2 slide");
+    expect(() => assertFrontendSlidesComplete(validHtml, 3)).toThrow("contains 2 slide(s), expected exactly 3");
   });
 
-  it("completes missing trailing slides from the approved outline", () => {
-    const completed = completeMissingFrontendSlides(validHtml, [
-      { title: "One", content: "First" },
-      { title: "Two", content: "Second" },
-      { title: "Three <final>", content: "Third & final" },
-    ]);
-
-    expect(countGeneratedSlides(completed)).toBe(3);
-    expect(completed).toContain("Three &lt;final&gt;");
-    expect(completed).toContain("Third &amp; final");
-    expect(() => assertFrontendSlidesDocument(completed, 3)).not.toThrow();
+  it("rejects documents with more slides than the approved outline", () => {
+    const extraSlide = validHtml.replace("</body>", '<section class="slide">Three</section>\n</body>');
+    expect(() => assertFrontendSlidesComplete(extraSlide, 2)).toThrow("expected exactly 2");
   });
 
-  it("does not alter a complete frontend-slides document", () => {
-    expect(completeMissingFrontendSlides(validHtml, [
-      { title: "One", content: "First" },
-      { title: "Two", content: "Second" },
-    ])).toBe(validHtml);
-  });
-
-  it("repairs a model response truncated after valid slide markup", () => {
-    const truncatedHtml = validHtml.replace(/<section class="slide">Two<\/section>[\s\S]*$/, "");
-    const completed = completeMissingFrontendSlides(truncatedHtml, [
-      { title: "One", content: "First" },
-      { title: "Two", content: "Second" },
-      { title: "Three", content: "Third" },
-    ]);
-
-    expect(completed).toMatch(/<\/body>\s*<\/html>\s*$/);
-    expect(countGeneratedSlides(completed)).toBe(3);
-    expect(() => assertFrontendSlidesDocument(completed, 3)).not.toThrow();
+  it("rejects truncated documents even when their slide count matches", () => {
+    const truncatedHtml = validHtml.replace(/<\/body>[\s\S]*$/, "");
+    expect(() => assertFrontendSlidesDocument(truncatedHtml, 2)).toThrow("truncated");
+    expect(() => extractHtmlFromAgentResult(truncatedHtml)).toThrow("Failed to extract HTML");
   });
 
   it("rejects display none slide switching", () => {
@@ -85,5 +74,15 @@ describe("frontend-slides html validator", () => {
     );
 
     expect(() => assertFrontendSlidesDocument(invalidHtml, 2)).toThrow("display none/block");
+  });
+
+  it("rejects documents without fixed-stage scaling or keyboard navigation", () => {
+    expect(() => assertFrontendSlidesDocument(validHtml.replace("Math.min", "Math.max"), 2)).toThrow("stage scaling");
+    expect(() => assertFrontendSlidesDocument(validHtml.replace("keydown", "keyup"), 2)).toThrow("keyboard navigation");
+  });
+
+  it("rejects external presentation controllers", () => {
+    const externalScriptHtml = validHtml.replace("<script>", '<script src="deck.js"></script><script>');
+    expect(() => assertFrontendSlidesDocument(externalScriptHtml, 2)).toThrow("external script");
   });
 });

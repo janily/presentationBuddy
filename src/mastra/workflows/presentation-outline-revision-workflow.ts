@@ -20,8 +20,8 @@ export const presentationOutlineRevisionWorkflow = createWorkflow({
   outputSchema: z.object({
     html: z.string(),
     htmlUrl: z.string().optional(),
-    generator: z.enum(["frontend-slides", "backup"]).optional(),
-    fallbackReason: z.string().optional(),
+    generator: z.literal("frontend-slides").optional(),
+    regenerationReason: z.string().optional(),
   }),
   description: "Revises an approved outline from a confirmed structural proposal and publishes a new presentation version.",
 })

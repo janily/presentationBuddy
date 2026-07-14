@@ -2,7 +2,6 @@ import { Mastra } from "@mastra/core/mastra";
 import { LibSQLStore } from "@mastra/libsql";
 import { frontendSlidesComposerAgent } from "./agents/frontend-slides-composer-agent";
 import { presentationBriefConversationAgent } from "./agents/presentation-brief-conversation-agent";
-import { presentationHtmlGenerationAgent } from "./agents/presentation-html-generation-agent";
 import { presentationOutlineSuggestionAgent } from "./agents/presentation-outline-suggestion-agent";
 import { presentationGenerationWorkflow } from "./workflows/presentation-generation-workflow";
 import { presentationRevisionWorkflow } from "./workflows/presentation-revision-workflow";
@@ -14,7 +13,6 @@ function createMastra() {
     agents: {
       presentationBriefConversationAgent,
       presentationOutlineSuggestionAgent,
-      presentationHtmlGenerationAgent,
       frontendSlidesComposerAgent,
     },
     workflows: {

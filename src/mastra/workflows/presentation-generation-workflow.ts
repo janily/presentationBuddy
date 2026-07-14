@@ -1,15 +1,15 @@
 import { createStep, createWorkflow } from "@mastra/core";
 import z from "zod";
 import {
-  assertFrontendSlidesComplete,
   assertFrontendSlidesDocument,
-  completeMissingFrontendSlides,
-  countGeneratedSlides,
   extractHtmlFromAgentResult,
   stripHtmlCodeFence,
 } from "@/src/services/frontend-slides/html-validator";
 import { loadFrontendSlidesFinalContext } from "@/src/services/frontend-slides/skill-loader";
-import { buildFrontendSlidesMastraPrompt } from "@/src/services/frontend-slides/prompt-builder";
+import {
+  buildFrontendSlidesMastraPrompt,
+  buildFrontendSlidesRepairPrompt,
+} from "@/src/services/frontend-slides/prompt-builder";
 import { saveHtmlToFile } from "@/src/utils/save-html-to-file";
 import { savePresentationArtifact } from "@/src/services/presentation-artifacts/artifact-store";
 import {
@@ -57,8 +57,8 @@ type PresentationHtmlStepData = {
   phase?: "structure" | "html" | "styles" | "bundle";
   message?: string;
   progress?: number;
-  generator?: "frontend-slides" | "backup";
-  fallbackReason?: string;
+  generator?: "frontend-slides";
+  regenerationReason?: string;
   generatedCharacters?: number;
   lastUpdatedAt?: number;
   steps?: HtmlGenerationProgressStep[];
@@ -71,7 +71,7 @@ type PresentationHtmlStepData = {
   };
 };
 
-type HtmlGenerationProgressStepId = "prepare" | "load-skill" | "compose" | "validate" | "fallback" | "save";
+type HtmlGenerationProgressStepId = "prepare" | "load-skill" | "compose" | "regenerate" | "validate" | "save";
 
 type HtmlGenerationProgressStep = {
   id: HtmlGenerationProgressStepId;
@@ -179,16 +179,12 @@ function getTextDelta(chunk: unknown) {
   return typeof text === "string" ? text : "";
 }
 
-function isFrontendSlidesRequired() {
-  return process.env.FRONTEND_SLIDES_REQUIRED === "true";
-}
-
 const baseHtmlProgressSteps: HtmlGenerationProgressStep[] = [
   { id: "prepare", label: "Preparing selected slides", status: "pending" },
   { id: "load-skill", label: "Loading design instructions", status: "pending" },
   { id: "compose", label: "Designing and writing HTML", status: "pending" },
   { id: "validate", label: "Checking slide completeness", status: "pending" },
-  { id: "fallback", label: "Switching to backup generator", status: "pending" },
+  { id: "regenerate", label: "Regenerating with frontend-slides", status: "pending" },
   { id: "save", label: "Saving preview document", status: "pending" },
 ];
 
@@ -232,11 +228,11 @@ function updateOutlineProgressSteps(
 function updateHtmlProgressSteps(
   activeStepId: HtmlGenerationProgressStepId,
   detail?: string,
-  options: { includeFallback?: boolean; completeThrough?: HtmlGenerationProgressStepId } = {},
+  options: { includeRegeneration?: boolean; completeThrough?: HtmlGenerationProgressStepId } = {},
 ) {
-  const visibleSteps = options.includeFallback
+  const visibleSteps = options.includeRegeneration
     ? baseHtmlProgressSteps
-    : baseHtmlProgressSteps.filter((step) => step.id !== "fallback");
+    : baseHtmlProgressSteps.filter((step) => step.id !== "regenerate");
   const activeIndex = visibleSteps.findIndex((step) => step.id === activeStepId);
   const completeThroughIndex = options.completeThrough
     ? visibleSteps.findIndex((step) => step.id === options.completeThrough)
@@ -584,14 +580,14 @@ export const presentationHtmlGenerationStep = createStep({
   outputSchema: z.object({
     html: z.string(),
     htmlUrl: z.string().optional(),
-    generator: z.enum(["frontend-slides", "backup"]).optional(),
-    fallbackReason: z.string().optional(),
+    generator: z.literal("frontend-slides").optional(),
+    regenerationReason: z.string().optional(),
   }),
   execute: async ({ inputData, mastra, writer, abortSignal }) => {
     logTimeoutConfiguration();
 
     const stepStartedAt = Date.now();
-    let includeFallbackStep = false;
+    let includeRegenerationStep = false;
 
     const writeHtmlProgress = (
       data: Omit<PresentationHtmlStepData, "status" | "lastUpdatedAt" | "steps"> & {
@@ -615,7 +611,7 @@ export const presentationHtmlGenerationStep = createStep({
           } : undefined,
           lastUpdatedAt: Date.now(),
           steps: updateHtmlProgressSteps(activeStepId, stepDetail, {
-            includeFallback: includeFallbackStep,
+            includeRegeneration: includeRegenerationStep,
             completeThrough,
           }),
         } satisfies PresentationHtmlStepData,
@@ -631,7 +627,7 @@ export const presentationHtmlGenerationStep = createStep({
 
     let html = "";
     let generator: PresentationHtmlStepData["generator"] | undefined;
-    let fallbackReason: string | undefined;
+    let regenerationReason: string | undefined;
     const frontendSlidesInput = mapOutlineToFrontendSlides(inputData.outline, inputData.style, {
       density: inputData.density,
       styleSpec: inputData.styleSpec,
@@ -649,7 +645,79 @@ export const presentationHtmlGenerationStep = createStep({
     const frontendSlidesStartedAt = Date.now();
     try {
       const frontendSlidesContext = await loadFrontendSlidesFinalContext();
-      const prompt = buildFrontendSlidesMastraPrompt(frontendSlidesInput, frontendSlidesContext);
+      const frontendSlidesAgent = mastra.getAgent("frontendSlidesComposerAgent");
+
+      const runFrontendSlidesAttempt = async (prompt: string, attempt: "initial" | "repair") => {
+        const attemptStartedAt = Date.now();
+        const stream = await Promise.race([
+          frontendSlidesAgent.stream(
+            [{ role: "user", content: prompt }],
+            {
+              abortSignal,
+              modelSettings: { maxOutputTokens: HTML_MAX_OUTPUT_TOKENS },
+            },
+          ),
+          timeoutAfter(
+            FRONTEND_SLIDES_TIMEOUT_MS,
+            `frontend-slides ${attempt} generation did not start within ${Math.round(FRONTEND_SLIDES_TIMEOUT_MS / 1000)} seconds`,
+          ),
+        ]);
+        let output = "";
+        let lastProgressWrite = 0;
+        const reader = stream.fullStream.getReader();
+
+        try {
+          while (Date.now() - attemptStartedAt <= FRONTEND_SLIDES_TIMEOUT_MS) {
+            const { done, value } = await Promise.race([
+              reader.read(),
+              timeoutAfter(
+                HTML_STREAM_IDLE_TIMEOUT_MS,
+                `frontend-slides ${attempt} generation stream was idle for ${Math.round(HTML_STREAM_IDLE_TIMEOUT_MS / 1000)} seconds`,
+              ),
+            ]);
+            if (done) break;
+
+            const textDelta = getTextDelta(value);
+            if (!textDelta) continue;
+            output += textDelta;
+
+            if (output.length - lastProgressWrite >= 800) {
+              lastProgressWrite = output.length;
+              writeHtmlProgress({
+                activeStepId: attempt === "repair" ? "regenerate" : "compose",
+                phase: output.length > 6_000 ? "styles" : "html",
+                message: attempt === "repair"
+                  ? "Regenerating a complete frontend-slides document..."
+                  : output.length > 6_000
+                    ? "Applying frontend-slides layout, styling, and motion..."
+                    : "Writing the presentation HTML document...",
+                progress: Math.min(82, 40 + Math.floor(output.length / 350)),
+                generator: "frontend-slides",
+                generatedCharacters: output.length,
+                stepDetail: `${Math.max(1, Math.round(output.length / 1024))} KB generated`,
+              });
+            }
+          }
+        } catch (error) {
+          await reader.cancel().catch(() => undefined);
+          throw error;
+        } finally {
+          reader.releaseLock();
+        }
+
+        if (Date.now() - attemptStartedAt > FRONTEND_SLIDES_TIMEOUT_MS) {
+          await stream.fullStream.cancel().catch(() => undefined);
+          throw new Error(`frontend-slides ${attempt} generation timed out after ${Math.round(FRONTEND_SLIDES_TIMEOUT_MS / 1000)} seconds`);
+        }
+        if (!output.trim()) output = await getCompletedStreamText(stream);
+        return output;
+      };
+
+      const validateFrontendSlidesHtml = (result: string) => {
+        const document = extractHtmlFromAgentResult(stripHtmlCodeFence(result));
+        assertFrontendSlidesDocument(document, frontendSlidesInput.slides.length);
+        return document;
+      };
 
       writeHtmlProgress({
         activeStepId: "compose",
@@ -658,244 +726,49 @@ export const presentationHtmlGenerationStep = createStep({
         progress: 36,
       });
 
-      const frontendSlidesAgent = mastra.getAgent("frontendSlidesComposerAgent");
-      const stream = await Promise.race([
-        frontendSlidesAgent.stream(
-          [
-            {
-              role: "user",
-              content: prompt,
-            },
-          ],
-          {
-            abortSignal,
-            modelSettings: { maxOutputTokens: HTML_MAX_OUTPUT_TOKENS },
-          },
-        ),
-        timeoutAfter(
-          FRONTEND_SLIDES_TIMEOUT_MS,
-          `frontend-slides generation did not start within ${Math.round(FRONTEND_SLIDES_TIMEOUT_MS / 1000)} seconds`,
-        ),
-      ]);
-
-      let lastProgressWrite = 0;
-      const reader = stream.fullStream.getReader();
-
       try {
-        while (Date.now() - frontendSlidesStartedAt <= FRONTEND_SLIDES_TIMEOUT_MS) {
-          const { done, value } = await Promise.race([
-            reader.read(),
-            timeoutAfter(
-              HTML_STREAM_IDLE_TIMEOUT_MS,
-              `frontend-slides generation stream was idle for ${Math.round(HTML_STREAM_IDLE_TIMEOUT_MS / 1000)} seconds`,
-            ),
-          ]);
-
-          if (done) break;
-
-          const textDelta = getTextDelta(value);
-          if (!textDelta) continue;
-
-          html += textDelta;
-
-          if (html.length - lastProgressWrite >= 800) {
-            lastProgressWrite = html.length;
-            writeHtmlProgress({
-              activeStepId: "compose",
-              phase: html.length > 6_000 ? "styles" : "html",
-              message: html.length > 6_000
-                ? "Applying frontend-slides layout, styling, and motion..."
-                : "Writing the presentation HTML document...",
-              progress: Math.min(82, 40 + Math.floor(html.length / 350)),
-              generator: "frontend-slides",
-              generatedCharacters: html.length,
-              stepDetail: `${Math.max(1, Math.round(html.length / 1024))} KB generated`,
-            });
-          }
-        }
-      } finally {
-        reader.releaseLock();
+        html = validateFrontendSlidesHtml(await runFrontendSlidesAttempt(
+          buildFrontendSlidesMastraPrompt(frontendSlidesInput, frontendSlidesContext),
+          "initial",
+        ));
+      } catch (initialError) {
+        const initialFailure = initialError instanceof Error ? initialError.message : String(initialError);
+        includeRegenerationStep = true;
+        regenerationReason = `Initial frontend-slides attempt failed: ${initialFailure}`;
+        console.warn("Presentation HTML generation: retrying with frontend-slides after the initial attempt failed", {
+          initialFailure,
+          expectedSlideCount: frontendSlidesInput.slides.length,
+        });
+        writeHtmlProgress({
+          activeStepId: "regenerate",
+          phase: "html",
+          message: "The first attempt failed; regenerating the complete deck with frontend-slides...",
+          progress: 38,
+          generator: "frontend-slides",
+          regenerationReason,
+        });
+        html = validateFrontendSlidesHtml(await runFrontendSlidesAttempt(
+          buildFrontendSlidesRepairPrompt(frontendSlidesInput, frontendSlidesContext, initialFailure),
+          "repair",
+        ));
       }
 
-      if (Date.now() - frontendSlidesStartedAt > FRONTEND_SLIDES_TIMEOUT_MS) {
-        await stream.fullStream.cancel().catch(() => undefined);
-        throw new Error(`frontend-slides generation timed out after ${Math.round(FRONTEND_SLIDES_TIMEOUT_MS / 1000)} seconds`);
-      }
-
-      if (!html.trim()) {
-        html = await getCompletedStreamText(stream);
-      }
-
-      html = stripHtmlCodeFence(html);
-      if (!/(?:<!doctype html>|<html[\s>])/i.test(html)) {
-        html = extractHtmlFromAgentResult(html);
-      }
-
-      const generatedSlideCount = countGeneratedSlides(html);
-      if (generatedSlideCount < frontendSlidesInput.slides.length) {
-        const completedHtml = completeMissingFrontendSlides(html, frontendSlidesInput.slides);
-        const completedSlideCount = countGeneratedSlides(completedHtml);
-        if (completedSlideCount > generatedSlideCount) {
-          fallbackReason = `frontend-slides model returned ${generatedSlideCount}/${frontendSlidesInput.slides.length} slides; completed ${completedSlideCount - generatedSlideCount} missing slide(s) from the approved outline`;
-          html = completedHtml;
-          console.warn("Presentation HTML generation: completed missing frontend-slides pages from the approved outline", {
-            generatedSlideCount,
-            expectedSlideCount: frontendSlidesInput.slides.length,
-            completedSlideCount,
-          });
-        }
-      }
-
-      writeHtmlProgress({
-        activeStepId: "validate",
-        phase: "styles",
-        message: "Checking slide count and document completeness...",
-        progress: 84,
-        generator: "frontend-slides",
-        generatedCharacters: html.length,
-      });
-      assertFrontendSlidesDocument(html, frontendSlidesInput.slides.length);
       generator = "frontend-slides";
-
       console.log("Presentation HTML generation: frontend-slides Mastra agent completed", {
         timestamp: new Date().toISOString(),
         durationMs: Date.now() - frontendSlidesStartedAt,
         generatedCharacters: html.length,
         expectedSlideCount: frontendSlidesInput.slides.length,
+        regeneratedAfterInitialFailure: Boolean(regenerationReason),
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      html = "";
-      fallbackReason = message;
-      if (isFrontendSlidesRequired()) {
-        console.error("frontend-slides Mastra generation failed and fallback is disabled:", {
-          message,
-          error,
-        });
-        throw new Error(`frontend-slides generation is required but failed: ${message}`);
-      }
-
-      console.warn("frontend-slides Mastra generation failed, falling back to backup HTML agent:", {
+      console.error("frontend-slides Mastra generation failed; no alternate generator is allowed:", {
         message,
         error,
       });
+      throw new Error(`frontend-slides generation failed: ${message}`);
     }
-
-    if (!html) {
-      includeFallbackStep = true;
-      generator = "backup";
-
-      writeHtmlProgress({
-        activeStepId: "fallback",
-        phase: "html",
-        message: "Switching to backup HTML generator...",
-        progress: 40,
-        generator,
-        fallbackReason,
-      });
-
-      const generationAgent = mastra.getAgent("presentationHtmlGenerationAgent");
-      console.log("Presentation HTML generation: starting backup model stream", {
-        timestamp: new Date().toISOString(),
-        slideCount: inputData.outline.slides.length,
-        title: inputData.outline.title,
-        timeoutMs: HTML_GENERATION_TIMEOUT_MS,
-        idleTimeoutMs: HTML_STREAM_IDLE_TIMEOUT_MS,
-      });
-
-      const stream = await Promise.race([
-        generationAgent.stream(
-          [
-            {
-              role: "user",
-              content: `Generate a standalone HTML presentation from this approved outline and original request. Return only the complete HTML document, starting with <!doctype html> or <html>, and do not wrap it in Markdown fences:\n${JSON.stringify(
-                inputData,
-                null,
-                2,
-              )}`,
-            },
-          ],
-          {
-            abortSignal,
-            modelSettings: { maxOutputTokens: HTML_MAX_OUTPUT_TOKENS },
-          },
-        ),
-        timeoutAfter(HTML_GENERATION_TIMEOUT_MS, `HTML generation did not start within ${Math.round(HTML_GENERATION_TIMEOUT_MS / 1000)} seconds`),
-      ]);
-
-      let lastProgressWrite = 0;
-      const htmlStartedAt = Date.now();
-      const reader = stream.fullStream.getReader();
-
-      try {
-        while (Date.now() - htmlStartedAt <= HTML_GENERATION_TIMEOUT_MS) {
-          const { done, value } = await Promise.race([
-            reader.read(),
-            timeoutAfter(
-              HTML_STREAM_IDLE_TIMEOUT_MS,
-              `HTML generation stream was idle for ${Math.round(HTML_STREAM_IDLE_TIMEOUT_MS / 1000)} seconds`,
-            ),
-          ]);
-
-          if (done) break;
-
-          const textDelta = getTextDelta(value);
-          if (!textDelta) continue;
-
-          html += textDelta;
-
-          if (html.length - lastProgressWrite >= 800) {
-            lastProgressWrite = html.length;
-            console.log("Presentation HTML generation: received backup text", {
-              generatedCharacters: html.length,
-            });
-            safeWrite(writer, {
-              type: "data-presentationHtml",
-              data: {
-                status: "in-progress",
-                phase: html.length > 4_000 ? "styles" : "html",
-                message: html.length > 4_000 ? "Applying layout and visual styling..." : "Writing slide markup...",
-                progress: Math.min(85, 40 + Math.floor(html.length / 250)),
-                generator,
-                fallbackReason,
-                generatedCharacters: html.length,
-                lastUpdatedAt: Date.now(),
-                steps: updateHtmlProgressSteps("compose", `${Math.max(1, Math.round(html.length / 1024))} KB generated`, {
-                  includeFallback: includeFallbackStep,
-                }),
-              } satisfies PresentationHtmlStepData,
-            });
-          }
-        }
-      } finally {
-        reader.releaseLock();
-      }
-
-      if (Date.now() - htmlStartedAt > HTML_GENERATION_TIMEOUT_MS) {
-        await stream.fullStream.cancel().catch(() => undefined);
-        throw new Error(`HTML generation timed out after ${Math.round(HTML_GENERATION_TIMEOUT_MS / 1000)} seconds`);
-      }
-
-      if (!html.trim()) {
-        html = await getCompletedStreamText(stream);
-      }
-
-      console.log("Presentation HTML generation: backup model stream completed", {
-        timestamp: new Date().toISOString(),
-        durationMs: Date.now() - htmlStartedAt,
-        generatedCharacters: html.length,
-      });
-    }
-
-    writeHtmlProgress({
-      activeStepId: "save",
-      phase: "bundle",
-      message: "Saving preview document...",
-      progress: 92,
-      generator,
-      fallbackReason,
-      generatedCharacters: html.length,
-    });
 
     if (!html) {
       throw new Error("HTML generation finished without returning any HTML content");
@@ -908,14 +781,20 @@ export const presentationHtmlGenerationStep = createStep({
       message: "Checking slide count and document completeness...",
       progress: 88,
       generator,
-      fallbackReason,
+      regenerationReason,
       generatedCharacters: html.length,
     });
-    if (generator === "frontend-slides") {
-      assertFrontendSlidesDocument(html, frontendSlidesInput.slides.length);
-    } else {
-      assertFrontendSlidesComplete(html, frontendSlidesInput.slides.length);
-    }
+    assertFrontendSlidesDocument(html, frontendSlidesInput.slides.length);
+
+    writeHtmlProgress({
+      activeStepId: "save",
+      phase: "bundle",
+      message: "Saving preview document...",
+      progress: 92,
+      generator,
+      regenerationReason,
+      generatedCharacters: html.length,
+    });
 
     const saveStartedAt = Date.now();
     const htmlUrl = await saveHtmlToFile(html, { prefix: "presentation-deck" });
@@ -962,11 +841,11 @@ export const presentationHtmlGenerationStep = createStep({
         message: "HTML presentation ready.",
         progress: 100,
         generator,
-        fallbackReason,
+        regenerationReason,
         generatedCharacters: html.length,
         lastUpdatedAt: Date.now(),
         steps: updateHtmlProgressSteps("save", "Preview document saved.", {
-          includeFallback: includeFallbackStep,
+          includeRegeneration: includeRegenerationStep,
           completeThrough: "save",
         }),
         html,
@@ -983,7 +862,7 @@ export const presentationHtmlGenerationStep = createStep({
       html,
       htmlUrl,
       generator,
-      fallbackReason,
+      regenerationReason,
     };
   },
 });
@@ -994,8 +873,8 @@ export const presentationGenerationWorkflow = createWorkflow({
   outputSchema: z.object({
     html: z.string(),
     htmlUrl: z.string().optional(),
-    generator: z.enum(["frontend-slides", "backup"]).optional(),
-    fallbackReason: z.string().optional(),
+    generator: z.literal("frontend-slides").optional(),
+    regenerationReason: z.string().optional(),
   }),
   description:
     "A workflow that drafts a presentation outline for approval, then generates a standalone HTML presentation.",

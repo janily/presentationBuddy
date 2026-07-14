@@ -894,7 +894,7 @@ export default function PresentationStudio() {
       slideCount: completedOutline?.slides.length ?? selectedSlides.length ?? outline.length,
       htmlUrl: data.htmlUrl,
       generator: data.generator,
-      fallbackReason: data.fallbackReason,
+      regenerationReason: data.regenerationReason,
     }));
   }, [activeArtifact?.version, baseOutline, brief, htmlGenerationStep?.data, outline.length, pendingArtifact, selectedSlides.length]);
 

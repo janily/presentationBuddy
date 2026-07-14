@@ -90,8 +90,8 @@ export type HtmlGenerationStepData = {
   phase?: "structure" | "html" | "styles" | "bundle";
   message?: string;
   progress?: number;
-  generator?: "frontend-slides" | "backup";
-  fallbackReason?: string;
+  generator?: "frontend-slides";
+  regenerationReason?: string;
   generatedCharacters?: number;
   lastUpdatedAt?: number;
   steps?: HtmlGenerationProgressStep[];
@@ -112,7 +112,7 @@ export type PresentationRevisionRequestData = {
 };
 
 export type HtmlGenerationProgressStep = {
-  id: "prepare" | "load-skill" | "compose" | "validate" | "fallback" | "save";
+  id: "prepare" | "load-skill" | "compose" | "regenerate" | "validate" | "save";
   label: string;
   status: "pending" | "active" | "completed";
   detail?: string;

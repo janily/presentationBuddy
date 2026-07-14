@@ -50,7 +50,7 @@ Non-negotiable output requirements:
 - Use .slide elements and .active/.visible visibility rules.
 - Do not use display:none/display:block for slide switching.
 - Include keyboard navigation and reduced-motion support.
-- Generate at least ${input.slides.length} real slides matching the approved outline.
+- Generate exactly ${input.slides.length} real slides matching the approved outline: no missing, merged, or extra slides.
 - Reuse shared CSS classes and keep markup compact so the response can include every slide.
 - Do not stop, summarize, or close the document until all ${input.slides.length} .slide elements have been written.
 - Use distinctive typography, color, motion, and layout. Avoid generic AI-looking templates.
@@ -70,4 +70,16 @@ ${context.viewportBaseCss}
 ${context.animationPatterns}
 ${context.stylePresets ? `\n=== frontend-slides/STYLE_PRESETS.md ===\n${context.stylePresets}` : ""}
 `;
+}
+
+export function buildFrontendSlidesRepairPrompt(
+  input: FrontendSlidesInput,
+  context: FrontendSlidesFinalContext,
+  failure: string,
+) {
+  return `The previous frontend-slides generation attempt failed before producing valid output: ${failure}
+
+Regenerate the presentation from the approved outline. This is a full regeneration, not a patch and not a summary. Keep the HTML compact, write exactly ${input.slides.length} complete .slide elements in outline order, then include navigation JavaScript and close the HTML document.
+
+${buildFrontendSlidesMastraPrompt(input, context)}`;
 }

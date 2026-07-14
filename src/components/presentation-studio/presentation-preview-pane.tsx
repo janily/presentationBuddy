@@ -205,11 +205,7 @@ function GenerationProgress({ htmlGeneration }: { htmlGeneration?: HtmlGeneratio
   const progress = htmlGeneration?.progress ?? 25;
   const ActiveIcon = generationSteps[activeIndex]?.icon ?? Sparkles;
   const progressSteps = htmlGeneration?.steps ?? [];
-  const generatorLabel = htmlGeneration?.generator === "frontend-slides"
-    ? "frontend-slides"
-    : htmlGeneration?.generator === "backup"
-      ? "backup generator"
-      : null;
+  const generatorLabel = htmlGeneration?.generator === "frontend-slides" ? "frontend-slides" : null;
 
   return (
     <div className="flex h-full min-h-[620px] items-center justify-center bg-[linear-gradient(135deg,#faf7f1_0%,#fff_56%,#f7efe5_100%)] p-8">
@@ -225,8 +221,8 @@ function GenerationProgress({ htmlGeneration }: { htmlGeneration?: HtmlGeneratio
           {generatorLabel ? (
             <div className="mt-4 rounded-2xl border border-[var(--border-light)] bg-white/70 px-4 py-3 text-sm text-[var(--text-secondary)]">
               <span className="font-semibold text-[var(--text-primary)]">Generator:</span> {generatorLabel}
-              {htmlGeneration?.fallbackReason && htmlGeneration.generator === "backup" ? (
-                <p className="mt-1 text-[var(--text-muted)]">frontend-slides fallback reason: {htmlGeneration.fallbackReason}</p>
+              {htmlGeneration?.regenerationReason ? (
+                <p className="mt-1 text-[var(--text-muted)]">首次生成未通过完整性检查，已使用 frontend-slides 重新生成。</p>
               ) : null}
             </div>
           ) : null}
