@@ -11,10 +11,9 @@ import {
 } from "ai";
 import type { AgentActionProposal, AgentChatUIMessage } from "@/src/types/agent-chat";
 import type { AgentChatStatusState } from "@/src/types/agent-chat";
-import { applyIntentGuard, createActionProposal } from "./intent-routing";
+import { createActionProposal } from "./intent-routing";
 import { NextResponse } from "next/server";
 import z from "zod";
-import { classifyProposalConfirmation } from "@/src/utils/proposal-confirmation";
 import {
   beginProposalExecution,
   getAgentProposal,
@@ -32,6 +31,7 @@ const agentChatRequestSchema = z.object({
   messages: z.array(chatMessageSchema).min(1),
   hasGeneratedDeck: z.boolean().optional(),
   hasSelectedStyle: z.boolean().optional(),
+  isGenerating: z.boolean().optional(),
   operationId: z.string().trim().min(1).optional(),
   pendingProposalId: z.string().trim().min(1).optional(),
   deckContext: z.object({
@@ -45,7 +45,6 @@ const agentChatRequestSchema = z.object({
 // Keep the request bounded; the agent only needs recent turns to stay coherent.
 const MAX_HISTORY_MESSAGES = 20;
 const AGENT_CHAT_TOTAL_TIMEOUT_MS = 90_000;
-const AGENT_CHAT_CLASSIFICATION_TIMEOUT_MS = 20_000;
 const AGENT_CHAT_VERY_SLOW_STATUS_MS = 8_000;
 
 type BriefDecision = z.infer<typeof briefDecisionSchema>;
@@ -70,8 +69,48 @@ type AgentChatStreamEvent =
   | { type: "decision"; payload: AgentChatResultPayload }
   | { type: "error"; error: string };
 
-function getLastUserMessage(messages: z.infer<typeof chatMessageSchema>[]) {
-  return [...messages].reverse().find((message) => message.role === "user")?.content.trim() ?? "";
+type DecisionGuardReason = "generation-in-progress" | "inconsistent-decision" | null;
+
+export function enforceAgentDecisionState(
+  decision: BriefDecision,
+  state: { isGenerating: boolean },
+): { decision: BriefDecision; reason: DecisionGuardReason } {
+  if (state.isGenerating) {
+    const attemptsImmediateExecution = decision.readyToGenerate
+      || decision.nextAction === "generate"
+      || decision.nextAction === "execute-proposal";
+    return {
+      reason: "generation-in-progress",
+      decision: attemptsImmediateExecution
+        ? {
+          ...decision,
+          readyToGenerate: false,
+          nextAction: "chat",
+          revision: null,
+          brief: null,
+          styleId: null,
+        }
+        : decision,
+    };
+  }
+
+  const readyWithoutGenerate = decision.readyToGenerate && decision.nextAction !== "generate";
+  const invalidGenerate = decision.nextAction === "generate" && (!decision.readyToGenerate || !decision.brief);
+  if (readyWithoutGenerate || invalidGenerate) {
+    return {
+      reason: "inconsistent-decision",
+      decision: {
+        ...decision,
+        readyToGenerate: false,
+        nextAction: "chat",
+        revision: null,
+        brief: null,
+        styleId: null,
+      },
+    };
+  }
+
+  return { decision, reason: null };
 }
 
 function createRequestDeadline(parentSignal: AbortSignal) {
@@ -95,47 +134,6 @@ function createRequestDeadline(parentSignal: AbortSignal) {
   };
 }
 
-function createChildDeadline(parentSignal: AbortSignal, timeoutMs: number) {
-  const controller = new AbortController();
-  let timedOut = false;
-  const forwardAbort = () => controller.abort(parentSignal.reason);
-  const timeout = setTimeout(() => {
-    timedOut = true;
-    controller.abort();
-  }, timeoutMs);
-
-  parentSignal.addEventListener("abort", forwardAbort, { once: true });
-
-  return {
-    signal: controller.signal,
-    didTimeOut: () => timedOut,
-    cleanup: () => {
-      clearTimeout(timeout);
-      parentSignal.removeEventListener("abort", forwardAbort);
-    },
-  };
-}
-
-export function explicitlyConfirmedGeneration(message: string) {
-  return classifyProposalConfirmation(message) === "confirm"
-    || /(^|\s)(开始|开始生成|确认|确认生成|可以|可以生成|直接生成|生成吧|就这样|就按这个|按这个|按这个生成|用这个|用第[一二三四五六七八九十123456789]|选第[一二三四五六七八九十123456789]|go ahead|yes|ok)(\s|。|！|!|$)/i.test(message);
-}
-
-export function buildRevisionConfirmationReply(decision: BriefDecision) {
-  const instruction = decision.revision?.instruction.trim();
-  if (instruction) {
-    return `我先不直接执行。你是要应用刚才这项修改吗：${instruction}\n\n确认后我会保持当前视觉方向并开始处理。`;
-  }
-
-  const style = decision.brief?.style?.trim();
-
-  if (style) {
-    return `我先不直接生成。你是想把这份演示文稿改成「${style}」这个方向吗？确认后我再开始重生成。`;
-  }
-
-  return "我先不直接生成。你想换成哪类方向？比如：1. 现代清爽 2. 专业深色 3. 更有视觉冲击。你选一个，我确认后再开始生成。";
-}
-
 export function buildProposalExecutionReply(proposal: AgentActionProposal) {
   if (proposal.requiresOutlineReview) {
     return "已确认，正在应用刚才的大纲修改并生成新版本。";
@@ -149,21 +147,95 @@ export function buildProposalExecutionReply(proposal: AgentActionProposal) {
   return "已确认，正在应用刚才的内容修改，当前视觉方向保持不变。";
 }
 
-function buildGenerationConfirmationReply(decision: BriefDecision) {
-  const brief = decision.brief;
-  if (!brief) {
-    return "我先不直接生成。我们先把主题、受众、页数和风格确认清楚，你确认后我再开始。";
+type DeckContext = { deckId: string; version: number } | undefined;
+
+/**
+ * Deterministic structural gating for proposal execution. The model already
+ * decided the user wants to execute the pending proposal; the server only
+ * verifies the proposal still exists, belongs to this deck, matches the current
+ * version, and is still pending — no keyword/regex intent matching.
+ */
+export function resolveProposalExecution(
+  pendingProposalId: string | undefined,
+  deckContext: DeckContext,
+  operationId: string,
+): { payload: AgentChatResultPayload; result: string } {
+  const invalid = (reply: string, proposal: AgentActionProposal | null, result: string) => ({
+    result,
+    payload: {
+      reply,
+      readyToGenerate: false,
+      brief: null,
+      nextAction: "chat" as const,
+      revision: null,
+      styleId: null,
+      proposal,
+      executeProposalId: null,
+    },
+  });
+
+  const storedProposal = pendingProposalId ? getAgentProposal(pendingProposalId) : null;
+  if (!pendingProposalId || !deckContext || !storedProposal) {
+    return invalid(
+      "刚才的待执行方案已失效，请基于当前版本重新整理后再执行。",
+      storedProposal,
+      "invalid-or-missing",
+    );
   }
 
-  return [
-    "我先不直接生成，先和你确认一下理解是否正确：",
-    `主题：${brief.topic}`,
-    `受众：${brief.audience}`,
-    `页数：约 ${brief.pageCount} 页`,
-    `风格：${brief.style}`,
-    brief.requirements ? `补充要求：${brief.requirements}` : null,
-    "如果没问题，回复“确认生成”或“开始生成”，我再正式生成。",
-  ].filter(Boolean).join("\n");
+  if (storedProposal.status === "executing" || storedProposal.status === "consumed") {
+    console.log("agent_chat.proposal_confirmation_deduplicated", {
+      operationId,
+      proposalId: storedProposal.proposalId,
+      status: storedProposal.status,
+    });
+    return invalid(
+      "刚才确认的方案已经在执行或已执行，不会重复启动。",
+      storedProposal,
+      "deduplicated",
+    );
+  }
+
+  if (
+    storedProposal.status !== "pending"
+    || storedProposal.deckId !== deckContext.deckId
+    || storedProposal.baseVersion !== deckContext.version
+  ) {
+    return invalid(
+      "刚才的待执行方案已失效，请基于当前版本重新整理后再执行。",
+      storedProposal,
+      "stale-version",
+    );
+  }
+
+  const proposal = beginProposalExecution(pendingProposalId, {
+    deckId: deckContext.deckId,
+    version: deckContext.version,
+  });
+  console.log("agent_chat.proposal_confirmed", {
+    operationId,
+    proposalId: proposal.proposalId,
+    action: proposal.action,
+    proposalAgeMs: Date.now() - Date.parse(proposal.createdAt),
+  });
+  const reply = buildProposalExecutionReply(proposal);
+  return {
+    result: "executed",
+    payload: {
+      reply,
+      readyToGenerate: false,
+      brief: null,
+      nextAction: "execute-proposal",
+      revision: {
+        instruction: proposal.instruction,
+        targetSlides: proposal.targetSlides,
+        requiresOutlineReview: proposal.requiresOutlineReview,
+      },
+      styleId: null,
+      proposal,
+      executeProposalId: proposal.proposalId,
+    },
+  };
 }
 
 function createAgentChatStreamResponse(
@@ -247,52 +319,72 @@ function parseJsonObject(text: string) {
   }
 }
 
-async function generateBriefDecisionStructured(
-  conversationAgent: ConversationAgent,
-  history: ModelMessage[],
-  abortSignal: AbortSignal,
-): Promise<BriefDecision | undefined> {
-  const stream = await conversationAgent.stream(history, {
-    structuredOutput: {
-      schema: briefDecisionSchema,
-    },
-    abortSignal,
-  });
-
-  try {
-    const decision = await stream.object as BriefDecision | undefined;
-    return decision;
-  } catch (error) {
-    throw error;
+function extractReplyText(partial: unknown): string {
+  if (partial && typeof partial === "object" && "reply" in partial) {
+    const reply = (partial as { reply?: unknown }).reply;
+    if (typeof reply === "string") return reply;
   }
+  return "";
 }
 
-async function streamConversationalReply(
+/**
+ * Single-pass decision: one Mastra run produces BOTH the user-facing reply
+ * (streamed live from the partial structured object) AND the structured
+ * intent decision. There is no second classification call and no keyword/regex
+ * intent guard. The model is the single source of truth for intent.
+ *
+ * A JSON text fallback still exists for providers whose structured stream
+ * errors out, but it is structured-only and never re-derives intent by regex.
+ */
+async function generateBriefDecision(
   conversationAgent: ConversationAgent,
   history: ModelMessage[],
   emit: (event: AgentChatStreamEvent) => void,
   abortSignal: AbortSignal,
   requestStartedAt: number,
   operationId: string,
-) {
-  const stream = await conversationAgent.stream(history, { abortSignal });
-  let reply = "";
-  let firstReasoningDeltaAt: number | null = null;
-  let firstTextDeltaAt: number | null = null;
+): Promise<BriefDecision | undefined> {
+  const stream = await conversationAgent.stream(history, {
+    structuredOutput: { schema: briefDecisionSchema },
+    abortSignal,
+  });
 
-  for await (const chunk of stream.fullStream) {
-    if (chunk.type === "reasoning-start") {
-      emit({ type: "reasoning", delta: "", state: "start" });
-    } else if (chunk.type === "reasoning-delta" && chunk.payload.text) {
-      if (!firstReasoningDeltaAt) firstReasoningDeltaAt = Date.now();
-      emit({ type: "reasoning", delta: chunk.payload.text, state: "delta" });
-    } else if (chunk.type === "reasoning-end") {
-      emit({ type: "reasoning", delta: "", state: "end" });
-    } else if (chunk.type === "text-delta" && chunk.payload.text) {
-      if (!firstTextDeltaAt) firstTextDeltaAt = Date.now();
-      reply += chunk.payload.text;
-      emit({ type: "assistant-delta", delta: chunk.payload.text });
+  let streamedReply = "";
+  let firstReasoningDeltaAt: number | null = null;
+  let firstReplyDeltaAt: number | null = null;
+
+  try {
+    for await (const chunk of stream.fullStream) {
+      if (chunk.type === "reasoning-start") {
+        emit({ type: "reasoning", delta: "", state: "start" });
+      } else if (chunk.type === "reasoning-delta" && chunk.payload.text) {
+        if (!firstReasoningDeltaAt) firstReasoningDeltaAt = Date.now();
+        emit({ type: "reasoning", delta: chunk.payload.text, state: "delta" });
+      } else if (chunk.type === "reasoning-end") {
+        emit({ type: "reasoning", delta: "", state: "end" });
+      } else if (chunk.type === "object") {
+        // Partial structured object: stream only the growing `reply` field to
+        // the user, never raw JSON of the other decision fields.
+        const nextReply = extractReplyText(chunk.object);
+        if (nextReply.length > streamedReply.length && nextReply.startsWith(streamedReply)) {
+          const delta = nextReply.slice(streamedReply.length);
+          if (!firstReplyDeltaAt) firstReplyDeltaAt = Date.now();
+          streamedReply = nextReply;
+          emit({ type: "assistant-delta", delta });
+        } else if (nextReply && nextReply !== streamedReply) {
+          // Provider re-emitted a non-append-only reply; correct via snapshot.
+          streamedReply = nextReply;
+          emit({ type: "assistant-snapshot", text: nextReply });
+        }
+      }
     }
+  } catch (streamError) {
+    if (abortSignal.aborted) throw streamError;
+    console.warn("agent_chat.structured_stream_failed; falling back to JSON text:", {
+      operationId,
+      message: streamError instanceof Error ? streamError.message : String(streamError),
+    });
+    return generateBriefDecisionFallback(conversationAgent, history, emit, abortSignal, operationId);
   }
 
   if (firstReasoningDeltaAt) {
@@ -301,14 +393,46 @@ async function streamConversationalReply(
       latencyMs: firstReasoningDeltaAt - requestStartedAt,
     });
   }
-  if (firstTextDeltaAt) {
+  if (firstReplyDeltaAt) {
     console.log("agent_chat.first_text_delta", {
       operationId,
-      latencyMs: firstTextDeltaAt - requestStartedAt,
+      latencyMs: firstReplyDeltaAt - requestStartedAt,
     });
   }
 
-  return reply.trim();
+  let decision: BriefDecision | undefined;
+  try {
+    decision = await stream.object as BriefDecision | undefined;
+  } catch (objectError) {
+    if (abortSignal.aborted) throw objectError;
+    console.warn("agent_chat.structured_object_failed; falling back to JSON text:", {
+      operationId,
+      message: objectError instanceof Error ? objectError.message : String(objectError),
+    });
+    return generateBriefDecisionFallback(conversationAgent, history, emit, abortSignal, operationId);
+  }
+
+  console.log("agent_chat.structured_completed", {
+    operationId,
+    durationMs: Date.now() - requestStartedAt,
+  });
+
+  if (!decision) {
+    console.warn("agent_chat.structured_returned_empty", { operationId });
+    // Preserve any reply the user already saw; do not invent an intent.
+    return {
+      reply: streamedReply || "我已经理解你的要求，请继续补充你希望我执行的具体调整。",
+      readyToGenerate: false,
+      nextAction: "chat",
+      revision: null,
+      styleId: null,
+      brief: null,
+    };
+  }
+
+  // The streamed reply and the final decision come from the same run, so they
+  // are already consistent. Prefer the validated decision.reply as canonical.
+  return decision;
 }
 
 async function generateBriefDecisionFallback(
@@ -331,7 +455,9 @@ The JSON shape must be:
 {
   "reply": "string shown to the user",
   "readyToGenerate": boolean,
-  "nextAction": "chat" | "revise-content" | "revise-structure" | "change-palette" | "discover-styles" | "more-styles" | "select-style" | "generate",
+  "nextAction": "chat" | "revise-content" | "revise-structure" | "change-palette" | "discover-styles" | "more-styles" | "select-style" | "execute-proposal" | "generate",
+  "revision": null | { "instruction": "string", "targetSlides": number[], "requiresOutlineReview": boolean },
+  "styleId": null | "string",
   "brief": null | {
     "topic": "string",
     "audience": "string",
@@ -351,86 +477,11 @@ The JSON shape must be:
   }
 
   const parsed = parseJsonObject(text);
-
-  return briefDecisionSchema.parse(parsed);
-}
-
-async function generateBriefDecision(
-  conversationAgent: ConversationAgent,
-  history: ModelMessage[],
-  emit: (event: AgentChatStreamEvent) => void,
-  abortSignal: AbortSignal,
-  requestStartedAt: number,
-  operationId: string,
-) {
-  const visibleReply = await streamConversationalReply(
-    conversationAgent,
-    history,
-    emit,
-    abortSignal,
-    requestStartedAt,
-    operationId,
-  );
-  const classificationHistory: ModelMessage[] = [
-    ...history,
-    { role: "assistant", content: visibleReply },
-    {
-      role: "user",
-      content: "Classify the action implied by the latest user request and the assistant reply. Return the brief decision only. Do not continue the conversation.",
-    },
-  ];
-  const classificationDeadline = createChildDeadline(abortSignal, AGENT_CHAT_CLASSIFICATION_TIMEOUT_MS);
-  const chatOnlyDecision = (): BriefDecision => ({
-    reply: visibleReply || "我已经理解你的要求，请继续补充你希望我执行的具体调整。",
-    readyToGenerate: false,
-    nextAction: "chat",
-    revision: null,
-    styleId: null,
-    brief: null,
-  });
-
-  try {
-    const decision = await generateBriefDecisionStructured(
-      conversationAgent,
-      classificationHistory,
-      classificationDeadline.signal,
-    );
-    console.log("agent_chat.structured_completed", {
-      operationId,
-      durationMs: Date.now() - requestStartedAt,
-    });
-    return decision ? { ...decision, reply: visibleReply || decision.reply } : decision;
-  } catch (structuredError) {
-    if (abortSignal.aborted) throw structuredError;
-    if (classificationDeadline.didTimeOut()) {
-      console.warn("agent_chat.classification_timed_out", { operationId });
-      return chatOnlyDecision();
-    }
-
-    console.warn("Presentation brief structured output failed; retrying with JSON text fallback:", {
-      message: structuredError instanceof Error ? structuredError.message : String(structuredError),
-    });
-
-    try {
-      const decision = await generateBriefDecisionFallback(
-        conversationAgent,
-        classificationHistory,
-        emit,
-        classificationDeadline.signal,
-        operationId,
-      );
-      return { ...decision, reply: visibleReply || decision.reply };
-    } catch (fallbackError) {
-      if (abortSignal.aborted) throw fallbackError;
-      if (classificationDeadline.didTimeOut()) {
-        console.warn("agent_chat.classification_fallback_timed_out", { operationId });
-        return chatOnlyDecision();
-      }
-      throw fallbackError;
-    }
-  } finally {
-    classificationDeadline.cleanup();
-  }
+  const decision = briefDecisionSchema.parse(parsed);
+  // Fallback JSON was internal; surface the reply as a snapshot so the user
+  // sees the final wording rather than raw JSON tokens.
+  emit({ type: "assistant-snapshot", text: decision.reply });
+  return decision;
 }
 
 export async function POST(request: Request) {
@@ -442,7 +493,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid agent chat request" }, { status: 400 });
   }
 
-  const { messages, hasGeneratedDeck, hasSelectedStyle, deckContext, pendingProposalId } = validation.data;
+  const { messages, hasGeneratedDeck, hasSelectedStyle, isGenerating, deckContext, pendingProposalId } = validation.data;
   const operationId = validation.data.operationId ?? crypto.randomUUID();
 
   return createAgentChatStreamResponse(operationId, async (emit) => {
@@ -466,10 +517,34 @@ export async function POST(request: Request) {
         ? { role: "user", content: message.content }
         : { role: "assistant", content: message.content });
 
-    if (hasGeneratedDeck) {
+    const storedPendingProposal = pendingProposalId ? getAgentProposal(pendingProposalId) : null;
+    const activePendingProposal = storedPendingProposal?.status === "pending"
+      && deckContext
+      && storedPendingProposal.deckId === deckContext.deckId
+      && storedPendingProposal.baseVersion === deckContext.version
+      ? storedPendingProposal
+      : null;
+
+    if (isGenerating) {
       history.unshift({
         role: "system",
-        content: `A deck has already been generated. Treat new user requests as revision discussion. Do not start generation unless the latest user message explicitly confirms generation or selects a proposed option.${deckContext ? `\n\nCurrent deck context:\n${JSON.stringify(deckContext)}` : ""}`,
+        content: `A presentation generation is currently in progress. Treat the latest request as discussion of a revision to apply after the current generation completes. Summarize the requested change as a concrete proposal and tell the user it will be confirmed after completion. Never set readyToGenerate to true, nextAction to "generate", or nextAction to "execute-proposal" in this state.`,
+      });
+    }
+
+    if (hasGeneratedDeck) {
+      const proposalContext = activePendingProposal
+        ? `\n\nThere is a PENDING action proposal awaiting the user's confirmation. If the latest user message means "confirm / go ahead / apply it" (in any wording), set nextAction to "execute-proposal". If the user changes the request, propose a new plan instead. Pending proposal:\n${JSON.stringify({
+            action: activePendingProposal.action,
+            instruction: activePendingProposal.instruction,
+            targetSlides: activePendingProposal.targetSlides,
+            requiresOutlineReview: activePendingProposal.requiresOutlineReview,
+            summary: activePendingProposal.userFacingSummary,
+          })}`
+        : "";
+      history.unshift({
+        role: "system",
+        content: `A deck has already been generated. Treat new user requests as revision discussion. Do not start generation unless the latest user message confirms it or selects a proposed option.${deckContext ? `\n\nCurrent deck context:\n${JSON.stringify(deckContext)}` : ""}${proposalContext}`,
       });
     }
 
@@ -478,6 +553,7 @@ export async function POST(request: Request) {
         operationId,
         messageCount: messages.length,
         hasGeneratedDeck: Boolean(hasGeneratedDeck),
+        isGenerating: Boolean(isGenerating),
       });
 
       emit({ type: "progress", state: "connecting", message: "正在连接模型…" });
@@ -487,107 +563,7 @@ export async function POST(request: Request) {
       });
       console.log("agent_chat.provider_call_started", { operationId });
 
-      if (pendingProposalId && classifyProposalConfirmation(getLastUserMessage(messages)) === "confirm") {
-        const storedProposal = getAgentProposal(pendingProposalId);
-        if (!deckContext || !storedProposal) {
-          const reply = "刚才的待执行方案已失效，请基于当前版本重新整理后再执行。";
-          emit({ type: "assistant-snapshot", text: reply });
-          emit({
-            type: "decision",
-            payload: {
-              reply,
-              readyToGenerate: false,
-              brief: null,
-              nextAction: "chat",
-              revision: null,
-              styleId: null,
-              proposal: null,
-              executeProposalId: null,
-            },
-          });
-          return;
-        }
-
-        if (storedProposal.status === "executing" || storedProposal.status === "consumed") {
-          console.log("agent_chat.proposal_confirmation_deduplicated", {
-            operationId,
-            proposalId: storedProposal.proposalId,
-            status: storedProposal.status,
-          });
-          const reply = "刚才确认的方案已经在执行或已执行，不会重复启动。";
-          emit({ type: "assistant-snapshot", text: reply });
-          emit({
-            type: "decision",
-            payload: {
-              reply,
-              readyToGenerate: false,
-              brief: null,
-              nextAction: "chat",
-              revision: null,
-              styleId: null,
-              proposal: storedProposal,
-              executeProposalId: null,
-            },
-          });
-          return;
-        }
-
-        if (
-          storedProposal.status !== "pending"
-          || storedProposal.deckId !== deckContext.deckId
-          || storedProposal.baseVersion !== deckContext.version
-        ) {
-          const reply = "刚才的待执行方案已失效，请基于当前版本重新整理后再执行。";
-          emit({ type: "assistant-snapshot", text: reply });
-          emit({
-            type: "decision",
-            payload: {
-              reply,
-              readyToGenerate: false,
-              brief: null,
-              nextAction: "chat",
-              revision: null,
-              styleId: null,
-              proposal: storedProposal,
-              executeProposalId: null,
-            },
-          });
-          return;
-        }
-
-        const proposal = beginProposalExecution(pendingProposalId, {
-          deckId: deckContext.deckId,
-          version: deckContext.version,
-        });
-        console.log("agent_chat.proposal_confirmed", {
-          operationId,
-          proposalId: proposal.proposalId,
-          action: proposal.action,
-          proposalAgeMs: Date.now() - Date.parse(proposal.createdAt),
-        });
-        const reply = buildProposalExecutionReply(proposal);
-        emit({ type: "assistant-snapshot", text: reply });
-        emit({
-          type: "decision",
-          payload: {
-            reply,
-            readyToGenerate: false,
-            brief: null,
-            nextAction: "execute-proposal",
-            revision: {
-              instruction: proposal.instruction,
-              targetSlides: proposal.targetSlides,
-              requiresOutlineReview: proposal.requiresOutlineReview,
-            },
-            styleId: null,
-            proposal,
-            executeProposalId: proposal.proposalId,
-          },
-        });
-        return;
-      }
-
-      const rawDecision = await generateBriefDecision(
+      const generatedDecision = await generateBriefDecision(
         conversationAgent,
         history,
         emitModelEvent,
@@ -596,22 +572,46 @@ export async function POST(request: Request) {
         operationId,
       );
 
-      const lastUserMessage = getLastUserMessage(messages);
-      const decision = rawDecision
-        ? applyIntentGuard(rawDecision, lastUserMessage, Boolean(hasGeneratedDeck), { explicitlyConfirmedGeneration })
-        : rawDecision;
-
-      if (!decision?.reply) {
+      if (!generatedDecision?.reply) {
         throw new Error("Brief agent returned no structured decision");
       }
 
-      const shouldBlockGeneration = Boolean(
-        decision.readyToGenerate
-        && decision.brief
-        && !explicitlyConfirmedGeneration(lastUserMessage),
-      );
+      const guarded = enforceAgentDecisionState(generatedDecision, {
+        isGenerating: Boolean(isGenerating),
+      });
+      const decision = guarded.decision;
+      if (guarded.reason) {
+        console.warn("agent_chat.decision_downgraded", {
+          operationId,
+          reason: guarded.reason,
+          originalNextAction: generatedDecision.nextAction,
+          originalReadyToGenerate: generatedDecision.readyToGenerate,
+        });
+      }
 
-      const shouldDiscoverStyle = decision.nextAction === "discover-styles" || decision.nextAction === "more-styles";
+      // The model is the single source of truth for intent. When it decides to
+      // execute a previously proposed action, the server only performs
+      // DETERMINISTIC structural gating (proposal exists, belongs to this deck,
+      // version matches, still pending) — never keyword/regex intent matching.
+      if (decision.nextAction === "execute-proposal") {
+        const outcome = resolveProposalExecution(pendingProposalId, deckContext, operationId);
+        emit({ type: "assistant-snapshot", text: outcome.payload.reply });
+        emit({ type: "decision", payload: outcome.payload });
+        console.log("agent_chat.decision_emitted", {
+          operationId,
+          durationMs: Date.now() - requestStartedAt,
+          readyToGenerate: outcome.payload.readyToGenerate,
+          hasBrief: Boolean(outcome.payload.brief),
+          proposalExecution: outcome.result,
+          proposalAction: outcome.payload.proposal?.action ?? null,
+        });
+        return;
+      }
+
+      // New-deck flow only: if the model is ready to generate but no visual
+      // system has been chosen yet, route to style discovery first. This is a
+      // product-state-machine gate keyed on hasSelectedStyle, NOT an intent
+      // guess about what the user said.
       const shouldRequireInitialStyle = Boolean(
         !hasGeneratedDeck
         && decision.readyToGenerate
@@ -619,23 +619,14 @@ export async function POST(request: Request) {
         && !hasSelectedStyle,
       );
 
+      const shouldDiscoverStyle = decision.nextAction === "discover-styles" || decision.nextAction === "more-styles";
+
       const basePayload: Omit<AgentChatResultPayload, "proposal" | "executeProposalId"> = shouldRequireInitialStyle
         ? {
           reply: "内容方向已经确认。生成前先按 frontend-slides 为你准备一组真实标题页预览，请从中选择整套演示文稿的视觉系统。",
           readyToGenerate: false,
           brief: decision.brief,
           nextAction: "discover-styles",
-          revision: null,
-          styleId: null,
-        }
-        : shouldBlockGeneration
-        ? {
-          reply: hasGeneratedDeck
-            ? buildRevisionConfirmationReply(decision)
-            : buildGenerationConfirmationReply(decision),
-          readyToGenerate: false,
-          brief: null,
-          nextAction: "chat",
           revision: null,
           styleId: null,
         }
@@ -648,7 +639,7 @@ export async function POST(request: Request) {
           styleId: decision.styleId,
         };
 
-      const proposal = deckContext
+      const proposal = deckContext && guarded.reason !== "generation-in-progress"
         ? createActionProposal(decision, {
             deckId: deckContext.deckId,
             version: deckContext.version,
@@ -671,7 +662,6 @@ export async function POST(request: Request) {
         durationMs: Date.now() - requestStartedAt,
         readyToGenerate: payload.readyToGenerate,
         hasBrief: Boolean(payload.brief),
-        blockedForConfirmation: shouldBlockGeneration,
         routedToStyleDiscovery: shouldDiscoverStyle || shouldRequireInitialStyle,
         proposalAction: proposal?.action ?? null,
       });

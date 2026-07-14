@@ -35,6 +35,12 @@ const validHtml = `<!doctype html>
 </html>`;
 
 describe("frontend-slides html validator", () => {
+  it.each(["", "   \n\t  "])("reports empty agent output separately: %j", (output) => {
+    expect(() => extractHtmlFromAgentResult(output)).toThrow(
+      "frontend-slides agent returned empty output (stream may have been aborted or truncated)",
+    );
+  });
+
   it("extracts complete HTML from fenced or mixed model output", () => {
     expect(extractHtmlFromAgentResult(`Here:\n\`\`\`html\n${validHtml}\n\`\`\``)).toBe(validHtml);
     expect(extractHtmlFromAgentResult(`Generated:\n${validHtml}\nDone.`)).toBe(validHtml);
@@ -48,8 +54,27 @@ describe("frontend-slides html validator", () => {
     expect(countGeneratedSlides(validHtml)).toBe(2);
   });
 
+  it("does not count slide-prefixed helper classes as additional slides", () => {
+    const htmlWithHelperClasses = validHtml
+      .replace("One</section>", '<div class="slide-content">One</div></section>')
+      .replace("Two</section>", '<div class="slide-number">Two</div></section>');
+
+    expect(countGeneratedSlides(htmlWithHelperClasses)).toBe(2);
+    expect(() => assertFrontendSlidesComplete(htmlWithHelperClasses, 2)).not.toThrow();
+  });
+
   it("accepts valid frontend-slides documents", () => {
     expect(() => assertFrontendSlidesDocument(validHtml, 2)).not.toThrow();
+  });
+
+  it("requires an exact slide class token even when section fallback can count pages", () => {
+    const helperClassesOnly = validHtml.replaceAll(
+      'class="slide',
+      'data-class="slide" class="slide-content',
+    );
+
+    expect(countGeneratedSlides(helperClassesOnly)).toBe(2);
+    expect(() => assertFrontendSlidesDocument(helperClassesOnly, 2)).toThrow("missing frontend-slides .slide elements");
   });
 
   it("rejects documents with too few slides", () => {

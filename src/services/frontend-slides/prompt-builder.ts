@@ -47,7 +47,8 @@ Non-negotiable output requirements:
 - Single self-contained HTML file with all CSS and JavaScript inline.
 - Every slide is authored inside a fixed 1920x1080 stage.
 - Include the full viewport-base.css behavior in the style block.
-- Use .slide elements and .active/.visible visibility rules.
+- Every real slide root must include an exact whitespace-delimited \`slide\` class token and use .active/.visible visibility rules.
+- The whole document must contain exactly ${input.slides.length} elements whose class list contains the exact \`slide\` token. Helper classes such as \`slide-content\` or \`slide-number\` do not count as slide roots.
 - Do not use display:none/display:block for slide switching.
 - Include keyboard navigation and reduced-motion support.
 - Generate exactly ${input.slides.length} real slides matching the approved outline: no missing, merged, or extra slides.
@@ -79,7 +80,7 @@ export function buildFrontendSlidesRepairPrompt(
 ) {
   return `The previous frontend-slides generation attempt failed before producing valid output: ${failure}
 
-Regenerate the presentation from the approved outline. This is a full regeneration, not a patch and not a summary. Keep the HTML compact, write exactly ${input.slides.length} complete .slide elements in outline order, then include navigation JavaScript and close the HTML document.
+Regenerate the presentation from the approved outline. This is a full regeneration, not a patch and not a summary. Keep the HTML compact, write exactly ${input.slides.length} complete slide roots in outline order, then include navigation JavaScript and close the HTML document. A slide root is counted only when its class list contains the exact whitespace-delimited token \`slide\`; names such as \`slide-content\` and \`slide-number\` are helper classes, not additional slides.
 
 ${buildFrontendSlidesMastraPrompt(input, context)}`;
 }

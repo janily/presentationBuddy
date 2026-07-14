@@ -8,6 +8,10 @@ export function stripHtmlCodeFence(html: string) {
 
 export function extractHtmlFromAgentResult(result: string) {
   const content = result.trim();
+  if (!content) {
+    throw new Error("frontend-slides agent returned empty output (stream may have been aborted or truncated)");
+  }
+
   const fencedMatch = content.match(/```(?:html)?\s*([\s\S]*?)```/i);
   if (fencedMatch?.[1]) {
     return fencedMatch[1].trim();
@@ -21,9 +25,15 @@ export function extractHtmlFromAgentResult(result: string) {
   throw new Error("Failed to extract HTML from frontend-slides agent result");
 }
 
+function countExactClassToken(html: string, token: string) {
+  return [...html.matchAll(/(?:^|[\s<])class\s*=\s*(["'])(.*?)\1/gi)]
+    .filter((match) => match[2].split(/\s+/).includes(token))
+    .length;
+}
+
 export function countGeneratedSlides(html: string) {
   const sectionCount = html.match(/<section(?:\s|>)/gi)?.length ?? 0;
-  const slideClassCount = html.match(/class=["'][^"']*\bslide\b[^"']*["']/gi)?.length ?? 0;
+  const slideClassCount = countExactClassToken(html, "slide");
 
   return slideClassCount || sectionCount;
 }
@@ -54,7 +64,7 @@ export function assertFrontendSlidesDocument(html: string, expectedSlideCount: n
       message: "missing frontend-slides viewport or fixed stage elements",
     },
     {
-      passed: /class=["'][^"']*\bslide\b[^"']*["']/i.test(html),
+      passed: countExactClassToken(html, "slide") > 0,
       message: "missing frontend-slides .slide elements",
     },
     {

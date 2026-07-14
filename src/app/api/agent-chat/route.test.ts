@@ -1,11 +1,16 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import type { BriefDecision } from "@/src/mastra/agents/presentation-brief-conversation-agent";
-import { applyIntentGuard, createActionProposal, detectExplicitAction } from "./intent-routing";
+import { createActionProposal } from "./intent-routing";
 import {
   buildProposalExecutionReply,
-  buildRevisionConfirmationReply,
-  explicitlyConfirmedGeneration,
+  enforceAgentDecisionState,
+  resolveProposalExecution,
 } from "./route";
+import {
+  resetAgentProposalStore,
+  saveAgentProposal,
+} from "@/src/services/agent-proposals/proposal-store";
+import type { AgentActionProposal } from "@/src/types/agent-chat";
 
 const baseDecision: BriefDecision = {
   reply: "正在准备视觉风格预览。",
@@ -16,55 +21,21 @@ const baseDecision: BriefDecision = {
   brief: null,
 };
 
-describe("agent chat intent guard", () => {
-  it("keeps content enrichment out of style discovery", () => {
-    const result = applyIntentGuard(baseDecision, "我觉得内容还需要再丰富下", true, {
-      explicitlyConfirmedGeneration: () => false,
-    });
-
-    expect(result.nextAction).toBe("revise-content");
-    expect(result.revision).toMatchObject({
-      instruction: "我觉得内容还需要再丰富下",
-      requiresOutlineReview: false,
-    });
-    expect(result.reply).not.toContain("风格预览");
-  });
-
-  it("recognizes a request for another style batch", () => {
-    expect(detectExplicitAction("再推荐一些其它的风格", true)).toBe("more-styles");
-  });
-
-  it("does not intercept an ordinary question", () => {
-    expect(detectExplicitAction("Mastra 和 LangGraph 有什么区别？", true)).toBeNull();
-  });
-
-  it("turns a concrete palette request into a confirmable revision", () => {
-    const result = applyIntentGuard(baseDecision, "把配色改成深蓝和青色", true, {
-      explicitlyConfirmedGeneration: () => false,
-    });
-
-    expect(result.nextAction).toBe("change-palette");
-    expect(result.revision).toEqual({
-      instruction: "把配色改成深蓝和青色",
-      requiresOutlineReview: false,
-    });
-  });
-
-  it("fills a missing palette revision even when the model classified the action correctly", () => {
-    const result = applyIntentGuard({
-      ...baseDecision,
-      nextAction: "change-palette",
-      revision: null,
-    }, "把配色改成深蓝和青色", true, {
-      explicitlyConfirmedGeneration: () => false,
-    });
-
-    expect(result.revision).toEqual({
-      instruction: "把配色改成深蓝和青色",
-      requiresOutlineReview: false,
-    });
-  });
-});
+function pendingProposal(overrides: Partial<AgentActionProposal> = {}): AgentActionProposal {
+  return {
+    proposalId: "proposal-1",
+    deckId: "deck-1",
+    baseVersion: 4,
+    action: "revise-structure",
+    instruction: "增加一页 Mastra Workflow 实战案例",
+    targetSlides: [6],
+    requiresOutlineReview: true,
+    userFacingSummary: "我会增加一页实战案例，确认后执行。",
+    status: "pending",
+    createdAt: "2026-07-13T00:00:00.000Z",
+    ...overrides,
+  };
+}
 
 describe("agent action proposal policy", () => {
   it("binds a structural revision proposal to the current artifact version", () => {
@@ -135,53 +106,148 @@ describe("agent action proposal policy", () => {
   });
 });
 
-describe("generation confirmation policy", () => {
-  it.each([
-    "按你的方案来执行",
-    "按上述方案生成",
-    "就按刚才的建议改",
-  ])("recognizes a proposal-referencing confirmation: %s", (message) => {
-    expect(explicitlyConfirmedGeneration(message)).toBe(true);
+describe("proposal execution reply", () => {
+  it("describes a confirmed palette proposal as a palette change", () => {
+    expect(buildProposalExecutionReply(pendingProposal({
+      action: "change-palette",
+      instruction: "把配色改成深蓝和青色",
+      requiresOutlineReview: false,
+    }))).toContain("配色修改");
   });
 
-  it("does not confirm when the user adds a new constraint", () => {
-    expect(explicitlyConfirmedGeneration("按你的方案来执行，但不要新增页面")).toBe(false);
+  it("describes an outline-review proposal as an outline change", () => {
+    expect(buildProposalExecutionReply(pendingProposal({
+      requiresOutlineReview: true,
+    }))).toContain("大纲修改");
+  });
+});
+
+describe("resolveProposalExecution deterministic gating", () => {
+  beforeEach(() => {
+    resetAgentProposalStore();
   });
 
-  it("confirms the pending revision rather than the existing visual style", () => {
-    const reply = buildRevisionConfirmationReply({
+  it("executes a valid pending proposal that matches the current deck version", () => {
+    saveAgentProposal(pendingProposal());
+
+    const outcome = resolveProposalExecution(
+      "proposal-1",
+      { deckId: "deck-1", version: 4 },
+      "op-1",
+    );
+
+    expect(outcome.result).toBe("executed");
+    expect(outcome.payload.nextAction).toBe("execute-proposal");
+    expect(outcome.payload.executeProposalId).toBe("proposal-1");
+    expect(outcome.payload.proposal?.status).toBe("executing");
+    expect(outcome.payload.revision).toMatchObject({
+      instruction: "增加一页 Mastra Workflow 实战案例",
+      requiresOutlineReview: true,
+    });
+  });
+
+  it("rejects execution when no deck context is supplied", () => {
+    saveAgentProposal(pendingProposal());
+
+    const outcome = resolveProposalExecution("proposal-1", undefined, "op-1");
+
+    expect(outcome.result).toBe("invalid-or-missing");
+    expect(outcome.payload.nextAction).toBe("chat");
+    expect(outcome.payload.executeProposalId).toBeNull();
+  });
+
+  it("rejects execution when the proposal id is unknown", () => {
+    const outcome = resolveProposalExecution(
+      "missing",
+      { deckId: "deck-1", version: 4 },
+      "op-1",
+    );
+
+    expect(outcome.result).toBe("invalid-or-missing");
+    expect(outcome.payload.executeProposalId).toBeNull();
+  });
+
+  it("rejects execution when the proposal is bound to an older deck version", () => {
+    saveAgentProposal(pendingProposal({ baseVersion: 3 }));
+
+    const outcome = resolveProposalExecution(
+      "proposal-1",
+      { deckId: "deck-1", version: 4 },
+      "op-1",
+    );
+
+    expect(outcome.result).toBe("stale-version");
+    expect(outcome.payload.nextAction).toBe("chat");
+  });
+
+  it("deduplicates a proposal that is already executing", () => {
+    saveAgentProposal(pendingProposal({ status: "executing" }));
+
+    const outcome = resolveProposalExecution(
+      "proposal-1",
+      { deckId: "deck-1", version: 4 },
+      "op-1",
+    );
+
+    expect(outcome.result).toBe("deduplicated");
+    expect(outcome.payload.nextAction).toBe("chat");
+  });
+});
+
+describe("agent decision state gating", () => {
+  it("downgrades generation while another generation is in progress", () => {
+    const result = enforceAgentDecisionState({
       ...baseDecision,
+      reply: "请确认后执行。",
+      readyToGenerate: true,
+      nextAction: "generate",
       brief: {
         topic: "Mastra 教程",
         audience: "开发者",
-        pageCount: 8,
+        pageCount: 10,
         style: "Paper & Ink",
         requirements: "",
         purpose: "teaching-tutorial",
         density: "speaker-led",
         contentReadiness: "ready",
       },
-      revision: {
-        instruction: "增加一页 Workflow 实战",
-        requiresOutlineReview: true,
-      },
-    });
+    }, { isGenerating: true });
 
-    expect(reply).toContain("增加一页 Workflow 实战");
-    expect(reply).not.toContain("Paper & Ink");
+    expect(result.decision.readyToGenerate).toBe(false);
+    expect(result.decision.nextAction).toBe("chat");
+    expect(result.decision.brief).toBeNull();
+    expect(result.reason).toBe("generation-in-progress");
   });
 
-  it("describes a confirmed palette proposal as a palette change", () => {
-    expect(buildProposalExecutionReply({
-      proposalId: "proposal-palette",
-      deckId: "deck-1",
-      baseVersion: 2,
-      action: "change-palette",
-      instruction: "把配色改成深蓝和青色",
-      requiresOutlineReview: false,
-      userFacingSummary: "调整配色",
-      status: "executing",
-      createdAt: "2026-07-13T00:00:00.000Z",
-    })).toContain("配色修改");
+  it("downgrades a revision decision with contradictory generation readiness", () => {
+    const result = enforceAgentDecisionState({
+      ...baseDecision,
+      readyToGenerate: true,
+      nextAction: "revise-structure",
+      revision: {
+        instruction: "增加一页框架对比",
+        requiresOutlineReview: true,
+      },
+    }, { isGenerating: false });
+
+    expect(result.decision.readyToGenerate).toBe(false);
+    expect(result.decision.nextAction).toBe("chat");
+    expect(result.decision.revision).toBeNull();
+    expect(result.reason).toBe("inconsistent-decision");
+  });
+
+  it("marks a generating-time revision for deferred orchestration without changing its intent", () => {
+    const result = enforceAgentDecisionState({
+      ...baseDecision,
+      nextAction: "revise-structure",
+      revision: {
+        instruction: "增加一页框架对比",
+        requiresOutlineReview: true,
+      },
+    }, { isGenerating: true });
+
+    expect(result.decision.readyToGenerate).toBe(false);
+    expect(result.decision.nextAction).toBe("revise-structure");
+    expect(result.reason).toBe("generation-in-progress");
   });
 });

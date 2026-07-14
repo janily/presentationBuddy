@@ -269,6 +269,53 @@ async function getCompletedStreamText(stream: { text?: Promise<string> }) {
   ]);
 }
 
+const PRESENTATION_HTML_CANCELLED_MESSAGE = "Presentation HTML generation was cancelled by the client";
+
+function throwIfPresentationHtmlGenerationCancelled(abortSignal?: AbortSignal) {
+  if (abortSignal?.aborted) {
+    throw new Error(PRESENTATION_HTML_CANCELLED_MESSAGE);
+  }
+}
+
+function waitForPresentationHtmlOperation<T>(operation: Promise<T>, abortSignal?: AbortSignal) {
+  throwIfPresentationHtmlGenerationCancelled(abortSignal);
+  if (!abortSignal) return operation;
+
+  return new Promise<T>((resolve, reject) => {
+    const handleAbort = () => reject(new Error(PRESENTATION_HTML_CANCELLED_MESSAGE));
+    abortSignal.addEventListener("abort", handleAbort, { once: true });
+    operation.then(resolve, reject).finally(() => {
+      abortSignal.removeEventListener("abort", handleAbort);
+    });
+  });
+}
+
+function isPresentationHtmlGenerationCancellation(error: unknown, abortSignal?: AbortSignal) {
+  if (abortSignal?.aborted) return true;
+  if (!(error instanceof Error)) return false;
+
+  return error.name === "AbortError" || error.message.toLowerCase().includes("cancelled");
+}
+
+export async function runWithFrontendSlidesRepair<T>({
+  abortSignal,
+  initialAttempt,
+  repairAttempt,
+}: {
+  abortSignal?: AbortSignal;
+  initialAttempt: () => Promise<T>;
+  repairAttempt: (initialError: unknown) => Promise<T>;
+}) {
+  throwIfPresentationHtmlGenerationCancelled(abortSignal);
+
+  try {
+    return await waitForPresentationHtmlOperation(initialAttempt(), abortSignal);
+  } catch (initialError) {
+    throwIfPresentationHtmlGenerationCancelled(abortSignal);
+    return waitForPresentationHtmlOperation(repairAttempt(initialError), abortSignal);
+  }
+}
+
 function assertOutlineHasSlides(
   outline: z.infer<typeof presentationOutlineSchema>,
   expectedSlideCount?: number,
@@ -648,6 +695,7 @@ export const presentationHtmlGenerationStep = createStep({
       const frontendSlidesAgent = mastra.getAgent("frontendSlidesComposerAgent");
 
       const runFrontendSlidesAttempt = async (prompt: string, attempt: "initial" | "repair") => {
+        throwIfPresentationHtmlGenerationCancelled(abortSignal);
         const attemptStartedAt = Date.now();
         const stream = await Promise.race([
           frontendSlidesAgent.stream(
@@ -662,12 +710,15 @@ export const presentationHtmlGenerationStep = createStep({
             `frontend-slides ${attempt} generation did not start within ${Math.round(FRONTEND_SLIDES_TIMEOUT_MS / 1000)} seconds`,
           ),
         ]);
+        throwIfPresentationHtmlGenerationCancelled(abortSignal);
         let output = "";
         let lastProgressWrite = 0;
+        let streamCompletedNormally = false;
         const reader = stream.fullStream.getReader();
 
         try {
           while (Date.now() - attemptStartedAt <= FRONTEND_SLIDES_TIMEOUT_MS) {
+            throwIfPresentationHtmlGenerationCancelled(abortSignal);
             const { done, value } = await Promise.race([
               reader.read(),
               timeoutAfter(
@@ -675,7 +726,11 @@ export const presentationHtmlGenerationStep = createStep({
                 `frontend-slides ${attempt} generation stream was idle for ${Math.round(HTML_STREAM_IDLE_TIMEOUT_MS / 1000)} seconds`,
               ),
             ]);
-            if (done) break;
+            throwIfPresentationHtmlGenerationCancelled(abortSignal);
+            if (done) {
+              streamCompletedNormally = true;
+              break;
+            }
 
             const textDelta = getTextDelta(value);
             if (!textDelta) continue;
@@ -705,11 +760,15 @@ export const presentationHtmlGenerationStep = createStep({
           reader.releaseLock();
         }
 
+        throwIfPresentationHtmlGenerationCancelled(abortSignal);
         if (Date.now() - attemptStartedAt > FRONTEND_SLIDES_TIMEOUT_MS) {
           await stream.fullStream.cancel().catch(() => undefined);
           throw new Error(`frontend-slides ${attempt} generation timed out after ${Math.round(FRONTEND_SLIDES_TIMEOUT_MS / 1000)} seconds`);
         }
-        if (!output.trim()) output = await getCompletedStreamText(stream);
+        if (!output.trim() && streamCompletedNormally) {
+          output = await getCompletedStreamText(stream);
+          throwIfPresentationHtmlGenerationCancelled(abortSignal);
+        }
         return output;
       };
 
@@ -726,32 +785,34 @@ export const presentationHtmlGenerationStep = createStep({
         progress: 36,
       });
 
-      try {
-        html = validateFrontendSlidesHtml(await runFrontendSlidesAttempt(
+      html = await runWithFrontendSlidesRepair({
+        abortSignal,
+        initialAttempt: async () => validateFrontendSlidesHtml(await runFrontendSlidesAttempt(
           buildFrontendSlidesMastraPrompt(frontendSlidesInput, frontendSlidesContext),
           "initial",
-        ));
-      } catch (initialError) {
-        const initialFailure = initialError instanceof Error ? initialError.message : String(initialError);
-        includeRegenerationStep = true;
-        regenerationReason = `Initial frontend-slides attempt failed: ${initialFailure}`;
-        console.warn("Presentation HTML generation: retrying with frontend-slides after the initial attempt failed", {
-          initialFailure,
-          expectedSlideCount: frontendSlidesInput.slides.length,
-        });
-        writeHtmlProgress({
-          activeStepId: "regenerate",
-          phase: "html",
-          message: "The first attempt failed; regenerating the complete deck with frontend-slides...",
-          progress: 38,
-          generator: "frontend-slides",
-          regenerationReason,
-        });
-        html = validateFrontendSlidesHtml(await runFrontendSlidesAttempt(
-          buildFrontendSlidesRepairPrompt(frontendSlidesInput, frontendSlidesContext, initialFailure),
-          "repair",
-        ));
-      }
+        )),
+        repairAttempt: async (initialError) => {
+          const initialFailure = initialError instanceof Error ? initialError.message : String(initialError);
+          includeRegenerationStep = true;
+          regenerationReason = `Initial frontend-slides attempt failed: ${initialFailure}`;
+          console.warn("Presentation HTML generation: retrying with frontend-slides after the initial attempt failed", {
+            initialFailure,
+            expectedSlideCount: frontendSlidesInput.slides.length,
+          });
+          writeHtmlProgress({
+            activeStepId: "regenerate",
+            phase: "html",
+            message: "The first attempt failed; regenerating the complete deck with frontend-slides...",
+            progress: 38,
+            generator: "frontend-slides",
+            regenerationReason,
+          });
+          return validateFrontendSlidesHtml(await runFrontendSlidesAttempt(
+            buildFrontendSlidesRepairPrompt(frontendSlidesInput, frontendSlidesContext, initialFailure),
+            "repair",
+          ));
+        },
+      });
 
       generator = "frontend-slides";
       console.log("Presentation HTML generation: frontend-slides Mastra agent completed", {
@@ -763,10 +824,12 @@ export const presentationHtmlGenerationStep = createStep({
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      console.error("frontend-slides Mastra generation failed; no alternate generator is allowed:", {
-        message,
-        error,
-      });
+      const logContext = { message, error };
+      if (isPresentationHtmlGenerationCancellation(error, abortSignal)) {
+        console.warn("frontend-slides Mastra generation cancelled by the client:", logContext);
+      } else {
+        console.error("frontend-slides Mastra generation failed; no alternate generator is allowed:", logContext);
+      }
       throw new Error(`frontend-slides generation failed: ${message}`);
     }
 

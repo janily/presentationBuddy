@@ -29,6 +29,8 @@ describe("buildFrontendSlidesMastraPrompt", () => {
     expect(prompt).toContain("Demo Deck");
     expect(prompt).toContain("Slide 1: Opening");
     expect(prompt).toContain("fixed 1920x1080 stage");
+    expect(prompt).toContain("exact whitespace-delimited `slide` class token");
+    expect(prompt).toContain("`slide-content` or `slide-number` do not count as slide roots");
     expect(prompt).toContain("Fixed 16:9 Stage");
     expect(prompt).toContain(".slide { visibility: hidden; }");
     expect(prompt).toContain("Swiss Modern");
@@ -101,7 +103,8 @@ describe("buildFrontendSlidesMastraPrompt", () => {
     );
 
     expect(prompt).toContain("previous frontend-slides generation attempt failed before producing valid output");
-    expect(prompt).toContain("exactly 10 complete .slide elements");
+    expect(prompt).toContain("exactly 10 complete slide roots");
+    expect(prompt).toContain("`slide-content` and `slide-number` are helper classes");
     expect(prompt).toContain("frontend-slides/SKILL.md");
   });
 });

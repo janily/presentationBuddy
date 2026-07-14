@@ -50,14 +50,27 @@ function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
+function isCancellationError(error: unknown) {
+  if (!(error instanceof Error)) return false;
+
+  const message = error.message.toLowerCase();
+  return error.name === "AbortError" || message.includes("cancelled") || message.includes("aborted");
+}
+
 function streamErrorMessage(error: unknown) {
   const classification = classifyProcessingError(error);
 
-  console.error("Presentation workflow stream failed:", {
+  const logContext = {
     code: classification.code,
     message: getErrorMessage(error),
     error,
-  });
+  };
+  if (isCancellationError(error)) {
+    console.warn("Presentation workflow stream cancelled by the client:", logContext);
+    return "Presentation generation was cancelled.";
+  }
+
+  console.error("Presentation workflow stream failed:", logContext);
 
   return classification.message;
 }
@@ -132,6 +145,9 @@ export async function POST(request: NextRequest) {
       const stream = run.stream({ inputData: plan.inputData } as never);
 
       request.signal.addEventListener("abort", () => {
+        console.info("Presentation revision workflow cancellation requested by client abort", {
+          workflowRunId: run.runId,
+        });
         void run.cancel();
       }, { once: true });
 
@@ -186,6 +202,9 @@ export async function POST(request: NextRequest) {
           } as never,
         });
         request.signal.addEventListener("abort", () => {
+          console.info("Presentation workflow resume cancellation requested by client abort", {
+            workflowRunId,
+          });
           void run.cancel();
         }, { once: true });
       } catch (error) {
@@ -240,6 +259,9 @@ export async function POST(request: NextRequest) {
         },
       });
       request.signal.addEventListener("abort", () => {
+        console.info("Presentation generation workflow cancellation requested by client abort", {
+          workflowRunId: run.runId,
+        });
         void run.cancel();
       }, { once: true });
     } catch (error) {

@@ -19,6 +19,10 @@ import { requestsCancelledGenerationRetry } from "./cancelled-generation-retry";
 import { discoverFrontendSlideStyles, listFrontendSlideStyles, type FrontendSlidesStylePreview, type FrontendSlidesStyleSpec } from "@/src/services/frontend-slides/style-catalog";
 import { applyPaletteRevision } from "@/src/services/frontend-slides/palette-revision";
 import { isStructureChangingRevision } from "./revision-routing";
+import {
+  shouldAppendReplayMessage,
+  shouldDeferAgentAction,
+} from "./generation-state-routing";
 import type { AgentActionProposal, AgentChatResponse, AgentChatUIChunk, AgentChatUIMessage } from "@/src/types/agent-chat";
 import {
   buildRevisionFromProposal,
@@ -176,6 +180,9 @@ export default function PresentationStudio() {
   const agentChatAbortRef = useRef<AbortController | null>(null);
   const deckIdRef = useRef(`deck-${makeId()}`);
   const publishedArtifactKeyRef = useRef<string | null>(null);
+  const phaseRef = useRef<StudioPhase>("briefing");
+  const activeArtifactRef = useRef(activeArtifact);
+  activeArtifactRef.current = activeArtifact;
 
   const workflowOutline = useMemo(() => {
     return outlineStep?.data?.outline ?? suspenseData?.outline ?? null;
@@ -286,6 +293,7 @@ export default function PresentationStudio() {
   }), [activeHtmlGenerationStepData, generatedHtml, outline.length, status, suspenseData?.outline, workflowError]);
 
   const phase = phaseState.phase;
+  phaseRef.current = phase;
   const previewStep = phase === "error" && activeArtifact ? "preview" : toPreviewStep(phase);
   const generateDisabledReason = !activeRunId ? (approvalError ?? "正在等待工作流会话 ID 后才能生成 HTML。") : approvalError;
 
@@ -546,6 +554,7 @@ export default function PresentationStudio() {
   const sendToAgentChat = useCallback(async (
     history: AgentMessage[],
     hasGeneratedDeck: boolean,
+    isGenerating: boolean,
     callbacks: AgentChatStreamCallbacks,
   ) => {
     const operationId = `operation-${makeId()}`;
@@ -553,17 +562,18 @@ export default function PresentationStudio() {
       api: "/api/agent-chat",
       prepareSendMessagesRequest: () => ({
         body: {
-        messages: textHistory(history),
-        hasGeneratedDeck,
-        hasSelectedStyle: Boolean(selectedStyle ?? activeArtifact?.brief.styleSpec),
+          messages: textHistory(history),
+          hasGeneratedDeck,
+          hasSelectedStyle: Boolean(selectedStyle ?? activeArtifact?.brief.styleSpec),
+          isGenerating,
           pendingProposalId: pendingProposal?.status === "pending" ? pendingProposal.proposalId : undefined,
           operationId,
-        deckContext: activeArtifact ? {
-          deckId: activeArtifact.deckId,
-          version: activeArtifact.version,
-          presentationBrief: toBriefData(activeArtifact.brief),
-          approvedOutline: activeArtifact.outline,
-        } : undefined,
+          deckContext: activeArtifact ? {
+            deckId: activeArtifact.deckId,
+            version: activeArtifact.version,
+            presentationBrief: toBriefData(activeArtifact.brief),
+            approvedOutline: activeArtifact.outline,
+          } : undefined,
         },
       }),
     });
@@ -591,8 +601,21 @@ export default function PresentationStudio() {
     return streamState.result;
   }, [activeArtifact, pendingProposal, selectedStyle]);
 
-  const handleAgentSend = useCallback(async (message: string, options: { force?: boolean } = {}) => {
+  const handleAgentSend = useCallback(async (
+    message: string,
+    options: { force?: boolean; replay?: boolean } = {},
+  ) => {
     const userMessage: AgentMessage = { id: makeId(), role: "user", kind: "text", content: message };
+
+    if (phaseRef.current === "generating" && !options.force) {
+      setQueuedGenerationMessage(message);
+      setChatMessages((current) => [
+        ...current,
+        userMessage,
+        { id: makeId(), role: "system", kind: "generation-request", message, queued: true },
+      ]);
+      return;
+    }
 
     const proposalResolution = resolveProposalConfirmation(
       message,
@@ -682,16 +705,11 @@ export default function PresentationStudio() {
       return;
     }
 
-    if (phase === "generating" && !options.force) {
-      setChatMessages((current) => [
-        ...current,
-        userMessage,
-        { id: makeId(), role: "system", kind: "generation-request", message },
-      ]);
-      return;
-    }
-
-    const history = [...chatMessages, userMessage];
+    const lastHistoryMessage = textHistory(chatMessages).at(-1);
+    const shouldAppendUserMessage = !options.replay
+      || shouldAppendReplayMessage(lastHistoryMessage, message);
+    const history = shouldAppendUserMessage ? [...chatMessages, userMessage] : chatMessages;
+    const visibleHistory = options.replay ? chatMessages : history;
     const assistantMessageId = makeId();
     const abortController = new AbortController();
 
@@ -699,7 +717,7 @@ export default function PresentationStudio() {
     agentChatAbortRef.current = abortController;
     setHtmlWatchdogError(null);
     setChatMessages([
-      ...history,
+      ...visibleHistory,
       { id: assistantMessageId, role: "assistant", kind: "text", content: "", streamState: "connecting", isStreaming: true },
     ]);
     setIsAgentReplying(true);
@@ -714,29 +732,59 @@ export default function PresentationStudio() {
     };
 
     try {
-      const data = await sendToAgentChat(history, Boolean(generatedHtml), {
-        signal: abortController.signal,
-        onProgress: (progressMessage) => setAgentProgressMessage(progressMessage),
-        onAssistantDelta: (delta) => {
-          setAgentProgressMessage(null);
-          updateAssistantMessage((content) => `${content}${delta}`);
+      const wasGeneratingAtDispatch = !options.force && phaseRef.current === "generating";
+      const artifactAtDispatch = activeArtifactRef.current;
+      const artifactKeyAtDispatch = artifactAtDispatch
+        ? `${artifactAtDispatch.deckId}:${artifactAtDispatch.version}`
+        : null;
+      const data = await sendToAgentChat(
+        history,
+        Boolean(generatedHtml),
+        wasGeneratingAtDispatch,
+        {
+          signal: abortController.signal,
+          onProgress: (progressMessage) => setAgentProgressMessage(progressMessage),
+          onAssistantDelta: (delta) => {
+            setAgentProgressMessage(null);
+            updateAssistantMessage((content) => `${content}${delta}`);
+          },
+          onReasoningDelta: (delta, state) => {
+            setAgentProgressMessage(null);
+            setChatMessages((current) => current.map((item) => (
+              item.id === assistantMessageId && item.role === "assistant" && (item.kind === undefined || item.kind === "text")
+                ? applyReasoningEvent(item, delta, state)
+                : item
+            )));
+          },
+          onAssistantSnapshot: (text) => {
+            if (text) setAgentProgressMessage(null);
+            updateAssistantMessage(() => text);
+          },
+          onDecision: (payload) => updateAssistantMessage(() => payload.reply ?? "", false),
         },
-        onReasoningDelta: (delta, state) => {
-          setAgentProgressMessage(null);
-          setChatMessages((current) => current.map((item) => (
-            item.id === assistantMessageId && item.role === "assistant" && (item.kind === undefined || item.kind === "text")
-              ? applyReasoningEvent(item, delta, state)
-              : item
-          )));
-        },
-        onAssistantSnapshot: (text) => {
-          if (text) setAgentProgressMessage(null);
-          updateAssistantMessage(() => text);
-        },
-        onDecision: (payload) => updateAssistantMessage(() => payload.reply ?? "", false),
-      });
+      );
 
       updateAssistantMessage(() => data.reply!, false);
+
+      const currentArtifact = activeArtifactRef.current;
+      const currentArtifactKey = currentArtifact
+        ? `${currentArtifact.deckId}:${currentArtifact.version}`
+        : null;
+      const artifactAdvancedWhileWaiting = artifactKeyAtDispatch !== currentArtifactKey;
+      const actionBecameStale = artifactAdvancedWhileWaiting
+        && shouldDeferAgentAction("generating", data);
+      if (
+        wasGeneratingAtDispatch
+        || actionBecameStale
+        || shouldDeferAgentAction(phaseRef.current, data)
+      ) {
+        setQueuedGenerationMessage(message);
+        setChatMessages((current) => [
+          ...current,
+          { id: makeId(), role: "system", kind: "generation-request", message, queued: true },
+        ]);
+        return;
+      }
 
       if (data.proposal) {
         setPendingProposal(data.proposal);
@@ -1006,21 +1054,21 @@ export default function PresentationStudio() {
     setQueuedGenerationMessage(null);
     markGenerationRequestQueued(messageId);
     window.setTimeout(() => {
-      void handleAgentSend(message, { force: true });
+      void handleAgentSend(message, { force: true, replay: true });
     }, 0);
   }, [handleAgentSend, markGenerationRequestQueued, resetWorkflow, stop]);
 
   useEffect(() => {
-    if (phase !== "previewing" || !queuedGenerationMessage) return;
+    if (phase !== "previewing" || !activeArtifact || !queuedGenerationMessage) return;
 
     const message = queuedGenerationMessage;
     const timeout = window.setTimeout(() => {
       setQueuedGenerationMessage(null);
-      void handleAgentSend(message, { force: true });
+      void handleAgentSend(message, { force: true, replay: true });
     }, 0);
 
     return () => window.clearTimeout(timeout);
-  }, [handleAgentSend, phase, queuedGenerationMessage]);
+  }, [activeArtifact, handleAgentSend, phase, queuedGenerationMessage]);
 
   const systemMessages = useMemo<AgentMessage[]>(() => {
     const messages: AgentMessage[] = [];

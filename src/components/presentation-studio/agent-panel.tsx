@@ -305,6 +305,9 @@ function GenerationRequestCard({
     <div className="rounded-2xl border border-[var(--border-light)] bg-[var(--bg-card)] p-4">
       <p className="text-sm font-semibold text-[var(--text-primary)]">正在生成中。</p>
       <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">新请求：「{message.message}」</p>
+      {message.queued ? (
+        <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">已记录；当前生成完成后会整理为可确认的修改方案。</p>
+      ) : null}
       <div className="mt-4 flex flex-wrap gap-2">
         <button
           type="button"
@@ -312,7 +315,7 @@ function GenerationRequestCard({
           disabled={message.queued}
           className="rounded-xl bg-[var(--accent-terracotta)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--accent-terracotta-light)] disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {message.queued ? "将在完成后应用" : "完成后应用"}
+          {message.queued ? "已排队" : "完成后处理"}
         </button>
         <button
           type="button"
