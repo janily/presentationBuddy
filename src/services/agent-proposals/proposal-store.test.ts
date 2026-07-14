@@ -84,4 +84,24 @@ describe("agent proposal store", () => {
     expect(() => resumeProposalExecution("proposal-1", { deckId: "deck-1", version: 3 })).toThrow(/version/i);
     expect(getAgentProposal("proposal-1")?.status).toBe("cancelled");
   });
+
+  it("ignores a late cancellation from an older execution attempt", () => {
+    saveAgentProposal(proposal);
+    const firstExecution = beginProposalExecution("proposal-1", { deckId: "deck-1", version: 2 });
+    markProposalCancelled("proposal-1", firstExecution.executionId!);
+    const resumedExecution = resumeProposalExecution("proposal-1", { deckId: "deck-1", version: 2 });
+
+    expect(() => markProposalCancelled("proposal-1", firstExecution.executionId!)).toThrow(/execution attempt/i);
+    expect(getAgentProposal("proposal-1")).toEqual(resumedExecution);
+  });
+
+  it("rotates the execution token when retry starts before cancellation arrives", () => {
+    saveAgentProposal(proposal);
+    const firstExecution = beginProposalExecution("proposal-1", { deckId: "deck-1", version: 2 });
+    const retriedExecution = resumeProposalExecution("proposal-1", { deckId: "deck-1", version: 2 });
+
+    expect(retriedExecution.executionId).not.toBe(firstExecution.executionId);
+    expect(() => markProposalCancelled("proposal-1", firstExecution.executionId!)).toThrow(/execution attempt/i);
+    expect(getAgentProposal("proposal-1")).toEqual(retriedExecution);
+  });
 });

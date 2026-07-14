@@ -43,6 +43,7 @@ export function beginProposalExecution(proposalId: string, artifact: ArtifactIde
     ...proposal,
     status: "executing",
     executionStartedAt: new Date().toISOString(),
+    executionId: crypto.randomUUID(),
   };
   store.set(proposalId, executing);
   return executing;
@@ -55,15 +56,15 @@ export function resumeProposalExecution(proposalId: string, artifact: ArtifactId
   if (proposal.deckId !== artifact.deckId || proposal.baseVersion !== artifact.version) {
     throw new Error("Proposal artifact version does not match the current presentation");
   }
-  if (proposal.status === "executing") return proposal;
-  if (proposal.status !== "cancelled") {
-    throw new Error(`Only a cancelled proposal can be resumed; proposal is ${proposal.status}`);
+  if (proposal.status !== "cancelled" && proposal.status !== "executing") {
+    throw new Error(`Only a cancelled or interrupted proposal can be resumed; proposal is ${proposal.status}`);
   }
 
   const executing: AgentActionProposal = {
     ...proposal,
     status: "executing",
     executionStartedAt: new Date().toISOString(),
+    executionId: crypto.randomUUID(),
   };
   store.set(proposalId, executing);
   return executing;
@@ -89,7 +90,15 @@ export function markProposalConsumed(proposalId: string) {
   return setTerminalStatus(proposalId, "consumed");
 }
 
-export function markProposalCancelled(proposalId: string) {
+export function markProposalCancelled(proposalId: string, expectedExecutionId?: string) {
+  const proposal = getAgentProposal(proposalId);
+  if (
+    expectedExecutionId
+    && proposal?.executionId
+    && proposal.executionId !== expectedExecutionId
+  ) {
+    throw new Error("Proposal execution attempt no longer matches the cancellation request");
+  }
   return setTerminalStatus(proposalId, "cancelled");
 }
 

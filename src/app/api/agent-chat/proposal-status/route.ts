@@ -9,6 +9,7 @@ const requestSchema = z.discriminatedUnion("status", [
   z.object({
     proposalId: z.string().trim().min(1),
     status: z.literal("cancelled"),
+    executionId: z.string().trim().min(1),
   }),
   z.object({
     proposalId: z.string().trim().min(1),
@@ -26,7 +27,7 @@ export async function POST(request: Request) {
 
   try {
     const proposal = validation.data.status === "cancelled"
-      ? markProposalCancelled(validation.data.proposalId)
+      ? markProposalCancelled(validation.data.proposalId, validation.data.executionId)
       : resumeProposalExecution(validation.data.proposalId, {
           deckId: validation.data.deckId,
           version: validation.data.baseVersion,

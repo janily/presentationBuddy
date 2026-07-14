@@ -71,4 +71,40 @@ describe("revision workflow planning", () => {
       },
     });
   });
+
+  it("releases the old fixed palette while preserving layout for a palette revision", () => {
+    const plan = buildRevisionWorkflowPlan({
+      ...baseRequest,
+      presentationBrief: {
+        ...baseRequest.presentationBrief,
+        styleSpec: {
+          id: "paper-ink",
+          name: "Paper & Ink",
+          source: "frontend-slides-preset",
+          vibe: "Editorial",
+          layout: "Paper layout",
+          typography: { display: "Fraunces", body: "Source Serif 4" },
+          palette: {
+            background: "#faf9f7",
+            surface: "#fffdf9",
+            text: "#1a1a1a",
+            accent: "#c41e3a",
+            secondary: "#6b625b",
+          },
+          signatureElements: ["rules"],
+        },
+      },
+      revision: {
+        kind: "palette",
+        instruction: "把配色改成深蓝和青色",
+        requiresOutlineReview: false,
+      },
+    });
+
+    expect(plan.workflowKind).toBe("html-revision");
+    if (plan.workflowKind !== "html-revision") throw new Error("Expected HTML revision plan");
+    expect(plan.inputData.style).toContain("把配色改成深蓝和青色");
+    expect(plan.inputData.styleSpec).toBeUndefined();
+    expect(plan.inputData.outline).toBe(outline);
+  });
 });

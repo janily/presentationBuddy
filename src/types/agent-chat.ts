@@ -40,6 +40,7 @@ export type AgentActionProposal = {
   status: "pending" | "executing" | "consumed" | "cancelled" | "superseded";
   createdAt: string;
   executionStartedAt?: string;
+  executionId?: string;
 };
 
 export type AgentChatResponse = {

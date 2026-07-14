@@ -57,11 +57,16 @@ const getErrorMessage = (error: Error | undefined, fallback: string) => {
 
 const makeId = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
-function persistCancelledProposal(proposalId: string) {
+function persistCancelledProposal(proposal: AgentActionProposal) {
+  if (!proposal.executionId) return;
   void fetch("/api/agent-chat/proposal-status", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ proposalId, status: "cancelled" }),
+    body: JSON.stringify({
+      proposalId: proposal.proposalId,
+      status: "cancelled",
+      executionId: proposal.executionId,
+    }),
   });
 }
 
@@ -79,6 +84,7 @@ async function persistResumedProposal(proposalId: string, operation: ArtifactOpe
   if (!response.ok) {
     throw new Error("无法恢复刚才已停止的修改，请基于当前版本重新确认方案。");
   }
+  return response.json() as Promise<AgentActionProposal>;
 }
 
 function toPreviewStep(phase: StudioPhase): PreviewPaneStep {
@@ -309,10 +315,16 @@ export default function PresentationStudio() {
       targetVersion: baseVersion + 1,
       proposalId,
     };
+    const isPaletteRevision = revision.kind === "palette";
     const revisedBrief: PresentationBrief = {
       ...baselineBrief,
-      style: revision.style ?? baselineBrief.style,
-      styleSpec: revision.styleSpec ?? baselineBrief.styleSpec,
+      style: revision.style
+        ?? (isPaletteRevision
+          ? `${baselineBrief.style}. Palette revision: ${revision.instruction}`
+          : baselineBrief.style),
+      styleSpec: isPaletteRevision
+        ? undefined
+        : revision.styleSpec ?? baselineBrief.styleSpec,
       requirements: [baselineBrief.requirements, revision.instruction].filter(Boolean).join("\n\n"),
     };
 
@@ -629,7 +641,8 @@ export default function PresentationStudio() {
 
       try {
         if (pendingProposal?.proposalId) {
-          await persistResumedProposal(pendingProposal.proposalId, operation);
+          const resumedProposal = await persistResumedProposal(pendingProposal.proposalId, operation);
+          setPendingProposal(resumedProposal);
         }
 
         if (resumedArtifact.revision) {
@@ -820,7 +833,7 @@ export default function PresentationStudio() {
 
     if (phase === "generating") {
       if (pendingProposal?.status === "executing") {
-        persistCancelledProposal(pendingProposal.proposalId);
+        persistCancelledProposal(pendingProposal);
         setPendingProposal({ ...pendingProposal, status: "cancelled" });
       }
       setLastCancelledArtifact(pendingArtifact);
@@ -836,7 +849,7 @@ export default function PresentationStudio() {
 
   useEffect(() => {
     if (!workflowError || pendingProposal?.status !== "executing") return;
-    persistCancelledProposal(pendingProposal.proposalId);
+    persistCancelledProposal(pendingProposal);
     setPendingProposal({ ...pendingProposal, status: "cancelled" });
   }, [pendingProposal, workflowError]);
 
@@ -913,17 +926,46 @@ export default function PresentationStudio() {
     };
   }, []);
 
-  const handleRetry = useCallback((kind: StudioErrorSource) => {
+  const handleRetry = useCallback(async (kind: StudioErrorSource) => {
     clearError();
     setHtmlWatchdogError(null);
 
     if (kind === "html") {
       if (pendingArtifact?.revision) {
+        const revision = pendingArtifact.revision;
+        let retryArtifact = pendingArtifact;
+        if (pendingProposal) {
+          const retryOperation = {
+            ...pendingArtifact.operation,
+            operationId: `operation-${makeId()}`,
+          };
+          try {
+            const resumedProposal = await persistResumedProposal(
+              pendingProposal.proposalId,
+              retryOperation,
+            );
+            retryArtifact = { ...pendingArtifact, operation: retryOperation };
+            setPendingArtifact(retryArtifact);
+            setPendingProposal(resumedProposal);
+          } catch (error) {
+            setChatMessages((current) => [
+              ...current,
+              {
+                id: makeId(),
+                role: "assistant",
+                kind: "text",
+                content: error instanceof Error ? error.message : "恢复执行失败，请重新确认方案。",
+                streamState: "error",
+              },
+            ]);
+            return;
+          }
+        }
         sendRevision({
-          presentationBrief: toBriefData(pendingArtifact.brief),
-          approvedOutline: pendingArtifact.outline,
-          revision: pendingArtifact.revision,
-          artifact: pendingArtifact.operation,
+          presentationBrief: toBriefData(retryArtifact.brief),
+          approvedOutline: retryArtifact.outline,
+          revision,
+          artifact: retryArtifact.operation,
         });
         return;
       }
@@ -933,7 +975,7 @@ export default function PresentationStudio() {
     }
 
     setBrief(null);
-  }, [clearError, handleGenerate, pendingArtifact, sendRevision]);
+  }, [clearError, handleGenerate, pendingArtifact, pendingProposal, sendRevision]);
 
   const markGenerationRequestQueued = useCallback((messageId: string) => {
     setChatMessages((current) => current.map((message) => (

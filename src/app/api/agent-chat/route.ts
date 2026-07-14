@@ -9,7 +9,7 @@ import {
   createUIMessageStreamResponse,
   type ModelMessage,
 } from "ai";
-import type { AgentChatUIMessage } from "@/src/types/agent-chat";
+import type { AgentActionProposal, AgentChatUIMessage } from "@/src/types/agent-chat";
 import type { AgentChatStatusState } from "@/src/types/agent-chat";
 import { applyIntentGuard, createActionProposal } from "./intent-routing";
 import { NextResponse } from "next/server";
@@ -134,6 +134,19 @@ export function buildRevisionConfirmationReply(decision: BriefDecision) {
   }
 
   return "我先不直接生成。你想换成哪类方向？比如：1. 现代清爽 2. 专业深色 3. 更有视觉冲击。你选一个，我确认后再开始生成。";
+}
+
+export function buildProposalExecutionReply(proposal: AgentActionProposal) {
+  if (proposal.requiresOutlineReview) {
+    return "已确认，正在应用刚才的大纲修改并生成新版本。";
+  }
+  if (proposal.action === "change-palette") {
+    return "已确认，正在应用刚才的配色修改，当前内容和版式保持不变。";
+  }
+  if (proposal.action === "change-style") {
+    return "已确认，正在应用刚才的视觉风格修改，当前内容和大纲保持不变。";
+  }
+  return "已确认，正在应用刚才的内容修改，当前视觉方向保持不变。";
 }
 
 function buildGenerationConfirmationReply(decision: BriefDecision) {
@@ -552,9 +565,7 @@ export async function POST(request: Request) {
           action: proposal.action,
           proposalAgeMs: Date.now() - Date.parse(proposal.createdAt),
         });
-        const reply = proposal.requiresOutlineReview
-          ? "已确认，正在应用刚才的大纲修改并生成新版本。"
-          : "已确认，正在应用刚才的内容修改，当前视觉方向保持不变。";
+        const reply = buildProposalExecutionReply(proposal);
         emit({ type: "assistant-snapshot", text: reply });
         emit({
           type: "decision",

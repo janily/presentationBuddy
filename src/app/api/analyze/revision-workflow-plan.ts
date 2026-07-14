@@ -4,13 +4,19 @@ import { presentationRevisionRequestSchema } from "@/src/mastra/workflows/presen
 type ValidatedRevisionRequest = z.infer<typeof presentationRevisionRequestSchema>;
 
 function resolveRevisionStyle({ presentationBrief, revision }: ValidatedRevisionRequest) {
+  const currentStyle = presentationBrief.style ?? "Polished modern presentation";
   if (revision.style) return revision.style;
+  if (revision.kind === "palette") {
+    return currentStyle.includes(revision.instruction)
+      ? currentStyle
+      : `${currentStyle}. Palette revision: ${revision.instruction}`;
+  }
   if (revision.palette?.length) {
-    return [presentationBrief.style, `Palette: ${revision.palette.join(", ")}`]
+    return [currentStyle, `Palette: ${revision.palette.join(", ")}`]
       .filter(Boolean)
       .join(". ");
   }
-  return presentationBrief.style;
+  return currentStyle;
 }
 
 export function buildRevisionWorkflowPlan(request: ValidatedRevisionRequest) {
@@ -22,6 +28,7 @@ export function buildRevisionWorkflowPlan(request: ValidatedRevisionRequest) {
       presentationBrief.requirements,
       `Revision request (${revision.kind}): ${revision.instruction}`,
     ].filter(Boolean).join("\n\n"),
+    styleSpec: revision.kind === "palette" ? undefined : presentationBrief.styleSpec,
     artifact,
   };
 

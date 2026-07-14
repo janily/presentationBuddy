@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { BriefDecision } from "@/src/mastra/agents/presentation-brief-conversation-agent";
 import { applyIntentGuard, createActionProposal, detectExplicitAction } from "./intent-routing";
-import { buildRevisionConfirmationReply, explicitlyConfirmedGeneration } from "./route";
+import {
+  buildProposalExecutionReply,
+  buildRevisionConfirmationReply,
+  explicitlyConfirmedGeneration,
+} from "./route";
 
 const baseDecision: BriefDecision = {
   reply: "正在准备视觉风格预览。",
@@ -165,5 +169,19 @@ describe("generation confirmation policy", () => {
 
     expect(reply).toContain("增加一页 Workflow 实战");
     expect(reply).not.toContain("Paper & Ink");
+  });
+
+  it("describes a confirmed palette proposal as a palette change", () => {
+    expect(buildProposalExecutionReply({
+      proposalId: "proposal-palette",
+      deckId: "deck-1",
+      baseVersion: 2,
+      action: "change-palette",
+      instruction: "把配色改成深蓝和青色",
+      requiresOutlineReview: false,
+      userFacingSummary: "调整配色",
+      status: "executing",
+      createdAt: "2026-07-13T00:00:00.000Z",
+    })).toContain("配色修改");
   });
 });
