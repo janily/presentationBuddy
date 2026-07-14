@@ -160,7 +160,7 @@ export async function POST(request: NextRequest) {
               type: "data-workflowRunId",
               data: run.runId,
             });
-            writer.merge(toAISdkFormat(stream as never, { from: "workflow" }));
+            writer.merge(toAISdkFormat(stream.fullStream as never, { from: "workflow" }));
           },
           onError: streamErrorMessage,
         }),
@@ -203,7 +203,7 @@ export async function POST(request: NextRequest) {
       return createUIMessageStreamResponse({
         stream: createUIMessageStream({
           execute: ({ writer }) => {
-            writer.merge(toAISdkFormat(stream, {
+            writer.merge(toAISdkFormat(stream.fullStream as never, {
               from: "workflow",
             }));
           },
@@ -266,7 +266,7 @@ export async function POST(request: NextRequest) {
             type: "data-workflowRunId",
             data: run.runId,
           });
-          writer.merge(toAISdkFormat(stream, {
+          writer.merge(toAISdkFormat(stream.fullStream as never, {
             from: "workflow",
           }));
         },

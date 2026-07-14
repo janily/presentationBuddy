@@ -56,6 +56,9 @@ PRESENTATION_OUTLINE_PROVIDER=openrouter
 PRESENTATION_HTML_MODEL=google/gemini-3-flash-preview
 PRESENTATION_HTML_PROVIDER=openrouter
 
+# Optional. Maximum output budget for full-deck HTML generation. Defaults to 32768.
+PRESENTATION_HTML_MAX_OUTPUT_TOKENS=32768
+
 # Optional. Enables the frontend-slides path through Claude Agent SDK.
 # The SDK must be able to discover .claude/skills/frontend-slides.
 ANTHROPIC_API_KEY=your-anthropic-api-key

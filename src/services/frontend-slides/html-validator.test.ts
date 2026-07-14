@@ -3,6 +3,7 @@ import {
   assertFrontendSlidesComplete,
   assertFrontendSlidesDocument,
   countGeneratedSlides,
+  completeMissingFrontendSlides,
   extractHtmlFromAgentResult,
   stripHtmlCodeFence,
 } from "./html-validator";
@@ -42,6 +43,39 @@ describe("frontend-slides html validator", () => {
 
   it("rejects documents with too few slides", () => {
     expect(() => assertFrontendSlidesComplete(validHtml, 3)).toThrow("only contains 2 slide");
+  });
+
+  it("completes missing trailing slides from the approved outline", () => {
+    const completed = completeMissingFrontendSlides(validHtml, [
+      { title: "One", content: "First" },
+      { title: "Two", content: "Second" },
+      { title: "Three <final>", content: "Third & final" },
+    ]);
+
+    expect(countGeneratedSlides(completed)).toBe(3);
+    expect(completed).toContain("Three &lt;final&gt;");
+    expect(completed).toContain("Third &amp; final");
+    expect(() => assertFrontendSlidesDocument(completed, 3)).not.toThrow();
+  });
+
+  it("does not alter a complete frontend-slides document", () => {
+    expect(completeMissingFrontendSlides(validHtml, [
+      { title: "One", content: "First" },
+      { title: "Two", content: "Second" },
+    ])).toBe(validHtml);
+  });
+
+  it("repairs a model response truncated after valid slide markup", () => {
+    const truncatedHtml = validHtml.replace(/<section class="slide">Two<\/section>[\s\S]*$/, "");
+    const completed = completeMissingFrontendSlides(truncatedHtml, [
+      { title: "One", content: "First" },
+      { title: "Two", content: "Second" },
+      { title: "Three", content: "Third" },
+    ]);
+
+    expect(completed).toMatch(/<\/body>\s*<\/html>\s*$/);
+    expect(countGeneratedSlides(completed)).toBe(3);
+    expect(() => assertFrontendSlidesDocument(completed, 3)).not.toThrow();
   });
 
   it("rejects display none slide switching", () => {

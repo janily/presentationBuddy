@@ -3,6 +3,8 @@ import z from "zod";
 import {
   assertFrontendSlidesComplete,
   assertFrontendSlidesDocument,
+  completeMissingFrontendSlides,
+  countGeneratedSlides,
   extractHtmlFromAgentResult,
   stripHtmlCodeFence,
 } from "@/src/services/frontend-slides/html-validator";
@@ -88,6 +90,10 @@ const HTML_STREAM_IDLE_TIMEOUT_MS = Math.floor(240_000 * TIMEOUT_MULTIPLIER);
 const OUTLINE_STREAM_IDLE_TIMEOUT_MS = Math.floor(180_000 * TIMEOUT_MULTIPLIER);
 const OUTLINE_FIRST_UPDATE_TIMEOUT_MS = Math.floor(60_000 * TIMEOUT_MULTIPLIER);
 const FRONTEND_SLIDES_TIMEOUT_MS = Math.floor(420_000 * TIMEOUT_MULTIPLIER);
+const HTML_MAX_OUTPUT_TOKENS = Math.max(
+  8_192,
+  Number.parseInt(process.env.PRESENTATION_HTML_MAX_OUTPUT_TOKENS ?? "32768", 10) || 32_768,
+);
 
 let didLogTimeoutConfiguration = false;
 
@@ -101,6 +107,7 @@ function logTimeoutConfiguration() {
     outlineGenerationTimeoutMs: OUTLINE_GENERATION_TIMEOUT_MS,
     htmlGenerationTimeoutMs: HTML_GENERATION_TIMEOUT_MS,
     frontendSlidesTimeoutMs: FRONTEND_SLIDES_TIMEOUT_MS,
+    htmlMaxOutputTokens: HTML_MAX_OUTPUT_TOKENS,
     outlineFirstUpdateTimeoutMs: OUTLINE_FIRST_UPDATE_TIMEOUT_MS,
     outlineStreamIdleTimeoutMs: OUTLINE_STREAM_IDLE_TIMEOUT_MS,
     htmlStreamIdleTimeoutMs: HTML_STREAM_IDLE_TIMEOUT_MS,
@@ -660,7 +667,10 @@ export const presentationHtmlGenerationStep = createStep({
               content: prompt,
             },
           ],
-          { abortSignal },
+          {
+            abortSignal,
+            modelSettings: { maxOutputTokens: HTML_MAX_OUTPUT_TOKENS },
+          },
         ),
         timeoutAfter(
           FRONTEND_SLIDES_TIMEOUT_MS,
@@ -721,6 +731,21 @@ export const presentationHtmlGenerationStep = createStep({
         html = extractHtmlFromAgentResult(html);
       }
 
+      const generatedSlideCount = countGeneratedSlides(html);
+      if (generatedSlideCount < frontendSlidesInput.slides.length) {
+        const completedHtml = completeMissingFrontendSlides(html, frontendSlidesInput.slides);
+        const completedSlideCount = countGeneratedSlides(completedHtml);
+        if (completedSlideCount > generatedSlideCount) {
+          fallbackReason = `frontend-slides model returned ${generatedSlideCount}/${frontendSlidesInput.slides.length} slides; completed ${completedSlideCount - generatedSlideCount} missing slide(s) from the approved outline`;
+          html = completedHtml;
+          console.warn("Presentation HTML generation: completed missing frontend-slides pages from the approved outline", {
+            generatedSlideCount,
+            expectedSlideCount: frontendSlidesInput.slides.length,
+            completedSlideCount,
+          });
+        }
+      }
+
       writeHtmlProgress({
         activeStepId: "validate",
         phase: "styles",
@@ -742,14 +767,18 @@ export const presentationHtmlGenerationStep = createStep({
       const message = error instanceof Error ? error.message : String(error);
       html = "";
       fallbackReason = message;
+      if (isFrontendSlidesRequired()) {
+        console.error("frontend-slides Mastra generation failed and fallback is disabled:", {
+          message,
+          error,
+        });
+        throw new Error(`frontend-slides generation is required but failed: ${message}`);
+      }
+
       console.warn("frontend-slides Mastra generation failed, falling back to backup HTML agent:", {
         message,
         error,
       });
-
-      if (isFrontendSlidesRequired()) {
-        throw new Error(`frontend-slides generation is required but failed: ${message}`);
-      }
     }
 
     if (!html) {
@@ -786,7 +815,10 @@ export const presentationHtmlGenerationStep = createStep({
               )}`,
             },
           ],
-          { abortSignal },
+          {
+            abortSignal,
+            modelSettings: { maxOutputTokens: HTML_MAX_OUTPUT_TOKENS },
+          },
         ),
         timeoutAfter(HTML_GENERATION_TIMEOUT_MS, `HTML generation did not start within ${Math.round(HTML_GENERATION_TIMEOUT_MS / 1000)} seconds`),
       ]);

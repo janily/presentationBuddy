@@ -51,6 +51,8 @@ Non-negotiable output requirements:
 - Do not use display:none/display:block for slide switching.
 - Include keyboard navigation and reduced-motion support.
 - Generate at least ${input.slides.length} real slides matching the approved outline.
+- Reuse shared CSS classes and keep markup compact so the response can include every slide.
+- Do not stop, summarize, or close the document until all ${input.slides.length} .slide elements have been written.
 - Use distinctive typography, color, motion, and layout. Avoid generic AI-looking templates.
 - Do not render internal labels such as "preview", "template", "style option", or file paths on slides.
 - Apply the ${input.density ?? "speaker-led"} content-density rules from frontend-slides.
