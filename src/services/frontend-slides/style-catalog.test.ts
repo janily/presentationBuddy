@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { existsSync } from "node:fs";
-import path from "node:path";
 import { discoverFrontendSlideStyles, getFrontendSlideStyle, listFrontendSlideStyles } from "./style-catalog";
+import { getBoldPreviewFamily } from "./bold-template-preview";
 
 describe("frontend-slides style catalog", () => {
   it("returns three distinct local static image previews for a technical tutorial", () => {
@@ -17,8 +16,8 @@ describe("frontend-slides style catalog", () => {
     expect(result.map((item) => item.style.id)).toContain("terminal-green");
     expect(result.some((item) => item.style.source === "frontend-slides-bold-template")).toBe(true);
     expect(result.some((item) => item.style.source === "frontend-slides-custom")).toBe(true);
-    expect(result.every((item) => item.previewImage.startsWith("/style-previews/"))).toBe(true);
     expect(new Set(result.map((item) => item.previewImage)).size).toBe(3);
+    expect(result.every((item) => item.previewImage.startsWith("/style-previews/") || item.previewImage.startsWith("data:image/svg+xml"))).toBe(true);
   });
 
   it("exposes bold template metadata needed for final generation", () => {
@@ -34,13 +33,29 @@ describe("frontend-slides style catalog", () => {
     });
   });
 
-  it("has static preview images for every bold template style", () => {
+  it("assigns every bold template a generated preview family", () => {
     const boldTemplateStyles = listFrontendSlideStyles().filter((style) => style.source === "frontend-slides-bold-template");
 
     expect(boldTemplateStyles).toHaveLength(34);
     for (const style of boldTemplateStyles) {
-      expect(existsSync(path.join(process.cwd(), "public", "style-previews", `${style.id}.svg`))).toBe(true);
+      expect(getBoldPreviewFamily(style.boldTemplate!.slug)).toBeTruthy();
     }
+  });
+
+  it("renders bold previews from the real topic with visually distinct composition families", () => {
+    const boldIds = ["bold-template-raw-grid", "bold-template-capsule", "bold-template-editorial-forest"];
+    const result = discoverFrontendSlideStyles({
+      topic: "Mastra Agent 开发框架入门",
+      audience: "TypeScript 开发者",
+      purpose: "teaching-tutorial",
+      density: "reading-first",
+    }, undefined, { limit: listFrontendSlideStyles().length })
+      .filter((item) => boldIds.includes(item.style.id));
+
+    const decoded = result.map((item) => decodeURIComponent(item.previewImage.split(",")[1]));
+    expect(decoded).toHaveLength(3);
+    expect(decoded.every((svg) => svg.includes("Mastra Agent"))).toBe(true);
+    expect(new Set(decoded.map((svg) => svg.match(/data-preview-family="([^"]+)"/)?.[1])).size).toBe(3);
   });
 
   it("returns the complete preset contract by stable style id", () => {
@@ -67,5 +82,9 @@ describe("frontend-slides style catalog", () => {
 
     expect(second).toHaveLength(3);
     expect(second.every((item) => !first.some((previous) => previous.style.id === item.style.id))).toBe(true);
+    const boldFamilies = second
+      .filter((item) => item.style.boldTemplate)
+      .map((item) => getBoldPreviewFamily(item.style.boldTemplate!.slug));
+    expect(new Set(boldFamilies).size).toBe(boldFamilies.length);
   });
 });

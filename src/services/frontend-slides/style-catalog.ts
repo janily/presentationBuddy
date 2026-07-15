@@ -1,6 +1,7 @@
 import type { FrontendSlidesDensity, FrontendSlidesPurpose, FrontendSlidesStylePreview, FrontendSlidesStyleSpec } from "./style-schema";
 export type { FrontendSlidesDensity, FrontendSlidesPurpose, FrontendSlidesStylePreview, FrontendSlidesStyleSpec } from "./style-schema";
 import boldTemplateSelectionIndex from "../../../.claude/skills/frontend-slides/bold-template-pack/selection-index.json";
+import { createBoldTemplatePreviewDataUri, getBoldPreviewFamily } from "./bold-template-preview";
 
 export type FrontendSlidesDiscoveryInput = {
   topic: string;
@@ -51,6 +52,43 @@ const boldTemplatePalettes: Record<string, FrontendSlidesStyleSpec["palette"]> =
   mixed: { background: "#111111", surface: "#f7f1e1", text: "#fff8e8", accent: "#ff5b2e", secondary: "#99e885" },
 };
 
+const boldTemplatePaletteOverrides: Record<string, FrontendSlidesStyleSpec["palette"]> = {
+  "8-bit-orbit": { background: "#0A0E27", surface: "#0F1B3D", text: "#FFFFFF", accent: "#5EDCF4", secondary: "#F0A6CA" },
+  "biennale-yellow": { background: "#E9E5DB", surface: "#F8F39B", text: "#1B2566", accent: "#F1EE2E", secondary: "#E26B4A" },
+  "block-frame": { background: "#FFFDF5", surface: "#FFFFFF", text: "#000000", accent: "#FE90E8", secondary: "#99E885" },
+  "blue-professional": { background: "#FDFAE7", surface: "#FFFFFF", text: "#111111", accent: "#1E2BFA", secondary: "#6B6B6B" },
+  "bold-poster": { background: "#FFFFFF", surface: "#1C1410", text: "#1C1410", accent: "#D8000F", secondary: "#F5F2EF" },
+  broadside: { background: "#111111", surface: "#1A1A18", text: "#F0ECE5", accent: "#E85D26", secondary: "#888880" },
+  capsule: { background: "#F5F5F0", surface: "#FFFFFF", text: "#1A1A1A", accent: "#E85D4E", secondary: "#C5B5E0" },
+  cartesian: { background: "#EDE8E0", surface: "#E2DBD1", text: "#1A1A1A", accent: "#8A8178", secondary: "#5A5A5A" },
+  "cobalt-grid": { background: "#F0EBDE", surface: "#E6E0CE", text: "#1F2BE0", accent: "#1F2BE0", secondary: "#5560E5" },
+  coral: { background: "#F5F0E8", surface: "#FFFFFF", text: "#1A1A1A", accent: "#E85D5D", secondary: "#6B6B6B" },
+  "creative-mode": { background: "#EFE9D9", surface: "#E4DCC4", text: "#0F0F0F", accent: "#1F8A4C", secondary: "#F06CA8" },
+  "daisy-days": { background: "#F5F0E6", surface: "#FDE68A", text: "#1A1A1A", accent: "#7ECDC0", secondary: "#F7C8D4" },
+  "editorial-forest": { background: "#EFE7D4", surface: "#2E4A2A", text: "#1A1A17", accent: "#E89CB1", secondary: "#D27E96" },
+  "editorial-tri-tone": { background: "#F2B6C6", surface: "#F2D86A", text: "#7A1F35", accent: "#7A1F35", secondary: "#F2D86A" },
+  "emerald-editorial": { background: "#3CD896", surface: "#F1E9D6", text: "#0F1A5C", accent: "#25B377", secondary: "#3A4593" },
+  grove: { background: "#192B1B", surface: "#E8E4D6", text: "#D4CFBF", accent: "#C8524A", secondary: "#DEDAD0" },
+  "long-table": { background: "#FAF1E2", surface: "#F2E5CF", text: "#8E2D1F", accent: "#B53D2A", secondary: "#E8D7B6" },
+  mat: { background: "#232E26", surface: "#EDE6D0", text: "#F0E8D2", accent: "#C07030", secondary: "#7A4E24" },
+  monochrome: { background: "#FAFADF", surface: "#F5F0E4", text: "#1A1A16", accent: "#5E5E54", secondary: "#8A8A80" },
+  "neo-grid-bold": { background: "#F5F4EF", surface: "#ECECE8", text: "#0A0A0A", accent: "#E6FF3D", secondary: "#8A8A85" },
+  "peoples-platform": { background: "#F4E9D6", surface: "#2C2CDC", text: "#1B1BB0", accent: "#F2A03A", secondary: "#E83A2A" },
+  "pin-and-paper": { background: "#EFE56A", surface: "#F8F1D6", text: "#1F3A8A", accent: "#C9A66B", secondary: "#FBE6A4" },
+  "pink-script": { background: "#F5EDF1", surface: "#0F0D11", text: "#060507", accent: "#ED3D8C", secondary: "#FF66A8" },
+  playful: { background: "#F0C8A0", surface: "#F7DEC6", text: "#1A1A1A", accent: "#E8B88E", secondary: "#F7DEC6" },
+  "raw-grid": { background: "#FFFFFF", surface: "#F5F5F5", text: "#0A0A0A", accent: "#F2D4CF", secondary: "#E5EDD6" },
+  "retro-windows": { background: "#C0C0C0", surface: "#FFFFFF", text: "#000000", accent: "#000080", secondary: "#808080" },
+  "retro-zine": { background: "#C8B99A", surface: "#F4EFE6", text: "#1A1A1A", accent: "#008F4D", secondary: "#00A85D" },
+  "sakura-chroma": { background: "#F1E6CB", surface: "#E5D6B0", text: "#3A2516", accent: "#E54489", secondary: "#F09131" },
+  scatterbrain: { background: "#FFE066", surface: "#A5D8FF", text: "#1A1A1A", accent: "#FF9F9F", secondary: "#8CE99A" },
+  signal: { background: "#1C2644", surface: "#232F55", text: "#F0ECE3", accent: "#8A96A8", secondary: "#4E5A6E" },
+  "soft-editorial": { background: "#F2EEDF", surface: "#ECE6D2", text: "#2A241B", accent: "#E1A4C2", secondary: "#D6DD63" },
+  "stencil-tablet": { background: "#E2DCC9", surface: "#F4EFE0", text: "#000000", accent: "#C73B7A", secondary: "#2D7E73" },
+  studio: { background: "#1C1C1C", surface: "#242422", text: "#F5D200", accent: "#F5D200", secondary: "#2E2E2C" },
+  vellum: { background: "#2A3870", surface: "#F4EFE0", text: "#E8D85C", accent: "#3A7878", secondary: "#F5E168" },
+};
+
 const boldTemplateTypographyByMood: Array<{ tokens: string[]; typography: FrontendSlidesStyleSpec["typography"] }> = [
   { tokens: ["retro-tech", "cyberpunk", "geeky", "tech-print"], typography: { display: "Tektur", body: "Chakra Petch" } },
   { tokens: ["editorial", "literary", "archival", "scholarly"], typography: { display: "Playfair Display", body: "Source Serif 4" } },
@@ -66,6 +104,8 @@ function getBoldTemplateTypography(template: BoldTemplateIndexItem) {
 }
 
 function getBoldTemplatePalette(template: BoldTemplateIndexItem) {
+  const override = boldTemplatePaletteOverrides[template.slug];
+  if (override) return override;
   if (template.slug === "block-frame" || template.slug === "raw-grid") {
     return { background: "#fffdf5", surface: "#ffffff", text: "#000000", accent: "#fe90e8", secondary: "#f7cb46" };
   }
@@ -217,9 +257,26 @@ function buildRankedStyleIds(input: FrontendSlidesDiscoveryInput, excludeIds: Se
     ...styles.map((style) => style.id),
   ].filter((id, index, all) => all.indexOf(id) === index);
 
-  return rankedIds
-    .filter((id) => !excludeIds.has(id))
-    .slice(0, limit);
+  const availableIds = rankedIds.filter((id) => !excludeIds.has(id));
+  const selected: string[] = [];
+  const previewFamilies = new Set<string>();
+
+  for (const id of availableIds) {
+    const style = getFrontendSlideStyle(id)!;
+    const family = style.source === "frontend-slides-bold-template"
+      ? `bold:${getBoldPreviewFamily(style.boldTemplate!.slug)}`
+      : `style:${style.id}`;
+    if (previewFamilies.has(family)) continue;
+    selected.push(id);
+    previewFamilies.add(family);
+    if (selected.length === limit) return selected;
+  }
+
+  for (const id of availableIds) {
+    if (!selected.includes(id)) selected.push(id);
+    if (selected.length === limit) break;
+  }
+  return selected;
 }
 
 export function discoverFrontendSlideStyles(
@@ -241,7 +298,9 @@ export function discoverFrontendSlideStyles(
     }
     return {
       style,
-      previewImage: `/style-previews/${style.id}.svg`,
+      previewImage: style.source === "frontend-slides-bold-template"
+        ? createBoldTemplatePreviewDataUri(style, input)
+        : `/style-previews/${style.id}.svg`,
     };
   });
 }
