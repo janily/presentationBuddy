@@ -28,6 +28,7 @@ import {
   buildRevisionFromProposal,
   resolveProposalConfirmation,
   resolveStructureRevisionPageCount,
+  shouldShowProposalCard,
 } from "./proposal-routing";
 import PresentationPreviewPane from "./presentation-preview-pane";
 import PresentationWorkspace from "./presentation-workspace";
@@ -171,6 +172,7 @@ export default function PresentationStudio() {
   const [pendingArtifact, setPendingArtifact] = useState<PendingArtifact | null>(null);
   const [lastCancelledArtifact, setLastCancelledArtifact] = useState<PendingArtifact | null>(null);
   const [pendingProposal, setPendingProposal] = useState<AgentActionProposal | null>(null);
+  const [confirmingProposalId, setConfirmingProposalId] = useState<string | null>(null);
   const [stylePreviews, setStylePreviews] = useState<FrontendSlidesStylePreview[]>([]);
   const [selectedStyle, setSelectedStyle] = useState<FrontendSlidesStyleSpec | null>(null);
   const [styleDiscoveryBrief, setStyleDiscoveryBrief] = useState<AgentBriefData | null>(null);
@@ -179,6 +181,7 @@ export default function PresentationStudio() {
   const [styleBatch, setStyleBatch] = useState(0);
   const [remainingStyleCount, setRemainingStyleCount] = useState(0);
   const agentChatAbortRef = useRef<AbortController | null>(null);
+  const agentReplyingRef = useRef(false);
   const deckIdRef = useRef(`deck-${makeId()}`);
   const publishedArtifactKeyRef = useRef<string | null>(null);
   const phaseRef = useRef<StudioPhase>("briefing");
@@ -595,6 +598,8 @@ export default function PresentationStudio() {
           hasGeneratedDeck,
           hasSelectedStyle: Boolean(selectedStyle ?? activeArtifact?.brief.styleSpec),
           isGenerating,
+          hasFailedGeneration: Boolean(workflowError),
+          draftBrief: workflowError && brief ? toBriefData(brief) : undefined,
           pendingProposalId: pendingProposal?.status === "pending" ? pendingProposal.proposalId : undefined,
           operationId,
           deckContext: activeArtifact ? {
@@ -628,12 +633,14 @@ export default function PresentationStudio() {
     if (!streamState.result?.reply) throw new Error("Agent chat stream ended without a result");
 
     return streamState.result;
-  }, [activeArtifact, pendingProposal, selectedStyle]);
+  }, [activeArtifact, brief, pendingProposal, selectedStyle, workflowError]);
 
   const handleAgentSend = useCallback(async (
     message: string,
     options: { force?: boolean; replay?: boolean } = {},
   ) => {
+    if (agentReplyingRef.current && !options.force) return;
+
     const userMessage: AgentMessage = { id: makeId(), role: "user", kind: "text", content: message };
 
     if (phaseRef.current === "generating" && !options.force) {
@@ -671,7 +678,6 @@ export default function PresentationStudio() {
     if (proposalResolution.kind === "amend") {
       setPendingProposal((current) => current ? { ...current, status: "superseded" } : null);
     }
-
     if (lastCancelledArtifact && requestsCancelledGenerationRetry(message)) {
       let operation: ArtifactOperation = {
         ...lastCancelledArtifact.operation,
@@ -734,6 +740,24 @@ export default function PresentationStudio() {
       return;
     }
 
+    if (phaseRef.current === "error") {
+      // A conversational follow-up starts a new branch from the retained brief.
+      // Remove failed workflow parts so they no longer keep the UI in error.
+      resetWorkflow();
+      setHtmlWatchdogError(null);
+      setPendingArtifact(null);
+      setPendingProposal((current) => current?.status === "cancelled"
+        ? { ...current, status: "superseded" }
+        : current);
+    }
+
+    if (proposalResolution.kind === "execute") {
+      // Remove the still-actionable proposal card immediately. The semantic
+      // proposal status remains pending until the server atomically starts it,
+      // so a failed or cancelled confirmation can safely reveal the card again.
+      setConfirmingProposalId(proposalResolution.proposal.proposalId);
+    }
+
     const lastHistoryMessage = textHistory(chatMessages).at(-1);
     const shouldAppendUserMessage = !options.replay
       || shouldAppendReplayMessage(lastHistoryMessage, message);
@@ -744,13 +768,18 @@ export default function PresentationStudio() {
 
     agentChatAbortRef.current?.abort();
     agentChatAbortRef.current = abortController;
+    agentReplyingRef.current = true;
     setHtmlWatchdogError(null);
     setChatMessages([
       ...visibleHistory,
       { id: assistantMessageId, role: "assistant", kind: "text", content: "", streamState: "connecting", isStreaming: true },
     ]);
     setIsAgentReplying(true);
-    setAgentProgressMessage("正在连接模型…");
+    setAgentProgressMessage(
+      proposalResolution.kind === "execute"
+        ? "正在确认方案并准备执行…"
+        : "正在连接模型…",
+    );
 
     const updateAssistantMessage = (contentUpdater: (content: string) => string, isStreaming = true) => {
       setChatMessages((current) => current.map((item) => (
@@ -772,7 +801,11 @@ export default function PresentationStudio() {
         wasGeneratingAtDispatch,
         {
           signal: abortController.signal,
-          onProgress: (progressMessage) => setAgentProgressMessage(progressMessage),
+          onProgress: (progressMessage) => setAgentProgressMessage(
+            proposalResolution.kind === "execute"
+              ? "正在确认方案并准备执行…"
+              : progressMessage,
+          ),
           onAssistantDelta: (delta) => {
             setAgentProgressMessage(null);
             updateAssistantMessage((content) => `${content}${delta}`);
@@ -845,13 +878,19 @@ export default function PresentationStudio() {
           : item
       )));
     } finally {
+      if (proposalResolution.kind === "execute") {
+        setConfirmingProposalId((current) => (
+          current === proposalResolution.proposal.proposalId ? null : current
+        ));
+      }
       if (agentChatAbortRef.current === abortController) {
         agentChatAbortRef.current = null;
+        agentReplyingRef.current = false;
         setIsAgentReplying(false);
         setAgentProgressMessage(null);
       }
     }
-  }, [activeArtifact, chatMessages, discoverStyles, executeProposal, generatedHtml, lastCancelledArtifact, pendingProposal, phase, sendAgentRequest, sendRevision, sendToAgentChat, startGenerationFromBrief, styleDiscoveryBrief]);
+  }, [activeArtifact, chatMessages, discoverStyles, executeProposal, generatedHtml, lastCancelledArtifact, pendingProposal, resetWorkflow, sendAgentRequest, sendRevision, sendToAgentChat, startGenerationFromBrief, styleDiscoveryBrief]);
 
   const handleExecuteProposal = useCallback((proposalId: string) => {
     if (!pendingProposal || pendingProposal.proposalId !== proposalId) return;
@@ -859,7 +898,7 @@ export default function PresentationStudio() {
   }, [handleAgentSend, pendingProposal]);
 
   const handleQuickAction = useCallback((command: AgentQuickCommand) => {
-    if (phase === "generating" || isAgentReplying) return;
+    if (phase === "generating" || agentReplyingRef.current || isAgentReplying) return;
     if (command === "change-style" && (activeArtifact?.brief ?? brief)) {
       const source = activeArtifact?.brief ?? brief!;
       void discoverStyles({
@@ -904,6 +943,7 @@ export default function PresentationStudio() {
     if (agentChatAbortRef.current) {
       agentChatAbortRef.current.abort();
       agentChatAbortRef.current = null;
+      agentReplyingRef.current = false;
       setIsAgentReplying(false);
       setAgentProgressMessage(null);
       setChatMessages((current) => current.map((message) => (
@@ -984,6 +1024,7 @@ export default function PresentationStudio() {
   const handleStartOver = useCallback(() => {
     agentChatAbortRef.current?.abort();
     agentChatAbortRef.current = null;
+    agentReplyingRef.current = false;
     resetWorkflow();
     setHtmlWatchdogError(null);
     setBrief(null);
@@ -1113,7 +1154,7 @@ export default function PresentationStudio() {
       return messages;
     }
 
-    if (pendingProposal?.status === "pending") {
+    if (shouldShowProposalCard(pendingProposal, confirmingProposalId)) {
       messages.push({
         id: `proposal-card-${pendingProposal.proposalId}`,
         role: "system",
@@ -1136,6 +1177,7 @@ export default function PresentationStudio() {
     return messages;
   }, [
     canApproveOutline,
+    confirmingProposalId,
     generateDisabledReason,
     outline.length,
     pendingProposal,

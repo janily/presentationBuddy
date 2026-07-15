@@ -5,6 +5,7 @@ import { AlertTriangle, Brain, FileText, RefreshCcw, RotateCcw, Send, Sparkles, 
 import type { StudioErrorSource, StudioPhase } from "./use-studio-phase";
 import type { AgentMessage } from "./agent-message-model";
 import type { AgentQuickActionChoice, AgentQuickCommand } from "./agent-quick-actions";
+import AgentMarkdown from "./agent-markdown";
 
 export type { AgentMessage } from "./agent-message-model";
 
@@ -447,11 +448,15 @@ export default function AgentPanel({
 
             return (
               <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-6 ${message.role === "user" ? "bg-[var(--accent-terracotta)] text-white" : "border border-[var(--border-light)] bg-[var(--bg-card)] text-[var(--text-secondary)]"}`}>
+                <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-6 ${message.role === "user" ? "whitespace-pre-wrap bg-[var(--accent-terracotta)] text-white" : "border border-[var(--border-light)] bg-[var(--bg-card)] text-[var(--text-secondary)]"}`}>
                   {message.role === "assistant" && (message.reasoningSummary !== undefined || message.streamState === "reasoning" || message.streamState === "finalizing") ? (
                     <ReasoningSummary summary={message.reasoningSummary} state={message.streamState} />
                   ) : null}
-                  {hasVisibleContent ? message.content : null}
+                  {hasVisibleContent
+                    ? message.role === "assistant"
+                      ? <AgentMarkdown>{message.content}</AgentMarkdown>
+                      : message.content
+                    : null}
                   {isStreamingText && !hasVisibleContent ? (
                     <div className="flex items-center gap-2">
                       <TypingDots />

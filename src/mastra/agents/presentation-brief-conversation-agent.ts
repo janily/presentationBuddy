@@ -33,7 +33,7 @@ export const briefDecisionSchema = z.object({
     .object({
       topic: z.string().describe("The presentation topic, phrased as a clear deck subject."),
       audience: z.string().describe("Target audience. Infer a sensible one if the user did not specify."),
-      pageCount: z.number().int().min(3).max(30).describe("Desired slide count. Default 8 when unspecified."),
+      pageCount: z.number().int().min(3).describe("Desired slide count. Default 8 when unspecified; there is no maximum."),
       style: z.string().describe("Visual/tonal style, e.g. technical tutorial, executive keynote, product launch."),
       requirements: z
         .string()

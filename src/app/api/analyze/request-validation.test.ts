@@ -89,13 +89,13 @@ describe("analyze request validation", () => {
     }
   });
 
-  it("keeps the 12-slide limit for new decks but accepts a larger structural revision", () => {
-    const startResult = validatePresentationWorkflowRequest({ topic: "AI", pageCount: 14 });
-    expect(startResult).toMatchObject({ success: false, action: "start" });
+  it("accepts page counts above the former limits for new decks and revisions", () => {
+    const startResult = validatePresentationWorkflowRequest({ topic: "AI", pageCount: 64 });
+    expect(startResult).toMatchObject({ success: true, action: "start" });
 
     const revisionResult = validatePresentationWorkflowRequest({
       revisionRequest: {
-        presentationBrief: { topic: "AI", pageCount: 14 },
+        presentationBrief: { topic: "AI", pageCount: 64 },
         approvedOutline: outline,
         revision: {
           kind: "structure",

@@ -1,6 +1,4 @@
 export const MIN_PRESENTATION_SLIDE_COUNT = 3;
-export const MAX_INITIAL_PRESENTATION_SLIDE_COUNT = 12;
-export const MAX_REVISED_PRESENTATION_SLIDE_COUNT = 30;
 
 const chineseDigitValues: Record<string, number> = {
   零: 0,
@@ -52,8 +50,5 @@ export function resolveStructureRevisionPageCount(currentCount: number, instruct
   const additions = extractSlideDelta(instruction, "增加|新增|添加|插入|补充|add|insert");
   const removals = extractSlideDelta(instruction, "删除|删掉|移除|去掉|remove|delete");
 
-  return Math.min(
-    MAX_REVISED_PRESENTATION_SLIDE_COUNT,
-    Math.max(MIN_PRESENTATION_SLIDE_COUNT, currentCount + additions - removals),
-  );
+  return Math.max(MIN_PRESENTATION_SLIDE_COUNT, currentCount + additions - removals);
 }

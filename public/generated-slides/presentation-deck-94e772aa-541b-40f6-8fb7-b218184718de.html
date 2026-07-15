@@ -1,0 +1,512 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mastra Agent 开发框架入门教程</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;700;900&family=Noto+Sans+SC:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ===========================================
+   CSS CUSTOM PROPERTIES (THEME) – Bold Poster CJK
+   =========================================== */
+:root{
+    --bg:#f8f3e8;
+    --dark:#111111;
+    --red:#f0442f;
+    --light:#f5f2ef;
+    --secondary:#222222;
+    --font-display:'Noto Serif SC',serif;
+    --font-body:'Noto Serif SC',serif;
+    --font-chrome:'Noto Sans SC',sans-serif;
+    --slide-padding:48px 56px;
+    --ease-out:cubic-bezier(0.22,1,0.36,1);
+}
+
+/* ===========================================
+   FIXED 16:9 STAGE: MANDATORY BASE STYLES
+   =========================================== */
+html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#000;}
+.deck-viewport{position:fixed;inset:0;overflow:hidden;background:#000;}
+.deck-stage{position:absolute;left:0;top:0;width:1920px;height:1080px;overflow:hidden;transform-origin:0 0;background:var(--bg);}
+.slide{position:absolute;inset:0;width:1920px;height:1080px;overflow:hidden;display:block;visibility:hidden;opacity:0;pointer-events:none;background:var(--bg);}
+.slide.active,.slide.visible{visibility:visible;opacity:1;pointer-events:auto;z-index:1;}
+img,video,canvas,svg{max-width:100%;max-height:100%;}
+.deck-controls{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:1000;}
+@media print{
+    html,body{width:1920px;height:auto;overflow:visible;background:#fff;}
+    .deck-viewport{position:static;overflow:visible;background:#fff;}
+    .deck-stage{position:static;width:auto;height:auto;transform:none!important;background:none;}
+    .slide{position:relative;display:block!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;width:1920px;height:1080px;break-after:page;page-break-after:always;}
+    .slide:last-child{break-after:auto;page-break-after:auto;}
+    .deck-controls{display:none!important;}
+}
+@media (prefers-reduced-motion: reduce){
+    *,*::before,*::after{animation-duration:0.01ms!important;transition-duration:0.2s!important;}
+}
+
+/* ===========================================
+   BOLD POSTER COMPONENT GRAMMAR (CJK adapted)
+   =========================================== */
+* { margin:0; padding:0; box-sizing:border-box; }
+.slide{ padding:var(--slide-padding); font-family:var(--font-body); color:var(--dark); }
+.slide-content{ width:100%; height:100%; display:flex; flex-direction:column; }
+
+/* Typography roles */
+.display{ font-family:var(--font-display); font-weight:900; line-height:1.15; }
+.body{ font-family:var(--font-body); font-weight:400; font-size:22px; line-height:1.8; color:var(--dark); }
+.chrome{ font-family:var(--font-chrome); font-weight:500; font-size:14px; letter-spacing:0; text-transform:none; }
+.red{ color:var(--red); }
+.dark{ color:var(--dark); }
+
+/* Eyebrow / label */
+.eyebrow{ font-family:var(--font-chrome); font-weight:600; font-size:16px; color:var(--red); margin-bottom:24px; }
+
+/* Hero stack */
+.hero{ justify-content:flex-start; }
+.hero-stack{ margin-top:40px; }
+.hero-line{ font-family:var(--font-display); font-weight:900; }
+.hero-title{ font-size:200px; line-height:1.1; color:var(--dark); }
+.hero-title-red{ font-size:240px; line-height:1.05; color:var(--red); transform:rotate(-4deg); margin:10px 0; }
+.hero-title-bottom{ font-size:180px; line-height:1.1; color:var(--dark); transform:rotate(2deg); }
+.hero-meta{ font-family:var(--font-body); font-size:24px; margin-top:40px; color:var(--dark); }
+
+/* Section header */
+.section-header{ font-family:var(--font-display); font-weight:900; font-size:72px; line-height:1; color:var(--dark); margin-bottom:32px; }
+
+/* Red leftbar card */
+.red-leftbar{ border-left:4px solid var(--red); padding-left:18px; margin-bottom:28px; }
+.card-title{ font-family:var(--font-display); font-weight:900; font-size:40px; line-height:1.1; color:var(--dark); margin-bottom:12px; }
+.card-body{ font-family:var(--font-body); font-size:22px; line-height:1.7; }
+
+/* Bullet list with red em-dash */
+.bullet-list{ list-style:none; }
+.bullet-list li{ position:relative; padding-left:28px; margin-bottom:14px; font-family:var(--font-chrome); font-weight:500; font-size:22px; line-height:1.5; }
+.bullet-list li::before{ content:"—"; position:absolute; left:0; top:0; color:var(--red); font-weight:700; }
+
+/* Tabular grid */
+.grid-bordered{ border:3px solid var(--dark); display:grid; gap:0; }
+.cell{ border:1.5px solid var(--dark); padding:22px 20px; }
+.cell-number{ font-family:var(--font-display); font-weight:900; font-size:52px; line-height:1; color:var(--red); }
+.cell-label{ font-family:var(--font-chrome); font-weight:600; font-size:16px; color:var(--dark); margin:8px 0; }
+.cell-body{ font-family:var(--font-body); font-size:20px; line-height:1.6; }
+
+/* Red panel */
+.red-panel{ background:var(--red); color:#fff; }
+.red-panel .display{ color:#fff; text-shadow:2px 2px 0 rgba(17,17,17,0.25),4px 4px 0 rgba(17,17,17,0.2),6px 6px 0 rgba(17,17,17,0.15); }
+.red-panel .body{ color:#fff; }
+
+/* Dark panel */
+.dark-panel{ background:var(--dark); color:#fff; }
+.dark-panel .display{ color:#fff; }
+.dark-panel .body{ color:#fff; }
+.dark-panel .red-leftbar{ border-left:3px solid var(--red); }
+
+/* Split layout */
+.split{ flex-direction:row; gap:48px; align-items:stretch; }
+.split > .left{ flex:1; display:flex; align-items:center; justify-content:center; }
+.split > .right{ flex:1; display:flex; flex-direction:column; justify-content:center; }
+.left-big{ font-family:var(--font-display); font-weight:900; font-size:180px; line-height:1; color:var(--dark); transform:rotate(-2deg); }
+
+/* VS block */
+.vs-block{ display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:900; font-size:160px; color:var(--red); transform:rotate(-6deg); }
+
+/* Code ghost */
+.code-ghost{ border:3px solid var(--dark); padding:32px; background:var(--light); font-family:var(--font-chrome); font-weight:500; font-size:20px; line-height:1.6; color:var(--dark); }
+
+/* Progress bar & chrome */
+.progress-bar{ position:fixed; bottom:0; left:0; height:5px; background:var(--red); width:0; z-index:2000; transition:width 0.5s var(--ease-out); }
+.counter{ position:fixed; bottom:18px; right:24px; font-family:var(--font-chrome); font-weight:600; font-size:11px; letter-spacing:2px; color:var(--dark); opacity:0.5; z-index:2000; }
+.hint-pill{ position:fixed; bottom:18px; left:50%; transform:translateX(-50%); background:var(--light); padding:6px 14px; border-radius:4px; font-family:var(--font-chrome); font-size:10px; opacity:0; z-index:2000; transition:opacity 0.4s ease; }
+body:hover .hint-pill{ opacity:0.5; }
+
+/* Reveal animation */
+.reveal{ opacity:0; transform:translateY(30px); transition:opacity 0.55s var(--ease-out), transform 0.55s var(--ease-out); }
+.slide.visible .reveal{ opacity:1; transform:translateY(0); }
+.reveal:nth-child(1){ transition-delay:0.1s; }
+.reveal:nth-child(2){ transition-delay:0.2s; }
+.reveal:nth-child(3){ transition-delay:0.3s; }
+.reveal:nth-child(4){ transition-delay:0.4s; }
+
+/* Utility */
+.mt-auto{ margin-top:auto; }
+.mb-40{ margin-bottom:40px; }
+.full-height{ height:100%; }
+.flex-col{ display:flex; flex-direction:column; }
+.flex-row{ display:flex; flex-direction:row; }
+.gap-32{ gap:32px; }
+.gap-24{ gap:24px; }
+.center{ align-items:center; justify-content:center; }
+.red-accent-bar{ width:100%; height:12px; background:var(--red); margin-bottom:32px; }
+</style>
+</head>
+<body>
+<div class="deck-viewport">
+    <main class="deck-stage" id="deckStage">
+
+        <!-- Slide 1: Title -->
+        <section class="slide active" id="s1">
+            <div class="slide-content hero">
+                <div class="eyebrow reveal">Mastra 入门教程</div>
+                <div class="hero-stack reveal">
+                    <div class="hero-line hero-title">Mastra</div>
+                    <div class="hero-line hero-title-red">构建 AI Agent</div>
+                    <div class="hero-line hero-title-bottom">TypeScript 利器</div>
+                </div>
+                <div class="hero-meta reveal">面向 Agent 初学者的实战导引</div>
+                <div class="red-accent-bar reveal" style="position:absolute;bottom:80px;left:56px;width:400px;"></div>
+            </div>
+        </section>
+
+        <!-- Slide 2: 什么是 AI Agent？ -->
+        <section class="slide" id="s2">
+            <div class="slide-content split">
+                <div class="left reveal">
+                    <div class="left-big">AGENT</div>
+                </div>
+                <div class="right reveal">
+                    <div class="section-header">什么是 AI Agent？</div>
+                    <div class="red-leftbar">
+                        <div class="card-title">感知·推理·行动</div>
+                        <div class="card-body">能感知、推理、调用工具完成任务</div>
+                    </div>
+                    <div class="red-leftbar">
+                        <div class="card-title">超越普通 LLM</div>
+                        <div class="card-body">具备自主规划能力</div>
+                    </div>
+                    <div class="red-leftbar">
+                        <div class="card-title">开发痛点</div>
+                        <div class="card-body">状态与工具编排复杂</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 3: 为什么选择 Mastra？ -->
+        <section class="slide" id="s3">
+            <div class="slide-content">
+                <div class="section-header reveal">为什么选择 Mastra？</div>
+                <div class="flex-row gap-32 reveal" style="flex:1;align-items:stretch;">
+                    <div class="dark-panel" style="flex:1;padding:48px;display:flex;flex-direction:column;justify-content:center;">
+                        <div class="display" style="font-size:56px;color:#fff;margin-bottom:24px;">原生开发痛点</div>
+                        <ul class="bullet-list">
+                            <li style="color:#fff;">类型不安全</li>
+                            <li style="color:#fff;">工具编排手写</li>
+                            <li style="color:#fff;">缺乏可观测性</li>
+                        </ul>
+                    </div>
+                    <div class="vs-block">VS</div>
+                    <div class="red-leftbar" style="flex:1;background:var(--light);padding:48px;display:flex;flex-direction:column;justify-content:center;border-left:none;">
+                        <div class="display" style="font-size:56px;color:var(--dark);margin-bottom:24px;">Mastra 方案</div>
+                        <ul class="bullet-list">
+                            <li>原生 TypeScript 类型安全</li>
+                            <li>开箱即用 Agent/Tool/Memory</li>
+                            <li>本地 Playground 与可观测性</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 4: Mastra 核心概念地图 -->
+        <section class="slide" id="s4">
+            <div class="slide-content">
+                <div class="section-header reveal">Mastra 核心概念地图</div>
+                <div class="grid-bordered reveal" style="grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;flex:1;">
+                    <div class="cell" style="background:var(--light);">
+                        <div class="cell-number">01</div>
+                        <div class="cell-label">Agent</div>
+                        <div class="cell-body">智能体核心</div>
+                    </div>
+                    <div class="cell">
+                        <div class="cell-number">02</div>
+                        <div class="cell-label">Tools</div>
+                        <div class="cell-body">能力扩展</div>
+                    </div>
+                    <div class="cell">
+                        <div class="cell-number">03</div>
+                        <div class="cell-label">Memory</div>
+                        <div class="cell-body">上下文记忆</div>
+                    </div>
+                    <div class="cell" style="background:var(--light);">
+                        <div class="cell-number">04</div>
+                        <div class="cell-label">Workflows</div>
+                        <div class="cell-body">复杂编排</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 5: 开发环境准备 -->
+        <section class="slide" id="s5">
+            <div class="slide-content">
+                <div class="section-header reveal">开发环境准备</div>
+                <div class="dark-panel reveal" style="flex:1;padding:48px;display:flex;flex-direction:column;justify-content:center;gap:32px;">
+                    <div class="code-ghost" style="background:#222;color:#fff;border-color:#000;">$ node --version  # 18+</div>
+                    <div class="red-leftbar" style="border-left:3px solid var(--red);">
+                        <div class="card-title" style="color:#fff;">配置 LLM API Key</div>
+                        <div class="card-body" style="color:#fff;">环境变量注入模型凭证</div>
+                    </div>
+                    <div class="code-ghost" style="background:#222;color:#fff;border-color:#000;">$ npx create-mastra@latest</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 6: 5 分钟：创建第一个 Agent -->
+        <section class="slide" id="s6">
+            <div class="slide-content split">
+                <div class="left reveal">
+                    <div class="code-ghost" style="height:100%;">
+                        <div style="color:var(--red);">import { Agent } from '@mastra/core';</div>
+                        <br>
+                        <div>const agent = new Agent({</div>
+                        <div style="padding-left:24px;">model: 'gpt-4',</div>
+                        <div style="padding-left:24px;">instructions: '...'</div>
+                        <div>});</div>
+                        <br>
+                        <div>await agent.generate('你好');</div>
+                    </div>
+                </div>
+                <div class="right reveal">
+                    <div class="section-header">5 分钟：创建第一个 Agent</div>
+                    <div class="red-leftbar">
+                        <div class="card-title">引入 @mastra/core</div>
+                    </div>
+                    <div class="red-leftbar">
+                        <div class="card-title">实例化 Agent 指定 model</div>
+                    </div>
+                    <div class="red-leftbar">
+                        <div class="card-title">调用 agent.generate()</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 7: 解剖 Agent 配置 -->
+        <section class="slide" id="s7">
+            <div class="slide-content">
+                <div class="section-header reveal">解剖 Agent 配置</div>
+                <div class="flex-row gap-32 reveal" style="flex:1;align-items:stretch;">
+                    <div class="red-leftbar" style="flex:1;background:var(--light);padding:32px;">
+                        <div class="cell-number" style="font-size:80px;">①</div>
+                        <div class="card-title">model</div>
+                        <div class="card-body">底层大模型</div>
+                    </div>
+                    <div class="red-leftbar" style="flex:1;background:var(--light);padding:32px;">
+                        <div class="cell-number" style="font-size:80px;">②</div>
+                        <div class="card-title">instructions</div>
+                        <div class="card-body">角色设定</div>
+                    </div>
+                    <div class="red-leftbar" style="flex:1;background:var(--light);padding:32px;">
+                        <div class="cell-number" style="font-size:80px;">③</div>
+                        <div class="card-title">tools</div>
+                        <div class="card-body">可调用工具数组</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 8: 赋予能力：接入 Tools -->
+        <section class="slide" id="s8">
+            <div class="slide-content">
+                <div class="section-header reveal">赋予能力：接入 Tools</div>
+                <div class="flex-row gap-32 reveal" style="flex:1;align-items:stretch;">
+                    <div class="red-leftbar" style="flex:1;display:flex;flex-direction:column;justify-content:center;">
+                        <div class="card-title">createTool 定义 schema</div>
+                        <div class="card-body">声明输入结构与执行函数</div>
+                    </div>
+                    <div class="red-leftbar" style="flex:1;display:flex;flex-direction:column;justify-content:center;">
+                        <div class="card-title">注入 Agent 实例</div>
+                        <div class="card-body">工具数组挂载到 Agent</div>
+                    </div>
+                    <div class="red-leftbar" style="flex:1;display:flex;flex-direction:column;justify-content:center;">
+                        <div class="card-title">自动规划调用</div>
+                        <div class="card-body">如查天气等外部能力</div>
+                    </div>
+                </div>
+                <div class="red-accent-bar reveal" style="margin-top:32px;"></div>
+            </div>
+        </section>
+
+        <!-- Slide 9: 实战实例：用 Mastra 构建天气查询 Agent -->
+        <section class="slide" id="s9">
+            <div class="slide-content split">
+                <div class="left reveal" style="flex-direction:column;justify-content:center;gap:24px;">
+                    <div class="section-header">实战：天气查询 Agent</div>
+                    <div class="red-leftbar"><div class="card-title">1 定义 createTool 查天气</div></div>
+                    <div class="red-leftbar"><div class="card-title">2 注入 Agent 工具数组</div></div>
+                    <div class="red-leftbar"><div class="card-title">3 用户提问触发调用</div></div>
+                    <div class="red-leftbar"><div class="card-title">4 自动返回天气结果</div></div>
+                </div>
+                <div class="right reveal">
+                    <div class="code-ghost" style="height:100%;opacity:0.85;">
+                        <div style="color:var(--red);">const weatherTool = createTool({</div>
+                        <div style="padding-left:24px;">schema: z.object({ city: z.string() }),</div>
+                        <div style="padding-left:24px;">execute: ({city}) => getWeather(city)</div>
+                        <div>});</div>
+                        <br>
+                        <div>agent.tools = [weatherTool];</div>
+                        <br>
+                        <div style="color:var(--red);">// 自动调用</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 10: 让 Agent 拥有记忆 -->
+        <section class="slide" id="s10">
+            <div class="slide-content">
+                <div class="section-header reveal">让 Agent 拥有记忆</div>
+                <div class="flex-row gap-32 reveal" style="flex:1;align-items:stretch;">
+                    <div class="red-leftbar" style="flex:1;background:var(--light);padding:32px;display:flex;flex-direction:column;justify-content:center;">
+                        <div class="cell-number" style="font-size:72px;">1</div>
+                        <div class="card-title">存储</div>
+                        <div class="card-body">基于 Thread 会话隔离</div>
+                    </div>
+                    <div class="red-leftbar" style="flex:1;background:var(--light);padding:32px;display:flex;flex-direction:column;justify-content:center;">
+                        <div class="cell-number" style="font-size:72px;">2</div>
+                        <div class="card-title">检索</div>
+                        <div class="card-body">自动注入历史消息</div>
+                    </div>
+                    <div class="red-leftbar" style="flex:1;background:var(--light);padding:32px;display:flex;flex-direction:column;justify-content:center;">
+                        <div class="cell-number" style="font-size:72px;">3</div>
+                        <div class="card-title">注入</div>
+                        <div class="card-body">支持向量库持久化</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 11: 复杂任务：Workflow 编排 -->
+        <section class="slide dark-panel" id="s11">
+            <div class="slide-content">
+                <div class="section-header reveal" style="color:#fff;">复杂任务：Workflow 编排</div>
+                <div class="flex-row reveal" style="flex:1;align-items:center;justify-content:space-between;gap:0;">
+                    <div class="red-leftbar" style="border-left:3px solid var(--red);">
+                        <div class="card-title" style="color:#fff;">Step A</div>
+                    </div>
+                    <div class="display" style="font-size:80px;color:var(--red);">→</div>
+                    <div class="red-leftbar" style="border-left:3px solid var(--red);">
+                        <div class="card-title" style="color:#fff;">Step B</div>
+                    </div>
+                    <div class="display" style="font-size:80px;color:var(--red);">→</div>
+                    <div class="red-leftbar" style="border-left:3px solid var(--red);">
+                        <div class="card-title" style="color:#fff;">Step C</div>
+                    </div>
+                </div>
+                <div class="body reveal" style="color:#fff;margin-top:32px;">多 Step 串联管道 · 条件分支与并行 · 比纯 Prompt 更稳定</div>
+            </div>
+        </section>
+
+        <!-- Slide 12: 调试与本地 Playground -->
+        <section class="slide" id="s12">
+            <div class="slide-content">
+                <div class="section-header reveal">调试与本地 Playground</div>
+                <div class="code-ghost reveal" style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:24px;">
+                    <div style="color:var(--red);">$ mastra dev</div>
+                    <div class="red-leftbar">
+                        <div class="card-title">实时查看 Tool 调用</div>
+                    </div>
+                    <div class="red-leftbar">
+                        <div class="card-title">快速迭代 instructions</div>
+                    </div>
+                    <div class="body">本地控制台可视化观测</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 13: 下一步与社区资源 -->
+        <section class="slide red-panel" id="s13">
+            <div class="slide-content center" style="align-items:center;justify-content:center;">
+                <div class="display reveal" style="font-size:200px;transform:rotate(-5deg);">开始构建</div>
+                <div class="body reveal" style="margin-top:40px;font-size:28px;">官方文档 · GitHub 库 · Discord 社区</div>
+                <div class="flex-row gap-32 reveal" style="margin-top:60px;">
+                    <div class="red-leftbar" style="border-left:4px solid #fff;padding-left:18px;">
+                        <div class="card-title" style="color:#fff;">文档</div>
+                    </div>
+                    <div class="red-leftbar" style="border-left:4px solid #fff;padding-left:18px;">
+                        <div class="card-title" style="color:#fff;">个人助理项目</div>
+                    </div>
+                    <div class="red-leftbar" style="border-left:4px solid #fff;padding-left:18px;">
+                        <div class="card-title" style="color:#fff;">Discord</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+</div>
+
+<div class="progress-bar" id="progressBar"></div>
+<div class="counter" id="counter">01 / 13</div>
+<div class="hint-pill">使用 → 键前进</div>
+
+<script>
+/* ===========================================
+   SLIDE PRESENTATION CONTROLLER
+   =========================================== */
+class SlidePresentation {
+    constructor() {
+        this.slides = document.querySelectorAll('.slide');
+        this.currentSlide = 0;
+        this.stage = document.getElementById('deckStage');
+        this.progressBar = document.getElementById('progressBar');
+        this.counter = document.getElementById('counter');
+        this.setupStageScale();
+        this.setupKeyboardNav();
+        this.setupTouchNav();
+        this.showSlide(0);
+    }
+
+    setupStageScale() {
+        const scale = () => {
+            const factor = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+            const x = (window.innerWidth - 1920 * factor) / 2;
+            const y = (window.innerHeight - 1080 * factor) / 2;
+            this.stage.style.transform = `translate(${x}px, ${y}px) scale(${factor})`;
+        };
+        scale();
+        window.addEventListener('resize', scale);
+    }
+
+    setupKeyboardNav() {
+        document.addEventListener('keydown', (e) => {
+            if (['ArrowRight','ArrowDown',' ','Enter','PageDown'].includes(e.key)) {
+                this.showSlide(this.currentSlide + 1);
+            } else if (['ArrowLeft','ArrowUp','PageUp'].includes(e.key)) {
+                this.showSlide(this.currentSlide - 1);
+            }
+        });
+    }
+
+    setupTouchNav() {
+        let startX = 0;
+        document.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; }, {passive:true});
+        document.addEventListener('touchend', (e) => {
+            const endX = e.changedTouches[0].clientX;
+            if (startX - endX > 50) this.showSlide(this.currentSlide + 1);
+            else if (endX - startX > 50) this.showSlide(this.currentSlide - 1);
+        }, {passive:true});
+        document.addEventListener('click', (e) => {
+            if (e.clientX > window.innerWidth / 2) this.showSlide(this.currentSlide + 1);
+            else this.showSlide(this.currentSlide - 1);
+        });
+    }
+
+    showSlide(index) {
+        this.currentSlide = Math.max(0, Math.min(index, this.slides.length - 1));
+        this.slides.forEach((slide, i) => {
+            slide.classList.toggle('active', i === this.currentSlide);
+            slide.classList.toggle('visible', i === this.currentSlide);
+        });
+        const pct = ((this.currentSlide + 1) / this.slides.length) * 100;
+        this.progressBar.style.width = pct + '%';
+        this.counter.textContent = String(this.currentSlide + 1).padStart(2,'0') + ' / ' + String(this.slides.length).padStart(2,'0');
+    }
+}
+
+new SlidePresentation();
+</script>
+</body>
+</html>

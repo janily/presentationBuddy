@@ -1,8 +1,6 @@
 import z from "zod";
 import { frontendSlidesStyleSpecSchema } from "@/src/services/frontend-slides/style-schema";
 import {
-  MAX_INITIAL_PRESENTATION_SLIDE_COUNT,
-  MAX_REVISED_PRESENTATION_SLIDE_COUNT,
   MIN_PRESENTATION_SLIDE_COUNT,
 } from "@/src/utils/structure-revision-page-count";
 
@@ -56,7 +54,6 @@ export const presentationInputSchema = z.object({
     .number()
     .int("Page count must be a whole number")
     .min(MIN_PRESENTATION_SLIDE_COUNT, "Page count must be at least 3")
-    .max(MAX_REVISED_PRESENTATION_SLIDE_COUNT, "Revised page count must be at most 30")
     .optional(),
   style: z.string().optional(),
   requirements: z.string().optional(),
@@ -74,14 +71,7 @@ export const presentationInputSchema = z.object({
   }).optional(),
 });
 
-export const presentationStartInputSchema = presentationInputSchema.extend({
-  pageCount: z
-    .number()
-    .int("Page count must be a whole number")
-    .min(MIN_PRESENTATION_SLIDE_COUNT, "Page count must be at least 3")
-    .max(MAX_INITIAL_PRESENTATION_SLIDE_COUNT, "Page count must be at most 12")
-    .optional(),
-});
+export const presentationStartInputSchema = presentationInputSchema;
 
 export const presentationRevisionRequestSchema = z.object({
   presentationBrief: presentationInputSchema,

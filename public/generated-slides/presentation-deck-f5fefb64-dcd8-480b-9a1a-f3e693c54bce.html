@@ -1,0 +1,958 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mastra Agent 开发教程：核心 Tool 的 MCP 与 Skill 实战</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@500;700&family=Fira+Code:wght@400;500&display=swap">
+<style>
+/* ===========================================
+   FIXED 16:9 STAGE: MANDATORY BASE STYLES
+   Include this ENTIRE file in every presentation.
+   Slides are authored at 1920×1080 and scaled as a whole.
+   =========================================== */
+
+/* 1. Lock the browser viewport */
+html,
+body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+    background: var(--stage-bg, #000);
+}
+
+/* 2. Full-window deck viewport */
+.deck-viewport {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    background: var(--stage-bg, #000);
+}
+
+/* 3. Fixed 16:9 design canvas.
+   JavaScript sets transform: translate(...) scale(...). */
+.deck-stage {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    transform-origin: 0 0;
+    background: var(--slide-bg, #fff);
+}
+
+/* 4. Slides stack inside the fixed stage.
+   Content must be laid out at 1920×1080, not reflowed per device. */
+.slide {
+    position: absolute;
+    inset: 0;
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    display: block;
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+    background: var(--slide-bg, #fff);
+}
+
+.slide.active,
+.slide.visible {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+    z-index: 1;
+}
+
+/* 5. Keep media inside authored slide bounds */
+img,
+video,
+canvas,
+svg {
+    max-width: 100%;
+    max-height: 100%;
+}
+
+/* 6. Presentation chrome stays outside the slide design system */
+.deck-controls {
+    position: fixed;
+    left: 50%;
+    bottom: 22px;
+    transform: translateX(-50%);
+    z-index: 1000;
+}
+
+/* 7. Print one fixed-size slide per page */
+@media print {
+    html,
+    body {
+        width: 1920px;
+        height: auto;
+        overflow: visible;
+        background: #fff;
+    }
+
+    .deck-viewport {
+        position: static;
+        overflow: visible;
+        background: #fff;
+    }
+
+    .deck-stage {
+        position: static;
+        width: auto;
+        height: auto;
+        transform: none !important;
+        background: none;
+    }
+
+    .slide {
+        position: relative;
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+        width: 1920px;
+        height: 1080px;
+        break-after: page;
+        page-break-after: always;
+    }
+
+    .slide:last-child {
+        break-after: auto;
+        page-break-after: auto;
+    }
+
+    .deck-controls {
+        display: none !important;
+    }
+}
+
+/* 8. Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.2s !important;
+    }
+}
+
+/* ===========================================
+   PINK SCRIPT — AFTER HOURS THEME
+   =========================================== */
+:root {
+    --bg-gradient: linear-gradient(135deg, #0d0b1f 0%, #1a0a2a 100%);
+    --pink-neon: #ff5cc8;
+    --pink-soft: #ff8fd0;
+    --pink-glow: rgba(255, 92, 200, 0.45);
+    --card-bg: rgba(22, 12, 34, 0.72);
+    --font-script: 'Dancing Script', cursive;
+    --font-mono: 'Fira Code', monospace;
+    --slide-bg: transparent;
+    --stage-bg: #05030a;
+    --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+    --duration-normal: 0.7s;
+}
+
+.deck-stage {
+    background: var(--bg-gradient);
+}
+
+/* Star/dot overlay for night mood */
+.deck-stage::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+        radial-gradient(circle at 20% 30%, rgba(255,255,255,0.25) 1px, transparent 1px),
+        radial-gradient(circle at 70% 60%, rgba(255,255,255,0.18) 1px, transparent 1px),
+        radial-gradient(circle at 40% 80%, rgba(255,143,208,0.22) 1px, transparent 1px),
+        radial-gradient(circle at 85% 20%, rgba(255,92,200,0.2) 1px, transparent 1px);
+    background-size: 220px 220px, 180px 180px, 260px 260px, 200px 200px;
+    opacity: 0.6;
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Thin pink accent lines */
+.deck-stage::after {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, var(--pink-neon), transparent);
+    opacity: 0.5;
+    z-index: 0;
+}
+
+.slide {
+    z-index: 1;
+}
+
+.slide-content {
+    position: absolute;
+    inset: 0;
+    padding: 90px 130px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    z-index: 2;
+}
+
+.script-title {
+    font-family: var(--font-script);
+    color: var(--pink-neon);
+    text-shadow: 0 0 24px var(--pink-glow), 0 0 8px var(--pink-glow);
+    font-weight: 700;
+    line-height: 1.1;
+}
+
+.subtitle {
+    font-family: var(--font-mono);
+    color: #d9c2e8;
+    font-size: 28px;
+    margin-top: 30px;
+    letter-spacing: 0.5px;
+}
+
+.subtitle.small {
+    font-size: 22px;
+    color: var(--pink-soft);
+    margin-top: 12px;
+}
+
+/* Footer slide number */
+.slide-footer {
+    position: absolute;
+    bottom: 42px;
+    right: 70px;
+    font-family: var(--font-script);
+    color: var(--pink-neon);
+    font-size: 38px;
+    text-shadow: 0 0 12px var(--pink-glow);
+    z-index: 5;
+}
+
+/* Reveal animations */
+.reveal {
+    opacity: 0;
+    transform: translateY(34px);
+    transition: opacity var(--duration-normal) var(--ease-out-expo),
+                transform var(--duration-normal) var(--ease-out-expo);
+}
+.slide.visible .reveal {
+    opacity: 1;
+    transform: translateY(0);
+}
+.reveal:nth-child(1) { transition-delay: 0.1s; }
+.reveal:nth-child(2) { transition-delay: 0.22s; }
+.reveal:nth-child(3) { transition-delay: 0.34s; }
+.reveal:nth-child(4) { transition-delay: 0.46s; }
+
+/* Split layout */
+.split {
+    display: flex;
+    gap: 70px;
+    align-items: center;
+    height: 100%;
+}
+.split .left { flex: 1; }
+.split .right { flex: 1; }
+
+/* Section headers in script */
+.script-h {
+    font-family: var(--font-script);
+    color: var(--pink-neon);
+    font-size: 72px;
+    text-shadow: 0 0 18px var(--pink-glow);
+    margin-bottom: 26px;
+}
+
+/* Monospace checklist */
+.mono-list {
+    font-family: var(--font-mono);
+    color: #e7d6f5;
+    font-size: 30px;
+    line-height: 2.1;
+    list-style: none;
+    padding: 0;
+}
+.mono-list li::before {
+    content: "▹ ";
+    color: var(--pink-soft);
+}
+
+/* Diagram nodes */
+.diagram {
+    position: relative;
+    width: 100%;
+    height: 520px;
+    margin-top: 20px;
+}
+.node {
+    position: absolute;
+    font-family: var(--font-script);
+    color: var(--pink-neon);
+    font-size: 44px;
+    text-shadow: 0 0 14px var(--pink-glow);
+    border: 2px solid var(--pink-soft);
+    border-radius: 50%;
+    width: 200px;
+    height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(20,10,30,0.5);
+}
+.node.center { top: 160px; left: 760px; width: 240px; height: 240px; font-size: 52px; }
+.node.t1 { top: 0; left: 360px; }
+.node.t2 { top: 320px; left: 360px; }
+.node.t3 { top: 0; left: 1160px; }
+.node.t4 { top: 320px; left: 1160px; }
+.line {
+    position: absolute;
+    background: linear-gradient(90deg, transparent, var(--pink-neon), transparent);
+    height: 2px;
+    transform-origin: 0 0;
+}
+
+/* Terminal mockup */
+.terminal {
+    background: #0a0612;
+    border: 2px solid var(--pink-soft);
+    border-radius: 12px;
+    box-shadow: 0 0 30px rgba(255,92,200,0.25);
+    padding: 26px 32px;
+    font-family: var(--font-mono);
+    font-size: 24px;
+    color: #ffd9f3;
+    line-height: 1.7;
+    width: 100%;
+}
+.terminal .bar {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 18px;
+}
+.terminal .dot {
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--pink-neon);
+    box-shadow: 0 0 8px var(--pink-glow);
+}
+.terminal .cmd { color: var(--pink-soft); }
+.terminal .out { color: #c9b3e0; }
+
+/* Code panel */
+.code-panel {
+    background: var(--card-bg);
+    border-left: 5px solid var(--pink-soft);
+    border-radius: 10px;
+    padding: 34px 40px;
+    font-family: var(--font-mono);
+    font-size: 22px;
+    line-height: 1.65;
+    color: #f3e6ff;
+    box-shadow: 0 0 26px rgba(255,92,200,0.12);
+    width: 72%;
+    overflow: hidden;
+    position: relative;
+}
+.code-panel.full { width: 100%; }
+.code-panel .ln {
+    display: block;
+    counter-increment: line;
+}
+.code-panel .ln::before {
+    content: counter(line);
+    display: inline-block;
+    width: 38px;
+    color: rgba(255,143,208,0.4);
+    font-size: 18px;
+    user-select: none;
+}
+.code-panel { counter-reset: line; }
+
+/* Syntax tokens */
+.tok-kw { color: #ffb3e6; }
+.tok-str { color: #ff5cc8; }
+.tok-fn { color: #ff8fd0; }
+.tok-com { color: #7a6a8a; font-style: italic; }
+.tok-num { color: #ffd1f0; }
+
+/* Callout */
+.callout {
+    font-family: var(--font-script);
+    color: var(--pink-neon);
+    font-size: 40px;
+    text-shadow: 0 0 12px var(--pink-glow);
+    margin-bottom: 20px;
+}
+
+/* Comparison */
+.compare {
+    display: flex;
+    gap: 0;
+    height: 560px;
+    align-items: stretch;
+}
+.compare .col {
+    flex: 1;
+    border: 2px solid var(--pink-soft);
+    border-radius: 16px;
+    margin: 0 30px;
+    padding: 40px;
+    background: rgba(20,10,30,0.5);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+.compare .col h3 {
+    font-family: var(--font-script);
+    color: var(--pink-neon);
+    font-size: 64px;
+    text-shadow: 0 0 16px var(--pink-glow);
+    margin-bottom: 24px;
+}
+.compare .col p {
+    font-family: var(--font-mono);
+    color: #e7d6f5;
+    font-size: 26px;
+    line-height: 1.8;
+}
+.compare .connect {
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 120px; height: 3px;
+    background: var(--pink-neon);
+    box-shadow: 0 0 12px var(--pink-glow);
+    transform: translate(-50%, -50%);
+}
+
+/* Protocol flow */
+.flow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 40px;
+    font-family: var(--font-mono);
+    color: #e7d6f5;
+    font-size: 26px;
+}
+.flow .box {
+    border: 2px solid var(--pink-soft);
+    border-radius: 10px;
+    padding: 24px 30px;
+    background: rgba(20,10,30,0.6);
+    text-align: center;
+}
+.flow .arrow {
+    color: var(--pink-neon);
+    font-size: 40px;
+    text-shadow: 0 0 10px var(--pink-glow);
+}
+
+/* Gear icon (CSS) */
+.gear {
+    font-family: var(--font-script);
+    color: var(--pink-neon);
+    font-size: 120px;
+    text-shadow: 0 0 20px var(--pink-glow);
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+/* Numbered list */
+.num-list {
+    list-style: none;
+    padding: 0;
+    font-family: var(--font-mono);
+    color: #e7d6f5;
+    font-size: 28px;
+    line-height: 2.2;
+}
+.num-list li {
+    border-bottom: 1px solid rgba(255,143,208,0.25);
+    padding: 14px 0;
+}
+.num-list li::before {
+    font-family: var(--font-script);
+    color: var(--pink-neon);
+    font-size: 40px;
+    margin-right: 20px;
+    text-shadow: 0 0 10px var(--pink-glow);
+    content: attr(data-n);
+}
+
+/* Quote / thank you */
+.center-script {
+    font-family: var(--font-script);
+    color: var(--pink-neon);
+    font-size: 130px;
+    text-shadow: 0 0 30px var(--pink-glow);
+    text-align: center;
+    line-height: 1.2;
+}
+.center-sub {
+    font-family: var(--font-mono);
+    color: #d9c2e8;
+    font-size: 30px;
+    text-align: center;
+    margin-top: 30px;
+    line-height: 1.8;
+}
+
+/* Watermark */
+.watermark {
+    position: absolute;
+    bottom: 120px;
+    right: 80px;
+    font-family: var(--font-script);
+    color: rgba(255,92,200,0.12);
+    font-size: 90px;
+    pointer-events: none;
+}
+
+/* Edit controls */
+.edit-hotzone {
+    position: fixed; top: 0; left: 0;
+    width: 80px; height: 80px;
+    z-index: 10000;
+    cursor: pointer;
+}
+.edit-toggle {
+    position: fixed; top: 20px; left: 20px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+    z-index: 10001;
+    background: var(--pink-neon);
+    color: #1a0a2a;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-family: var(--font-mono);
+    font-size: 20px;
+    cursor: pointer;
+}
+.edit-toggle.show,
+.edit-toggle.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+[contenteditable="true"] {
+    outline: 2px dashed var(--pink-soft);
+    border-radius: 4px;
+}
+</style>
+</head>
+<body>
+<div class="deck-viewport">
+    <main class="deck-stage" id="deckStage">
+
+        <!-- Slide 1: Title -->
+        <section class="slide active" id="slide-1">
+            <div class="slide-content">
+                <div class="reveal" style="font-family:var(--font-mono);color:var(--pink-soft);font-size:40px;margin-bottom:10px;">{ }</div>
+                <h1 class="reveal script-title" style="font-size:96px;">Mastra Agent 开发教程：核心 Tool 的 MCP 与 Skill 实战</h1>
+                <p class="reveal subtitle">面向开发者的 Mastra 实战教程 · 重点：详细代码演示 MCP 与 Skill 用法</p>
+                <p class="reveal subtitle small">Pink Script — After Hours</p>
+            </div>
+            <div class="slide-footer">01 / 15</div>
+        </section>
+
+        <!-- Slide 2: Agenda -->
+        <section class="slide" id="slide-2">
+            <div class="slide-content">
+                <div class="split">
+                    <div class="left">
+                        <h2 class="reveal script-h">议程与学习目标</h2>
+                        <p class="reveal subtitle">本次教程的路线与收获</p>
+                    </div>
+                    <div class="right">
+                        <ul class="reveal mono-list">
+                            <li>Mastra 基础与环境搭建</li>
+                            <li>MCP Tool 详细代码三步演示</li>
+                            <li>Skill 详细代码两步演示</li>
+                            <li>MCP+Skill 综合案例与最佳实践</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="slide-footer">02 / 15</div>
+        </section>
+
+        <!-- Slide 3: Concept -->
+        <section class="slide" id="slide-3">
+            <div class="slide-content">
+                <h2 class="reveal script-h" style="text-align:center;font-size:64px;">Mastra Agent 与 Core Tool 概念</h2>
+                <div class="reveal diagram">
+                    <div class="node center">Agent</div>
+                    <div class="node t1">LLM</div>
+                    <div class="node t2">Memory</div>
+                    <div class="node t3">MCP</div>
+                    <div class="node t4">Skill</div>
+                    <div class="line" style="top:260px;left:860px;width:300px;transform:rotate(0.6rad);"></div>
+                    <div class="line" style="top:260px;left:860px;width:300px;transform:rotate(-0.6rad);"></div>
+                    <div class="line" style="top:280px;left:860px;width:300px;transform:rotate(2.5rad);"></div>
+                    <div class="line" style="top:280px;left:860px;width:300px;transform:rotate(-2.5rad);"></div>
+                </div>
+                <p class="reveal subtitle" style="text-align:center;margin-top:30px;">Agent = LLM + Tools + Memory · Core Tool 是扩展能力的基石</p>
+            </div>
+            <div class="slide-footer">03 / 15</div>
+        </section>
+
+        <!-- Slide 4: Setup -->
+        <section class="slide" id="slide-4">
+            <div class="slide-content">
+                <h2 class="reveal script-h">开发环境准备与项目脚手架</h2>
+                <div class="reveal terminal">
+                    <div class="bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+                    <div><span class="cmd">$ </span>node -v  <span class="out"># Node 18+</span></div>
+                    <div><span class="cmd">$ </span>npm create mastra@latest</div>
+                    <div><span class="cmd">$ </span>npm i @mastra/core @mastra/mcp</div>
+                    <div><span class="out">src/</span></div>
+                    <div><span class="out">  tools/   # MCP adapters</span></div>
+                    <div><span class="out">  skills/  # local skills</span></div>
+                </div>
+            </div>
+            <div class="slide-footer">04 / 15</div>
+        </section>
+
+        <!-- Slide 5: Architecture relation -->
+        <section class="slide" id="slide-5">
+            <div class="slide-content">
+                <h2 class="reveal script-h" style="text-align:center;font-size:60px;">Core Tool 架构：MCP 与 Skill 的关系</h2>
+                <div class="reveal compare" style="position:relative;">
+                    <div class="col">
+                        <h3>MCP</h3>
+                        <p>外部服务通过 Model Context Protocol 暴露工具</p>
+                    </div>
+                    <div class="connect"></div>
+                    <div class="col">
+                        <h3>Skill</h3>
+                        <p>本地函数式能力封装</p>
+                    </div>
+                </div>
+                <p class="reveal subtitle" style="text-align:center;margin-top:30px;">两者均通过 zod schema 定义 IO</p>
+            </div>
+            <div class="slide-footer">05 / 15</div>
+        </section>
+
+        <!-- Slide 6: MCP basics -->
+        <section class="slide" id="slide-6">
+            <div class="slide-content">
+                <h2 class="reveal script-h" style="font-size:80px;">MCP 基础</h2>
+                <p class="reveal subtitle">Model Context Protocol 是什么</p>
+                <div class="reveal flow">
+                    <div class="box">Client<br><span style="color:var(--pink-soft)">JSON-RPC 2.0</span></div>
+                    <div class="arrow">→</div>
+                    <div class="box">Server<br><span style="color:var(--pink-soft)">tools/list</span></div>
+                    <div class="arrow">→</div>
+                    <div class="box">Server<br><span style="color:var(--pink-soft)">tools/call</span></div>
+                    <div class="arrow">→</div>
+                    <div class="box">McpTool<br><span style="color:var(--pink-soft)">Mastra 适配器</span></div>
+                </div>
+            </div>
+            <div class="slide-footer">06 / 15</div>
+        </section>
+
+        <!-- Slide 7: MCP code 1 -->
+        <section class="slide" id="slide-7">
+            <div class="slide-content">
+                <h2 class="reveal script-h" style="font-size:56px;">MCP 代码演示 (1)：定义 MCP Server 与 Schema</h2>
+                <div class="reveal code-panel full">
+<span class="ln"><span class="tok-kw">import</span> { Server } <span class="tok-kw">from</span> <span class="tok-str">'@modelcontextprotocol/sdk/server/index.js'</span>;</span>
+<span class="ln"><span class="tok-kw">import</span> { z } <span class="tok-kw">from</span> <span class="tok-str">'zod'</span>;</span>
+<span class="ln"></span>
+<span class="ln"><span class="tok-kw">const</span> server = <span class="tok-kw">new</span> <span class="tok-fn">Server</span>({ name: <span class="tok-str">'weather-mcp'</span>, version: <span class="tok-str">'1.0.0'</span> });</span>
+<span class="ln">server.<span class="tok-fn">setRequestHandler</span>(<span class="tok-str">'tools/list'</span>, () => ({</span>
+<span class="ln">  tools: [{ name: <span class="tok-str">'weatherTool'</span>, inputShape: z.<span class="tok-fn">object</span>({ city: z.<span class="tok-fn">string</span>() }) }]</span>
+<span class="ln">}));</span>
+<span class="ln">server.<span class="tok-fn">setRequestHandler</span>(<span class="tok-str">'tools/call'</span>, <span class="tok-kw">async</span> (req) => {</span>
+<span class="ln">  <span class="tok-kw">const</span> { city } = req.params;</span>
+<span class="ln">  <span class="tok-kw">return</span> { temperature: <span class="tok-num">22</span>, city };</span>
+<span class="ln">});</span>
+                </div>
+            </div>
+            <div class="slide-footer">07 / 15</div>
+        </section>
+
+        <!-- Slide 8: MCP code 2 -->
+        <section class="slide" id="slide-8">
+            <div class="slide-content">
+                <div class="split">
+                    <div class="left">
+                        <div class="reveal callout">在 Mastra 注册 MCP Tool</div>
+                        <p class="reveal subtitle">配置 serverUrl 与 toolName，含 auth 与错误处理</p>
+                    </div>
+                    <div class="right">
+                        <div class="reveal code-panel">
+<span class="ln"><span class="tok-kw">import</span> { McpTool } <span class="tok-kw">from</span> <span class="tok-str">'@mastra/core'</span>;</span>
+<span class="ln"><span class="tok-kw">const</span> weatherMcp = <span class="tok-kw">new</span> <span class="tok-fn">McpTool</span>({</span>
+<span class="ln">  serverUrl: <span class="tok-str">'http://localhost:3000/mcp'</span>,</span>
+<span class="ln">  toolName: <span class="tok-str">'weatherTool'</span>,</span>
+<span class="ln">  auth: { type: <span class="tok-str">'bearer'</span>, token: process.env.MCP_TOKEN },</span>
+<span class="ln">  onError: (e) => <span class="tok-fn">console</span>.<span class="tok-fn">error</span>(<span class="tok-str">'[mcp]'</span>, e)</span>
+<span class="ln">});</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="slide-footer">08 / 15</div>
+        </section>
+
+        <!-- Slide 9: MCP code 3 -->
+        <section class="slide" id="slide-9">
+            <div class="slide-content">
+                <h2 class="reveal script-h" style="font-size:52px;">MCP 代码演示 (3)：调用与调试</h2>
+                <div class="split">
+                    <div class="left">
+                        <div class="reveal code-panel">
+<span class="ln"><span class="tok-kw">const</span> agent = <span class="tok-kw">new</span> <span class="tok-fn">Agent</span>({</span>
+<span class="ln">  name: <span class="tok-str">'weather-agent'</span>, tools: [weatherMcp]</span>
+<span class="ln">});</span>
+<span class="ln"><span class="tok-kw">const</span> res = <span class="tok-kw">await</span> agent.<span class="tok-fn">generate</span>(</span>
+<span class="ln">  <span class="tok-str">'Temperature in Tokyo?'</span>);</span>
+<span class="ln"><span class="tok-fn">console</span>.<span class="tok-fn">log</span>(res.text);</span>
+                        </div>
+                    </div>
+                    <div class="right">
+                        <div class="reveal terminal">
+                            <div class="bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+                            <div><span class="out">[mcp] → tools/call weatherTool</span></div>
+                            <div><span class="out">[mcp] ← { temperature: 22 }</span></div>
+                            <div><span class="out">agent: Tokyo is 22°C</span></div>
+                            <div><span class="cmd">timeout: 5000ms retry: 2</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="slide-footer">09 / 15</div>
+        </section>
+
+        <!-- Slide 10: Skill basics -->
+        <section class="slide" id="slide-10">
+            <div class="slide-content">
+                <div class="reveal gear">⚙</div>
+                <h2 class="reveal script-h" style="text-align:center;font-size:68px;">Skill 基础</h2>
+                <ul class="reveal mono-list" style="text-align:center;list-style:none;">
+                    <li>Skill = 带元数据的 async 函数</li>
+                    <li>可组合、可复用</li>
+                    <li>通过 .skill() 装饰器挂载</li>
+                </ul>
+            </div>
+            <div class="slide-footer">10 / 15</div>
+        </section>
+
+        <!-- Slide 11: Skill code 1 -->
+        <section class="slide" id="slide-11">
+            <div class="slide-content">
+                <h2 class="reveal script-h" style="font-size:56px;">Skill 代码演示 (1)：定义 Skill 与 Zod Schema</h2>
+                <div class="reveal code-panel full">
+<span class="ln"><span class="tok-kw">import</span> { defineSkill } <span class="tok-kw">from</span> <span class="tok-str">'@mastra/core'</span>;</span>
+<span class="ln"><span class="tok-kw">import</span> { z } <span class="tok-kw">from</span> <span class="tok-str">'zod'</span>;</span>
+<span class="ln"><span class="tok-kw">export const</span> searchSkill = <span class="tok-fn">defineSkill</span>({</span>
+<span class="ln">  name: <span class="tok-str">'searchSkill'</span>,</span>
+<span class="ln">  params: z.<span class="tok-fn">object</span>({ query: z.<span class="tok-fn">string</span>() }),</span>
+<span class="ln">  <span class="tok-kw">async</span> <span class="tok-fn">run</span>({ query }) {</span>
+<span class="ln">    <span class="tok-kw">const</span> data = <span class="tok-kw">await</span> <span class="tok-fn">fetch</span>(<span class="tok-str">`/api/search?q=${query}`</span>);</span>
+<span class="ln">    <span class="tok-kw">return</span> data.<span class="tok-fn">json</span>();</span>
+<span class="ln">  }</span>
+<span class="ln">});</span>
+                </div>
+            </div>
+            <div class="slide-footer">11 / 15</div>
+        </section>
+
+        <!-- Slide 12: Skill code 2 -->
+        <section class="slide" id="slide-12">
+            <div class="slide-content">
+                <h2 class="reveal script-h" style="font-size:52px;">Skill 代码演示 (2)：挂载到 Agent</h2>
+                <div class="split">
+                    <div class="left">
+                        <div class="reveal callout" style="font-size:32px;">Skill Recap</div>
+                        <div class="reveal code-panel">
+<span class="ln"><span class="tok-kw">const</span> skill = <span class="tok-fn">defineSkill</span>({</span>
+<span class="ln">  name: <span class="tok-str">'s'</span>, params: z.<span class="tok-fn">object</span>({})</span>
+<span class="ln">});</span>
+                        </div>
+                    </div>
+                    <div class="right">
+                        <div class="reveal callout" style="font-size:32px;">Agent Init</div>
+                        <div class="reveal code-panel">
+<span class="ln"><span class="tok-kw">const</span> agent = <span class="tok-kw">new</span> <span class="tok-fn">Agent</span>({</span>
+<span class="ln">  tools: [skill], model: <span class="tok-str">'gpt-4o'</span></span>
+<span class="ln">});</span>
+<span class="ln"><span class="tok-kw">await</span> agent.<span class="tok-fn">generate</span>(<span class="tok-str">'Use searchSkill'</span>);</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="slide-footer">12 / 15</div>
+        </section>
+
+        <!-- Slide 13: Combined -->
+        <section class="slide" id="slide-13">
+            <div class="slide-content">
+                <h2 class="reveal script-h" style="font-size:50px;">综合示例：MCP + Skill 协同工作</h2>
+                <div class="reveal code-panel full">
+<span class="ln"><span class="tok-kw">import</span> { Agent, McpTool, defineSkill } <span class="tok-kw">from</span> <span class="tok-str">'@mastra/core'</span>;</span>
+<span class="ln"><span class="tok-kw">const</span> mcp = <span class="tok-kw">new</span> <span class="tok-fn">McpTool</span>({ serverUrl: <span class="tok-str">'http://localhost:3000/mcp'</span>, toolName: <span class="tok-str">'weatherTool'</span> });</span>
+<span class="ln"><span class="tok-kw">const</span> skill = <span class="tok-fn">defineSkill</span>({ name: <span class="tok-str">'local'</span>, params: z.<span class="tok-fn">object</span>({ x: z.<span class="tok-fn">number</span>() }),</span>
+<span class="ln">  <span class="tok-kw">async</span> <span class="tok-fn">run</span>({ x }) { <span class="tok-kw">return</span> x * <span class="tok-num">2</span>; } });</span>
+<span class="ln"><span class="tok-kw">const</span> agent = <span class="tok-kw">new</span> <span class="tok-fn">Agent</span>({</span>
+<span class="ln">  name: <span class="tok-str">'hybrid'</span>, tools: [mcp, skill], model: <span class="tok-str">'gpt-4o'</span></span>
+<span class="ln">});</span>
+<span class="ln"><span class="tok-kw">const</span> out = <span class="tok-kw">await</span> agent.<span class="tok-fn">generate</span>(</span>
+<span class="ln">  <span class="tok-str">'Get weather via MCP and double temp via localSkill'</span>);</span>
+<span class="ln"><span class="tok-fn">console</span>.<span class="tok-fn">log</span>(out.text);</span>
+                </div>
+                <div class="watermark">After Hours</div>
+            </div>
+            <div class="slide-footer">13 / 15</div>
+        </section>
+
+        <!-- Slide 14: Best practices -->
+        <section class="slide" id="slide-14">
+            <div class="slide-content">
+                <h2 class="reveal script-h" style="font-size:60px;">最佳实践与常见坑</h2>
+                <ul class="reveal num-list">
+                    <li data-n="1">MCP 网络失败降级到 Skill</li>
+                    <li data-n="2">Zod schema 严格校验</li>
+                    <li data-n="3">避免 tool 名冲突；日志用 pink debug</li>
+                </ul>
+            </div>
+            <div class="slide-footer">14 / 15</div>
+        </section>
+
+        <!-- Slide 15: Summary -->
+        <section class="slide" id="slide-15">
+            <div class="slide-content">
+                <div class="reveal center-script">Thank You</div>
+                <p class="reveal center-sub">回顾 MCP 与 Skill 代码模式<br>GitHub: github.com/mastra-ai/examples<br>Mastra 官方文档与社区</p>
+            </div>
+            <div class="slide-footer">15 / 15</div>
+        </section>
+
+    </main>
+</div>
+
+<div class="edit-hotzone"></div>
+<button class="edit-toggle" id="editToggle" title="Edit mode (E)">✏️ Edit</button>
+
+<script>
+/* ===========================================
+   SLIDE PRESENTATION CONTROLLER
+   =========================================== */
+class SlidePresentation {
+    constructor() {
+        this.slides = document.querySelectorAll('.slide');
+        this.currentSlide = 0;
+        this.stage = document.getElementById('deckStage');
+        this.setupStageScale();
+        this.setupKeyboardNav();
+        this.setupTouchNav();
+        this.setupWheelNav();
+        this.showSlide(0);
+    }
+
+    setupStageScale() {
+        const scale = () => {
+            const factor = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+            const x = (window.innerWidth - 1920 * factor) / 2;
+            const y = (window.innerHeight - 1080 * factor) / 2;
+            this.stage.style.transform = `translate(${x}px, ${y}px) scale(${factor})`;
+        };
+        scale();
+        window.addEventListener('resize', scale);
+    }
+
+    setupKeyboardNav() {
+        document.addEventListener('keydown', (e) => {
+            if (e.target.getAttribute && e.target.getAttribute('contenteditable')) return;
+            if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
+                this.showSlide(this.currentSlide + 1);
+            } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+                this.showSlide(this.currentSlide - 1);
+            }
+        });
+    }
+
+    setupTouchNav() {
+        let startX = 0;
+        this.stage.addEventListener('touchstart', (e) => {
+            startX = e.touches[0].clientX;
+        }, {passive:true});
+        this.stage.addEventListener('touchend', (e) => {
+            const diff = e.changedTouches[0].clientX - startX;
+            if (diff > 50) this.showSlide(this.currentSlide - 1);
+            else if (diff < -50) this.showSlide(this.currentSlide + 1);
+        }, {passive:true});
+    }
+
+    setupWheelNav() {
+        let lock = false;
+        window.addEventListener('wheel', (e) => {
+            if (lock) return;
+            if (Math.abs(e.deltaY) < 30) return;
+            lock = true;
+            if (e.deltaY > 0) this.showSlide(this.currentSlide + 1);
+            else this.showSlide(this.currentSlide - 1);
+            setTimeout(() => lock = false, 600);
+        }, {passive:true});
+    }
+
+    showSlide(index) {
+        this.currentSlide = Math.max(0, Math.min(index, this.slides.length - 1));
+        this.slides.forEach((slide, i) => {
+            slide.classList.toggle('active', i === this.currentSlide);
+            slide.classList.toggle('visible', i === this.currentSlide);
+        });
+    }
+}
+
+/* ===========================================
+   INLINE EDITING (lightweight)
+   =========================================== */
+class SlideEditor {
+    constructor() {
+        this.isActive = false;
+        this.toggleBtn = document.getElementById('editToggle');
+        this.hotzone = document.querySelector('.edit-hotzone');
+        this.bindEvents();
+    }
+    bindEvents() {
+        this.toggleBtn.addEventListener('click', () => this.toggleEditMode());
+        this.hotzone.addEventListener('click', () => this.toggleEditMode());
+        let hideTimeout = null;
+        const show = () => { clearTimeout(hideTimeout); this.toggleBtn.classList.add('show'); };
+        const hide = () => { hideTimeout = setTimeout(() => { if (!this.isActive) this.toggleBtn.classList.remove('show'); }, 400); };
+        this.hotzone.addEventListener('mouseenter', show);
+        this.hotzone.addEventListener('mouseleave', hide);
+        this.toggleBtn.addEventListener('mouseenter', show);
+        this.toggleBtn.addEventListener('mouseleave', hide);
+        document.addEventListener('keydown', (e) => {
+            if ((e.key === 'e' || e.key === 'E') && !e.target.getAttribute('contenteditable')) {
+                this.toggleEditMode();
+            }
+        });
+    }
+    toggleEditMode() {
+        this.isActive = !this.isActive;
+        this.toggleBtn.classList.toggle('active', this.isActive);
+        const els = document.querySelectorAll('.slide h1, .slide h2, .slide p, .slide li, .slide .code-panel, .slide .terminal');
+        els.forEach(el => {
+            if (this.isActive) el.setAttribute('contenteditable', 'true');
+            else el.removeAttribute('contenteditable');
+        });
+    }
+}
+
+new SlidePresentation();
+new SlideEditor();
+</script>
+</body>
+</html>

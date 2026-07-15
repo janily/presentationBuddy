@@ -4,6 +4,7 @@ import {
   buildRevisionFromProposal,
   resolveProposalConfirmation,
   resolveStructureRevisionPageCount,
+  shouldShowProposalCard,
 } from "./proposal-routing";
 
 const proposal: AgentActionProposal = {
@@ -60,6 +61,20 @@ describe("proposal confirmation routing", () => {
   });
 });
 
+describe("proposal card visibility", () => {
+  it("hides a pending proposal as soon as its confirmation is being processed", () => {
+    expect(shouldShowProposalCard(proposal, proposal.proposalId)).toBe(false);
+  });
+
+  it("keeps an unconfirmed pending proposal visible", () => {
+    expect(shouldShowProposalCard(proposal, null)).toBe(true);
+  });
+
+  it("does not show proposals that have already started executing", () => {
+    expect(shouldShowProposalCard({ ...proposal, status: "executing" }, null)).toBe(false);
+  });
+});
+
 describe("structure revision page count", () => {
   it("increments for an explicit one-slide addition", () => {
     expect(resolveStructureRevisionPageCount(8, "增加一页 Mastra Workflow 实战案例")).toBe(9);
@@ -75,6 +90,10 @@ describe("structure revision page count", () => {
       "1) 新增一页天气查询 Agent 设计；2) 新增一页完整实现代码",
     )).toBe(14);
     expect(resolveStructureRevisionPageCount(12, "新增两页实战内容")).toBe(14);
+  });
+
+  it("does not cap structural revisions at the former 30-slide limit", () => {
+    expect(resolveStructureRevisionPageCount(30, "新增两页附录")).toBe(32);
   });
 
   it("decrements for an explicit one-slide removal", () => {

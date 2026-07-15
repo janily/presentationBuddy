@@ -39,6 +39,14 @@ export function resolveProposalConfirmation(
   return { kind: "execute", proposal };
 }
 
+export function shouldShowProposalCard(
+  proposal: AgentActionProposal | null,
+  confirmingProposalId: string | null,
+): proposal is AgentActionProposal & { status: "pending" } {
+  return proposal?.status === "pending"
+    && proposal.proposalId !== confirmingProposalId;
+}
+
 export function buildRevisionFromProposal(proposal: AgentActionProposal): RevisionSpec {
   const kind = proposal.action === "revise-structure"
     ? "structure"

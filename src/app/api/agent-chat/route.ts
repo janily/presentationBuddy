@@ -32,6 +32,8 @@ const agentChatRequestSchema = z.object({
   hasGeneratedDeck: z.boolean().optional(),
   hasSelectedStyle: z.boolean().optional(),
   isGenerating: z.boolean().optional(),
+  hasFailedGeneration: z.boolean().optional(),
+  draftBrief: presentationInputSchema.optional(),
   operationId: z.string().trim().min(1).optional(),
   pendingProposalId: z.string().trim().min(1).optional(),
   deckContext: z.object({
@@ -41,6 +43,12 @@ const agentChatRequestSchema = z.object({
     approvedOutline: presentationOutlineSchema,
   }).optional(),
 });
+
+export function buildFailedGenerationSystemContext(
+  draftBrief?: z.infer<typeof presentationInputSchema>,
+) {
+  return `A previous presentation generation attempt failed and is no longer running. Do not tell the user that generation is still in progress. Treat the latest message as a new instruction for the retained draft. If the user requests a different visual style, set nextAction to "discover-styles" and populate brief from the retained draft so the UI can render style previews.${draftBrief ? `\n\nRetained draft brief:\n${JSON.stringify(draftBrief)}` : ""}`;
+}
 
 // Keep the request bounded; the agent only needs recent turns to stay coherent.
 const MAX_HISTORY_MESSAGES = 20;
@@ -493,7 +501,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid agent chat request" }, { status: 400 });
   }
 
-  const { messages, hasGeneratedDeck, hasSelectedStyle, isGenerating, deckContext, pendingProposalId } = validation.data;
+  const {
+    messages,
+    hasGeneratedDeck,
+    hasSelectedStyle,
+    isGenerating,
+    hasFailedGeneration,
+    draftBrief,
+    deckContext,
+    pendingProposalId,
+  } = validation.data;
   const operationId = validation.data.operationId ?? crypto.randomUUID();
 
   return createAgentChatStreamResponse(operationId, async (emit) => {
@@ -529,6 +546,13 @@ export async function POST(request: Request) {
       history.unshift({
         role: "system",
         content: `A presentation generation is currently in progress. Treat the latest request as discussion of a revision to apply after the current generation completes. Summarize the requested change as a concrete proposal and tell the user it will be confirmed after completion. Never set readyToGenerate to true, nextAction to "generate", or nextAction to "execute-proposal" in this state.`,
+      });
+    }
+
+    if (hasFailedGeneration && !isGenerating) {
+      history.unshift({
+        role: "system",
+        content: buildFailedGenerationSystemContext(draftBrief),
       });
     }
 

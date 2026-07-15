@@ -3,6 +3,7 @@ import type { BriefDecision } from "@/src/mastra/agents/presentation-brief-conve
 import { createActionProposal } from "./intent-routing";
 import {
   buildProposalExecutionReply,
+  buildFailedGenerationSystemContext,
   enforceAgentDecisionState,
   resolveProposalExecution,
 } from "./route";
@@ -249,5 +250,20 @@ describe("agent decision state gating", () => {
     expect(result.decision.readyToGenerate).toBe(false);
     expect(result.decision.nextAction).toBe("revise-structure");
     expect(result.reason).toBe("generation-in-progress");
+  });
+});
+
+describe("failed generation conversation context", () => {
+  it("marks the old run as stopped and routes visual requests to style discovery", () => {
+    const context = buildFailedGenerationSystemContext({
+      topic: "Mastra 教程",
+      audience: "开发者",
+      pageCount: 15,
+      style: "Vellum",
+    });
+
+    expect(context).toContain("is no longer running");
+    expect(context).toContain('nextAction to "discover-styles"');
+    expect(context).toContain('"pageCount":15');
   });
 });
