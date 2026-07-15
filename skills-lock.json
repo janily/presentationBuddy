@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "humanizer-zh": {
+      "source": "op7418/Humanizer-zh",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "dede9681d9fea5caed2fb9d88656af3024c9ec0136fc833415ffc6e16d762429"
+    },
     "mastra": {
       "source": "mastra-ai/skills",
       "sourceType": "github",
