@@ -14,6 +14,7 @@ import { saveHtmlToFile } from "@/src/utils/save-html-to-file";
 import { savePresentationArtifact } from "@/src/services/presentation-artifacts/artifact-store";
 import {
   assertProposalExecution,
+  getAgentProposal,
   markProposalConsumed,
 } from "@/src/services/agent-proposals/proposal-store";
 import { mapOutlineToFrontendSlides } from "@/src/utils/outline-to-slides-mapper";
@@ -883,7 +884,17 @@ export const presentationHtmlGenerationStep = createStep({
     abortSignal?.throwIfAborted();
 
     if (inputData.artifact) {
-      if (inputData.artifact.proposalId && inputData.artifact.executionId) {
+      const proposalIsAvailable = inputData.artifact.proposalId
+        ? Boolean(getAgentProposal(inputData.artifact.proposalId))
+        : false;
+      if (inputData.artifact.proposalId && !proposalIsAvailable) {
+        console.warn("Presentation proposal state is unavailable in this server instance; publishing with artifact version validation only", {
+          proposalId: inputData.artifact.proposalId,
+          operationId: inputData.artifact.operationId,
+          deckId: inputData.artifact.deckId,
+        });
+      }
+      if (proposalIsAvailable && inputData.artifact.proposalId && inputData.artifact.executionId) {
         assertProposalExecution(inputData.artifact.proposalId, inputData.artifact.executionId);
       }
       savePresentationArtifact({
@@ -903,7 +914,7 @@ export const presentationHtmlGenerationStep = createStep({
         html,
         htmlUrl,
       });
-      if (inputData.artifact.proposalId) {
+      if (proposalIsAvailable && inputData.artifact.proposalId) {
         markProposalConsumed(inputData.artifact.proposalId, inputData.artifact.executionId);
       }
     }

@@ -5,7 +5,10 @@ import { toAISdkFormat } from "@mastra/ai-sdk";
 import { NextResponse } from "next/server";
 import z from "zod";
 import { formatValidationErrors, validatePresentationWorkflowRequest } from "./request-validation";
-import { getPresentationArtifact } from "@/src/services/presentation-artifacts/artifact-store";
+import {
+  getPresentationArtifact,
+  hasPresentationArtifactVersionConflict,
+} from "@/src/services/presentation-artifacts/artifact-store";
 import { buildRevisionWorkflowPlan } from "./revision-workflow-plan";
 import { getAgentProposal } from "@/src/services/agent-proposals/proposal-store";
 
@@ -122,7 +125,7 @@ export async function POST(request: NextRequest) {
       const currentArtifact = getPresentationArtifact(artifact.deckId);
       const currentVersion = currentArtifact?.version ?? 0;
 
-      if (currentVersion !== artifact.baseVersion) {
+      if (hasPresentationArtifactVersionConflict(artifact.deckId, artifact.baseVersion)) {
         console.warn("presentation_revision.artifact_version_conflict", {
           operationId: artifact.operationId,
           proposalId: artifact.proposalId ?? null,

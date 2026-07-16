@@ -26,13 +26,23 @@ export function getPresentationArtifact(deckId: string) {
   return getStore().get(deckId) ?? null;
 }
 
+export function hasPresentationArtifactVersionConflict(deckId: string, baseVersion: number) {
+  const current = getStore().get(deckId);
+
+  // The in-memory store is only a best-effort cache in production. A cold
+  // server instance has no record of decks created by another instance, so a
+  // missing entry must not be treated as version 0. When an entry is present,
+  // keep enforcing the optimistic lock normally.
+  return current !== undefined && current.version !== baseVersion;
+}
+
 export function savePresentationArtifact(input: SavePresentationArtifactInput) {
   const { operation } = input;
   const store = getStore();
   const current = store.get(operation.deckId);
   const currentVersion = current?.version ?? 0;
 
-  if (currentVersion !== operation.baseVersion) {
+  if (current && currentVersion !== operation.baseVersion) {
     throw new Error(
       `Artifact version conflict for ${operation.deckId}: expected base ${currentVersion}, received ${operation.baseVersion}`,
     );

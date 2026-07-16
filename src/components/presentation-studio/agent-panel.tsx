@@ -273,8 +273,8 @@ function ErrorCard({ message, onRetry }: { message: Extract<AgentMessage, { kind
   return (
     <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-red-950">
       <div className="flex gap-3">
-        <div className="rounded-xl bg-white/80 p-2 text-red-700">
-          <AlertTriangle className="h-5 w-5" />
+        <div className="self-start shrink-0 rounded-xl bg-white/80 p-2 text-red-700">
+          <AlertTriangle className="h-5 w-5 shrink-0" />
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-red-700">生成遇到问题</p>

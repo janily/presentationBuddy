@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   getPresentationArtifact,
+  hasPresentationArtifactVersionConflict,
   resetPresentationArtifactStore,
   savePresentationArtifact,
 } from "./artifact-store";
@@ -66,6 +67,25 @@ describe("presentation artifact store", () => {
     expect(artifact.html).toContain("v2");
   });
 
+  it("accepts a later revision when this server instance has no cached baseline", () => {
+    expect(hasPresentationArtifactVersionConflict("deck-from-another-instance", 3)).toBe(false);
+
+    const artifact = savePresentationArtifact({
+      operation: {
+        operationId: "op-4",
+        deckId: "deck-from-another-instance",
+        baseVersion: 3,
+        targetVersion: 4,
+      },
+      brief,
+      approvedOutline: outline,
+      html: "<html>v4</html>",
+      htmlUrl: "/api/preview/v4",
+    });
+
+    expect(artifact.version).toBe(4);
+  });
+
   it("rejects stale revisions without replacing the active artifact", () => {
     savePresentationArtifact({
       operation: { operationId: "op-1", deckId: "deck-1", baseVersion: 0, targetVersion: 1 },
@@ -84,5 +104,6 @@ describe("presentation artifact store", () => {
     })).toThrow(/version conflict/i);
 
     expect(getPresentationArtifact("deck-1")?.html).toContain("v1");
+    expect(hasPresentationArtifactVersionConflict("deck-1", 0)).toBe(true);
   });
 });
