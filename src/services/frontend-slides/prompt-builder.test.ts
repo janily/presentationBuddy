@@ -28,7 +28,9 @@ describe("buildFrontendSlidesMastraPrompt", () => {
 
     expect(prompt).toContain("Demo Deck");
     expect(prompt).toContain("Slide 1: Opening");
-    expect(prompt).toContain("fixed 1920x1080 stage");
+    expect(prompt).toContain("fill the browser viewport");
+    expect(prompt).toContain("Do not calculate a 1920x1080 scale factor");
+    expect(prompt).toContain("FINAL VIEWPORT OVERRIDE");
     expect(prompt).toContain("exact whitespace-delimited `slide` class token");
     expect(prompt).toContain("`slide-content` or `slide-number` do not count as slide roots");
     expect(prompt).toContain("Fixed 16:9 Stage");

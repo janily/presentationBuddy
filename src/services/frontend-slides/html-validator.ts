@@ -92,13 +92,9 @@ export function assertFrontendSlidesDocument(
       message: "document is truncated or missing a closing html tag",
     },
     {
-      passed: /\bwidth\s*:\s*1920px\b/i.test(html) && /\bheight\s*:\s*1080px\b/i.test(html),
-      message: "missing fixed 1920x1080 stage rules",
-    },
-    {
       passed: /class=["'][^"']*\bdeck-viewport\b[^"']*["']/i.test(html)
         && /class=["'][^"']*\bdeck-stage\b[^"']*["']/i.test(html),
-      message: "missing frontend-slides viewport or fixed stage elements",
+      message: "missing frontend-slides viewport or stage elements",
     },
     {
       passed: countExactClassToken(html, "slide") > 0,
@@ -119,11 +115,6 @@ export function assertFrontendSlidesDocument(
     {
       passed: /prefers-reduced-motion\s*:\s*reduce/i.test(html),
       message: "missing prefers-reduced-motion support",
-    },
-    {
-      passed: /Math\.min\s*\(\s*window\.innerWidth\s*\/\s*1920\s*,\s*window\.innerHeight\s*\/\s*1080\s*\)/i.test(html)
-        && /style\.transform\s*=/i.test(html),
-      message: "missing uniform 1920x1080 stage scaling",
     },
     {
       passed: /addEventListener\s*\(\s*["']keydown["']/i.test(html),

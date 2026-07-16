@@ -59,7 +59,7 @@ Name: ${context.boldTemplateDesign.name}
 Slug: ${context.boldTemplateDesign.slug}
 Source: frontend-slides/${context.boldTemplateDesign.path}
 
-Use this design.md as the final deck's style recipe. Preserve its fonts, palette, decorative vocabulary, spacing rhythm, and component grammar, translated into the fixed 1920x1080 frontend-slides stage. Do not copy demo content from the template.
+Use this design.md only as the final deck's visual recipe. Preserve its fonts, palette, decorative vocabulary, spacing rhythm, and component grammar, but ignore any fixed-canvas, 1920x1080, deck-stage.js, letterboxing, or stage-scaling instructions inside it. Adapt the design to a full-browser viewport. Do not copy demo content from the template.
 
 === frontend-slides/${context.boldTemplateDesign.path} ===
 ${context.boldTemplateDesign.content}` : ""}
@@ -74,7 +74,8 @@ ${slides}
 
 Non-negotiable output requirements:
 - Single self-contained HTML file with all CSS and JavaScript inline.
-- Every slide is authored inside a fixed 1920x1080 stage.
+- The .deck-viewport, .deck-stage, and every .slide must fill the browser viewport using 100vw and 100dvh (with 100vh fallback).
+- Do not calculate a 1920x1080 scale factor, do not letterbox or pillarbox, and do not apply a whole-stage scale() transform. Layout directly in viewport-relative units, percentages, CSS grid/flex, and clamp().
 - Include the full viewport-base.css behavior in the style block.
 - Every real slide root must include an exact whitespace-delimited \`slide\` class token and use .active/.visible visibility rules.
 - The whole document must contain exactly ${input.slides.length} elements whose class list contains the exact \`slide\` token. Helper classes such as \`slide-content\` or \`slide-number\` do not count as slide roots.
@@ -99,6 +100,9 @@ ${context.viewportBaseCss}
 === frontend-slides/animation-patterns.md ===
 ${context.animationPatterns}
 ${context.stylePresets ? `\n=== frontend-slides/STYLE_PRESETS.md ===\n${context.stylePresets}` : ""}
+
+FINAL VIEWPORT OVERRIDE (HIGHEST PRIORITY):
+Ignore any fixed 16:9 canvas, 1920x1080 stage, deck-stage.js, uniform scaling, letterboxing, or pillarboxing instruction that may remain in a selected template recipe or reference text. The delivered deck must fill the current browser viewport directly and must not scale a fixed-size canvas.
 `;
 }
 

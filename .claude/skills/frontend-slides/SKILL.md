@@ -13,7 +13,7 @@ Create zero-dependency, animation-rich HTML presentations that run entirely in t
 2. **Show, Don't Tell** — Generate visual previews, not abstract choices. People discover what they want by seeing it.
 3. **Distinctive Design** — No generic "AI slop." Every presentation must feel custom-crafted.
 4. **Progressive Disclosure** — Read lightweight style indexes first. For bold templates, use small preview cards for style previews and load the full `design.md` only after the user picks that template.
-5. **Fixed 16:9 Stage (NON-NEGOTIABLE)** — Every deck uses a 1920×1080 slide canvas scaled as a whole to the viewport. Slides must stay 16:9 on every screen, including phones. Do not reflow slide content to fit the device.
+5. **Full-Viewport Stage (NON-NEGOTIABLE)** — Every deck fills the current browser viewport directly. Do not create or scale a fixed-size canvas and do not letterbox or pillarbox the presentation.
 
 ## Design Aesthetics
 
@@ -35,17 +35,17 @@ Avoid generic AI-generated aesthetics:
 
 Interpret creatively and make unexpected choices that feel genuinely designed for the context. Vary between light and dark themes, different fonts, different aesthetics. You still tend to converge on common choices (Space Grotesk, for example) across generations. Avoid this: it is critical that you think outside the box!
 
-## Fixed Stage Rules
+## Full-Viewport Stage Rules
 
 These invariants apply to EVERY slide in EVERY presentation:
 
 - Every deck has a viewport wrapper that fills the browser window.
-- Every slide is authored inside a fixed 1920×1080 stage.
-- The stage scales uniformly to fit the viewport. It may letterbox/pillarbox; it must not re-layout content.
-- Do not use responsive breakpoints to rearrange slide content for phones.
-- Use fixed internal slide measurements at the 1920×1080 design size.
+- `.deck-stage` and every slide fill the viewport using `100vw` and `100dvh`, with `100vh` as a fallback.
+- Layout content directly with CSS grid/flex, percentages, viewport units, and `clamp()`.
+- Do not calculate a fixed-canvas scale factor or apply a whole-stage `scale()` transform.
+- Responsive rules may adjust composition for narrow screens, but each slide must remain a single non-scrolling viewport.
 - Slide visibility must be controlled by `.active` / `.visible` using `visibility`, `opacity`, and `pointer-events` from `viewport-base.css`. Do not use `display: none` / `display: block` for slide switching; later layout classes such as `.slide-content { display: flex; }` can override them and make every slide visible at once.
-- Use `clamp()` only for non-slide UI outside the stage, or for small fallback previews where a full stage is impractical.
+- Use `clamp()` to keep typography and spacing readable across viewport sizes.
 - Include `prefers-reduced-motion` support
 - Never negate CSS functions directly (`-clamp()`, `-min()`, `-max()` are silently ignored) — use `calc(-1 * clamp(...))` instead
 
@@ -74,15 +74,15 @@ Determine what the user wants:
 
 ### Mode C: Modification Rules
 
-When enhancing existing presentations, fixed-stage fitting is the biggest risk:
+When enhancing existing presentations, viewport overflow is the biggest risk:
 
 1. **Before adding content:** Count existing elements, check against density limits
-2. **Adding images:** Fit them inside the 1920×1080 slide canvas. If slide already has max content, split into two slides
+2. **Adding images:** Fit them inside the visible slide viewport. If the slide already has max content, split it into two slides
 3. **Adding text:** Max 4-6 bullets per slide. Exceeds limits? Split into continuation slides
-4. **After ANY modification, verify:** the slide stage remains 16:9, no text overflows its card, no panels overlap, and screenshots look correct at 1280×720 plus one phone viewport
+4. **After ANY modification, verify:** no text overflows its card, no panels overlap, and screenshots look correct at 1280×720 plus one phone viewport
 5. **Proactively reorganize:** If modifications will cause overflow, automatically split content and inform the user. Don't wait to be asked
 
-**When adding images to existing slides:** Move image to a new slide or reduce other content first. Never add images without checking if existing content already fills the 1920×1080 slide stage.
+**When adding images to existing slides:** Move the image to a new slide or reduce other content first. Never add images without checking whether the visible viewport is already full.
 
 ---
 
@@ -165,7 +165,7 @@ Read [STYLE_PRESETS.md](STYLE_PRESETS.md) for safe preset candidates. If [bold-t
 - Match the user's stated occasion, audience, mood/vibe, and content density. The custom design should feel authored for this deck, not merely "stylish."
 - Make a deliberate visual thesis: distinctive typography, a committed palette, a recognizable layout system, and one strong atmospheric or graphic device.
 - Keep it feasible for a full deck. The preview must imply a design system that can expand into section, content, quote, comparison, and closing slides.
-- Use fixed 1920×1080 stage rules and pass the same preview authenticity checks as every other option.
+- Use the full-viewport stage rules and pass the same preview authenticity checks as every other option.
 - Never render "custom", "wildcard", "AI-generated", or design-process labels on the slide itself.
 
 **Bold template selection rules:**
@@ -217,8 +217,8 @@ Never let high density become visual clutter. If a high-density slide starts to 
 If the user selected a bold template from `bold-template-pack`, read that one template's full `design.md` before generating. Do not read the other bold templates. Treat `design.md` as the design recipe:
 
 - Preserve its fonts, palette, decorative vocabulary, spacing rhythm, and component grammar.
-- Generate the final deck as a fixed 1920×1080 stage scaled uniformly to the viewport, regardless of whether the source template originally used `deck-stage.js` or viewport-fluid CSS.
-- Treat viewport-fluid values in `design.md` as design proportions to translate into 1920×1080 stage coordinates. Do not keep them as live viewport reflow rules in the final deck.
+- Generate the final deck as a viewport-filling layout, regardless of whether the source template originally used `deck-stage.js` or fixed-canvas CSS.
+- Treat fixed-canvas values in `design.md` as visual proportions to translate into responsive CSS, not as runtime canvas dimensions.
 - Keep the output as a single self-contained Frontend Slides HTML file.
 - Do not copy demo slide content or mimic the source template too literally.
 - Use `template.html` only as a last-resort implementation reference for the selected template.

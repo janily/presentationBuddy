@@ -12,7 +12,7 @@ const validHtml = `<!doctype html>
 <head>
   <style>
     .deck-viewport { position: fixed; inset: 0; }
-    .deck-stage { width: 1920px; height: 1080px; }
+    .deck-stage { width: 100vw; height: 100dvh; }
     .slide { visibility: hidden; opacity: 0; pointer-events: none; }
     .slide.active { visibility: visible; opacity: 1; pointer-events: auto; }
     @media (prefers-reduced-motion: reduce) { * { animation-duration: 0.01ms !important; } }
@@ -26,9 +26,6 @@ const validHtml = `<!doctype html>
     </main>
   </div>
   <script>
-    const stage = document.getElementById('deckStage');
-    const factor = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
-    stage.style.transform = 'scale(' + factor + ')';
     document.addEventListener('keydown', () => {});
   </script>
 </body>
@@ -75,6 +72,13 @@ describe("frontend-slides html validator", () => {
   });
 
   it("accepts valid frontend-slides documents", () => {
+    expect(() => assertFrontendSlidesDocument(validHtml, 2)).not.toThrow();
+  });
+
+  it("does not require fixed dimensions or stage scaling", () => {
+    expect(validHtml).not.toContain("1920");
+    expect(validHtml).not.toContain("1080");
+    expect(validHtml).not.toContain("Math.min");
     expect(() => assertFrontendSlidesDocument(validHtml, 2)).not.toThrow();
   });
 
@@ -142,8 +146,7 @@ describe("frontend-slides html validator", () => {
     expect(() => assertFrontendSlidesDocument(invalidHtml, 2)).toThrow("display none/block");
   });
 
-  it("rejects documents without fixed-stage scaling or keyboard navigation", () => {
-    expect(() => assertFrontendSlidesDocument(validHtml.replace("Math.min", "Math.max"), 2)).toThrow("stage scaling");
+  it("rejects documents without keyboard navigation", () => {
     expect(() => assertFrontendSlidesDocument(validHtml.replace("keydown", "keyup"), 2)).toThrow("keyboard navigation");
   });
 
