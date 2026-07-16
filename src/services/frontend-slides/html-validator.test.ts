@@ -6,6 +6,7 @@ import {
   extractHtmlFromAgentResult,
   stripHtmlCodeFence,
 } from "./html-validator";
+import { ensureFrontendSlidesStyleContract } from "./style-contract";
 
 const validHtml = `<!doctype html>
 <html>
@@ -110,6 +111,90 @@ describe("frontend-slides html validator", () => {
       )
       .replace('class="deck-stage"', 'class="deck-stage" data-presentation-style="bold-template-studio"');
     expect(() => assertFrontendSlidesDocument(styledHtml, 2, studioStyle)).not.toThrow();
+  });
+
+  it("accepts selected style tokens used through generated aliases", () => {
+    const aliasedHtml = validHtml.replace(
+      "<style>",
+      `<style>
+    :root {
+      --deck-background: #1C1C1C;
+      --deck-accent: #F5D200;
+      --deck-display-font: "Barlow";
+      --deck-body-font: "IBM Plex Mono";
+    }
+    .deck-stage { background: var(--deck-background); font-family: var(--deck-body-font); }
+    .slide h1, .slide h2 { color: var(--deck-accent); font-family: var(--deck-display-font); }`,
+    );
+    const normalizedHtml = ensureFrontendSlidesStyleContract(aliasedHtml, studioStyle);
+
+    expect(() => assertFrontendSlidesDocument(normalizedHtml, 2, studioStyle)).not.toThrow();
+  });
+
+  it("accepts a final declaration without a semicolon and var fallbacks", () => {
+    const styledHtml = validHtml
+      .replace(
+        "<style>",
+        `<style>
+    :root {
+      --presentation-style-background: #1C1C1C;
+      --presentation-style-display-font: "Barlow";
+      --presentation-style-body-font: "IBM Plex Mono";
+      --presentation-style-accent: #F5D200
+    }
+    .deck-stage { background: var(--presentation-style-background, #1C1C1C); font-family: var(--presentation-style-body-font, monospace); }
+    .slide h1, .slide h2 { color: var(--presentation-style-accent, #F5D200); font-family: var(--presentation-style-display-font, sans-serif); }`,
+      )
+      .replace('class="deck-stage"', 'class="deck-stage" data-presentation-style="bold-template-studio"');
+
+    expect(() => assertFrontendSlidesDocument(styledHtml, 2, studioStyle)).not.toThrow();
+  });
+
+  it("accepts selected accent colors rendered through alpha colors", () => {
+    const styledHtml = validHtml
+      .replace(
+        "<style>",
+        `<style>
+    :root {
+      --presentation-style-background: #1C1C1C;
+      --presentation-style-accent: #F5D200;
+      --presentation-style-display-font: "Barlow";
+      --presentation-style-body-font: "IBM Plex Mono";
+    }
+    .deck-stage { background: var(--presentation-style-background); font-family: var(--presentation-style-body-font); }
+    .slide { box-shadow: inset 0 0 20px rgba(245, 210, 0, 0.2); }
+    .slide h1, .slide h2 { font-family: var(--presentation-style-display-font); }`,
+      )
+      .replace('class="deck-stage"', 'class="deck-stage" data-presentation-style="bold-template-studio"');
+
+    expect(() => assertFrontendSlidesDocument(styledHtml, 2, studioStyle)).not.toThrow();
+  });
+
+  it("accepts selected accent colors rendered through SVG presentation attributes", () => {
+    const styledHtml = validHtml
+      .replace(
+        "<style>",
+        `<style>
+    :root {
+      --presentation-style-background: #1C1C1C;
+      --presentation-style-accent: #F5D200;
+      --presentation-style-display-font: "Barlow";
+      --presentation-style-body-font: "IBM Plex Mono";
+    }
+    .deck-stage { background: var(--presentation-style-background); font-family: var(--presentation-style-body-font); }
+    .slide h1, .slide h2 { font-family: var(--presentation-style-display-font); }`,
+      )
+      .replace('class="deck-stage"', 'class="deck-stage" data-presentation-style="bold-template-studio"')
+      .replace("One</section>", '<svg aria-hidden="true"><circle fill="#F5D20080" /></svg>One</section>');
+
+    expect(() => assertFrontendSlidesDocument(styledHtml, 2, studioStyle)).not.toThrow();
+  });
+
+  it("still rejects canonical metadata when the selected visual tokens are not rendered", () => {
+    const normalizedHtml = ensureFrontendSlidesStyleContract(validHtml, studioStyle);
+    expect(() => assertFrontendSlidesDocument(normalizedHtml, 2, studioStyle)).toThrow(
+      "missing or unused --presentation-style-background",
+    );
   });
 
   it("requires an exact slide class token even when section fallback can count pages", () => {

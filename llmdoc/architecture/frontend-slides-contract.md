@@ -10,6 +10,7 @@
 - `src/services/frontend-slides/prompt-builder.ts`（`buildFrontendSlidesMastraPrompt`/`buildFrontendSlidesRepairPrompt`）：把 `FrontendSlidesInput` + 完整契约上下文拼成一次性、headless 的生成 prompt；repair prompt 在首次失败后前置失败原因，复用主 prompt 做整体重生成（不是局部补丁）。
 - `src/services/frontend-slides/html-validator.ts`（`assertFrontendSlidesDocument`/`assertFrontendSlidesComplete`）：运行时断言，检查文档完整性、viewport/stage 结构、slide 可见性切换、键盘导航和风格身份；不再校验固定画布尺寸或缩放语法。
 - `src/services/frontend-slides/viewport-fill.ts`（`ensureFrontendSlidesViewportFill`）：在校验前幂等注入纯 CSS 全屏覆盖，强制 stage/slide 使用当前 viewport 并清除模板遗留的整体 transform；它不参与失败判定，不包含固定画布尺寸计算。
+- `src/services/frontend-slides/style-contract.ts`（`ensureFrontendSlidesStyleContract`）：在校验前幂等补齐稳定 style ID 和规范化 CSS token 声明；不覆盖模型生成的视觉规则，避免仅因变量命名、尾分号等语法差异触发整稿重生成。
 - `src/utils/outline-to-slides-mapper.ts`（`mapOutlineToFrontendSlides`）：把已批准大纲转成 `FrontendSlidesInput`，含按内容特征分派的 `getSlideLayout`（title/quote/split/content）。
 - `src/utils/save-html-to-file.ts`（`resolveGeneratedSlidesDir`/`saveHtmlToFile`）：生成 HTML 的磁盘落盘与 URL 解析，**不在 `src/services/presentation-artifacts/` 里**（那里只是内存版本元数据，命名易混）。
 - `src/app/api/preview/[filename]/route.ts`：当产物不在 `public/` 下时的静态托管出口。
@@ -20,7 +21,7 @@
 1. `mapOutlineToFrontendSlides(outline, style, options)` → `FrontendSlidesInput`。
 2. `loadFrontendSlidesFinalContext()` 并行读取 SKILL.md/html-template.md/viewport-base.css/animation-patterns.md（必需）+ 可选 STYLE_PRESETS.md。
 3. `frontendSlidesComposerAgent.stream(buildFrontendSlidesMastraPrompt(...))`，流式累积 text-delta，按字符阈值推进度。
-4. `extractHtmlFromAgentResult` 剥离 markdown fence / 正则抓取 `<!doctype>...</html>`，再 `assertFrontendSlidesDocument` 校验。
+4. `extractHtmlFromAgentResult` 剥离 markdown fence / 正则抓取 `<!doctype>...</html>`，依次补齐 viewport 与 style contract 元数据，再由 `assertFrontendSlidesDocument` 校验。
 5. 校验失败 → 用 `buildFrontendSlidesRepairPrompt`（带失败原因）**整体重生成一次**；仍失败 → 整步抛错，**不允许切换到其他生成器**。
 6. 校验通过 → `saveHtmlToFile` 落盘；若有 `inputData.artifact` 则推进 artifact/proposal 状态（见 request-lifecycle 文档）。
 
@@ -44,7 +45,7 @@
 | 必须支持键盘导航 | 断言存在 `keydown` 事件绑定 |
 | 自包含单文档，无外部依赖 | 断言无外部 `<script src>`；文档必须闭合完整 |
 | slide 数量必须等于批准大纲的页数 | `countGeneratedSlides`（优先数 `class="...slide..."`，回退 `<section>`）+ `assertFrontendSlidesComplete` 强制相等 |
-| 已选择视觉风格 | prompt 要求 `.deck-stage` 写入稳定 style ID，并声明、实际引用 style contract 的规范化 background/accent/display-font/body-font CSS variables；validator 校验身份、声明与引用，缺失时触发一次完整 repair 重生成 |
+| 已选择视觉风格 | prompt 要求使用 style contract 的 background/accent/display-font/body-font；workflow 幂等补齐稳定 style ID 与规范化变量声明；validator 接受直接使用规范变量，也接受同值字面量或经模型自定义变量别名实际进入渲染规则，真正缺少视觉 token 时才触发一次完整 repair 重生成 |
 - 固定舞台不变量在两处强制：契约文本（约束模型）+ validator（运行时断言），改任一处必须同步检查另一处是否仍对应。
 - `style` revision 是全稿视觉重设计：保留内容、叙事和页序，但清除旧大纲的 `designGuidance`/`designSuggestion`，并要求每一页替换旧布局、字体、配色和标志性元素；内容 revision 才使用“保留未影响页面和当前视觉风格”的约束。
 - `artifact-store`（内存元数据）与 `save-html-to-file`（磁盘产物）是两个不同职责的存储，命名容易混淆，改落盘逻辑时认准 `save-html-to-file.ts`。
