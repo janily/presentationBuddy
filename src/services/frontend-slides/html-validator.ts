@@ -1,3 +1,5 @@
+import type { FrontendSlidesStyleSpec } from "./style-schema";
+
 export function stripHtmlCodeFence(html: string) {
   return html
     .trim()
@@ -31,6 +33,37 @@ function countExactClassToken(html: string, token: string) {
     .length;
 }
 
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function getStyleSheets(html: string) {
+  return [...html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi)]
+    .map((match) => match[1])
+    .join("\n")
+    .replace(/\/\*[\s\S]*?\*\//g, "");
+}
+
+function deckStageHasStyleIdentity(html: string, styleId: string) {
+  return [...html.matchAll(/<[^>]+>/g)].some((match) => {
+    const tag = match[0];
+    const classValue = tag.match(/\bclass\s*=\s*(["'])(.*?)\1/i)?.[2] ?? "";
+    const styleValue = tag.match(/\bdata-presentation-style\s*=\s*(["'])(.*?)\1/i)?.[2];
+    return classValue.split(/\s+/).includes("deck-stage") && styleValue === styleId;
+  });
+}
+
+function cssDeclaresToken(css: string, property: string, value: string) {
+  const quotedValue = value.startsWith("#")
+    ? escapeRegExp(value)
+    : `["']?${escapeRegExp(value)}["']?`;
+  return new RegExp(`${escapeRegExp(property)}\\s*:\\s*${quotedValue}(?:\\s*;|\\s*$)`, "im").test(css);
+}
+
+function cssUsesVariable(css: string, property: string) {
+  return new RegExp(`var\\(\\s*${escapeRegExp(property)}\\s*\\)`, "i").test(css);
+}
+
 export function countGeneratedSlides(html: string) {
   const sectionCount = html.match(/<section(?:\s|>)/gi)?.length ?? 0;
   const slideClassCount = countExactClassToken(html, "slide");
@@ -46,7 +79,11 @@ export function assertFrontendSlidesComplete(html: string, expectedSlideCount: n
   }
 }
 
-export function assertFrontendSlidesDocument(html: string, expectedSlideCount: number) {
+export function assertFrontendSlidesDocument(
+  html: string,
+  expectedSlideCount: number,
+  styleSpec?: FrontendSlidesStyleSpec,
+) {
   assertFrontendSlidesComplete(html, expectedSlideCount);
 
   const checks = [
@@ -101,5 +138,28 @@ export function assertFrontendSlidesDocument(html: string, expectedSlideCount: n
   const failed = checks.find((check) => !check.passed);
   if (failed) {
     throw new Error(`frontend-slides output failed validation: ${failed.message}`);
+  }
+
+  if (styleSpec) {
+    const css = getStyleSheets(html);
+    const requiredProperties = [
+      ["--presentation-style-background", styleSpec.palette.background],
+      ["--presentation-style-accent", styleSpec.palette.accent],
+      ["--presentation-style-display-font", styleSpec.typography.display],
+      ["--presentation-style-body-font", styleSpec.typography.body],
+    ] as const;
+    const missingProperties = requiredProperties
+      .filter(([property, value]) => !cssDeclaresToken(css, property, value) || !cssUsesVariable(css, property))
+      .map(([property]) => property);
+    const hasStyleIdentity = deckStageHasStyleIdentity(html, styleSpec.id);
+
+    if (!hasStyleIdentity || missingProperties.length > 0) {
+      throw new Error(
+        `frontend-slides output failed selected style contract: ${[
+          !hasStyleIdentity ? `missing deck style identity ${styleSpec.id}` : "",
+          missingProperties.length > 0 ? `missing or unused ${missingProperties.join(", ")}` : "",
+        ].filter(Boolean).join("; ")}`,
+      );
+    }
   }
 }

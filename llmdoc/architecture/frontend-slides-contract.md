@@ -43,7 +43,9 @@
 | 必须支持键盘导航 | 断言存在 `keydown` 事件绑定 |
 | 自包含单文档，无外部依赖 | 断言无外部 `<script src>`；文档必须闭合完整 |
 | slide 数量必须等于批准大纲的页数 | `countGeneratedSlides`（优先数 `class="...slide..."`，回退 `<section>`）+ `assertFrontendSlidesComplete` 强制相等 |
+| 已选择视觉风格 | prompt 要求 `.deck-stage` 写入稳定 style ID，并声明、实际引用 style contract 的规范化 background/accent/display-font/body-font CSS variables；validator 校验身份、声明与引用，缺失时触发一次完整 repair 重生成 |
 - 固定舞台不变量在两处强制：契约文本（约束模型）+ validator（运行时断言），改任一处必须同步检查另一处是否仍对应。
+- `style` revision 是全稿视觉重设计：保留内容、叙事和页序，但清除旧大纲的 `designGuidance`/`designSuggestion`，并要求每一页替换旧布局、字体、配色和标志性元素；内容 revision 才使用“保留未影响页面和当前视觉风格”的约束。
 - `artifact-store`（内存元数据）与 `save-html-to-file`（磁盘产物）是两个不同职责的存储，命名容易混淆，改落盘逻辑时认准 `save-html-to-file.ts`。
 
 ## Related Docs

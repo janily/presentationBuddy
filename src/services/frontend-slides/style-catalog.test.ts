@@ -33,6 +33,17 @@ describe("frontend-slides style catalog", () => {
     });
   });
 
+  it("uses the Studio design recipe typography in the selectable style contract", () => {
+    expect(getFrontendSlideStyle("bold-template-studio")).toMatchObject({
+      typography: { display: "Barlow", body: "IBM Plex Mono" },
+      palette: {
+        background: "#1C1C1C",
+        text: "#F5D200",
+        accent: "#F5D200",
+      },
+    });
+  });
+
   it("assigns every bold template a generated preview family", () => {
     const boldTemplateStyles = listFrontendSlideStyles().filter((style) => style.source === "frontend-slides-bold-template");
 

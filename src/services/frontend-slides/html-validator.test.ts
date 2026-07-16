@@ -34,6 +34,17 @@ const validHtml = `<!doctype html>
 </body>
 </html>`;
 
+const studioStyle = {
+  id: "bold-template-studio",
+  name: "Studio",
+  source: "frontend-slides-bold-template" as const,
+  vibe: "electric",
+  layout: "black and acid yellow",
+  typography: { display: "Barlow", body: "IBM Plex Mono" },
+  palette: { background: "#1C1C1C", surface: "#242422", text: "#F5D200", accent: "#F5D200", secondary: "#2E2E2C" },
+  signatureElements: ["type-as-graphic-mass"],
+};
+
 describe("frontend-slides html validator", () => {
   it.each(["", "   \n\t  "])("reports empty agent output separately: %j", (output) => {
     expect(() => extractHtmlFromAgentResult(output)).toThrow(
@@ -65,6 +76,36 @@ describe("frontend-slides html validator", () => {
 
   it("accepts valid frontend-slides documents", () => {
     expect(() => assertFrontendSlidesDocument(validHtml, 2)).not.toThrow();
+  });
+
+  it("rejects a generated deck that does not contain the selected style's core visual tokens", () => {
+    expect(() => assertFrontendSlidesDocument(validHtml, 2, studioStyle)).toThrow(
+      "selected style contract",
+    );
+
+    const tokenOnlyHtml = validHtml.replace(
+      "<style>",
+      "<style>\n/* Studio #1C1C1C #F5D200 Barlow IBM Plex Mono */",
+    );
+    expect(() => assertFrontendSlidesDocument(tokenOnlyHtml, 2, studioStyle)).toThrow(
+      "selected style contract",
+    );
+
+    const styledHtml = validHtml
+      .replace(
+        "<style>",
+        `<style>
+    :root {
+      --presentation-style-background: #1C1C1C;
+      --presentation-style-accent: #F5D200;
+      --presentation-style-display-font: "Barlow";
+      --presentation-style-body-font: "IBM Plex Mono";
+    }
+    .deck-stage { background: var(--presentation-style-background); color: var(--presentation-style-accent); font-family: var(--presentation-style-body-font); }
+    .slide h1, .slide h2 { font-family: var(--presentation-style-display-font); }`,
+      )
+      .replace('class="deck-stage"', 'class="deck-stage" data-presentation-style="bold-template-studio"');
+    expect(() => assertFrontendSlidesDocument(styledHtml, 2, studioStyle)).not.toThrow();
   });
 
   it("requires an exact slide class token even when section fallback can count pages", () => {

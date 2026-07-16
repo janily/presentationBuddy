@@ -39,6 +39,36 @@ const baseRequest: PresentationRevisionRequestData = {
   },
 };
 
+const studioStyle = {
+  id: "bold-template-studio",
+  name: "Studio",
+  source: "frontend-slides-bold-template" as const,
+  vibe: "electric, bold, graphic",
+  layout: "Black canvas with electric-yellow type",
+  typography: { display: "Barlow", body: "IBM Plex Mono" },
+  palette: {
+    background: "#1C1C1C",
+    surface: "#242422",
+    text: "#F5D200",
+    accent: "#F5D200",
+    secondary: "#2E2E2C",
+  },
+  signatureElements: ["type-as-graphic-mass"],
+  boldTemplate: {
+    slug: "studio",
+    tagline: "Black canvas with electric-yellow type",
+    mood: ["electric", "bold", "graphic"],
+    tone: ["loud", "intentional"],
+    formality: "medium",
+    density: "medium",
+    scheme: "dark",
+    bestFor: "Design-led decks",
+    avoidFor: "Quiet institutional decks",
+    previewMd: "bold-template-pack/templates/studio/preview.md",
+    designMd: "bold-template-pack/templates/studio/design.md",
+  },
+};
+
 describe("revision workflow planning", () => {
   it("preserves the visual style while passing a content revision separately", () => {
     const plan = buildRevisionWorkflowPlan(baseRequest);
@@ -135,5 +165,31 @@ describe("revision workflow planning", () => {
       signatureElements: ["rules"],
     });
     expect(plan.inputData.outline).toBe(outline);
+  });
+
+  it("restyles every slide without carrying visual directions from the previous theme", () => {
+    const plan = buildRevisionWorkflowPlan({
+      ...baseRequest,
+      presentationBrief: {
+        ...baseRequest.presentationBrief,
+      },
+      revision: {
+        kind: "style",
+        instruction: "Restyle the entire presentation using Studio",
+        style: "Studio",
+        styleSpec: studioStyle,
+        requiresOutlineReview: false,
+      },
+    });
+
+    expect(plan.workflowKind).toBe("html-revision");
+    if (plan.workflowKind !== "html-revision") throw new Error("Expected HTML revision plan");
+    expect(plan.inputData.style).toBe("Studio");
+    expect(plan.inputData.styleSpec).toEqual(studioStyle);
+    expect(plan.inputData.requirements).toBe(baseRequest.presentationBrief.requirements);
+    expect(plan.inputData.requirements).not.toContain("Restyle the entire presentation");
+    expect(plan.inputData.outline.designGuidance).toEqual([]);
+    expect(plan.inputData.outline.slides[0].designSuggestion).toBe("");
+    expect(plan.inputData.outline.slides[0].keyPoints).toEqual(outline.slides[0].keyPoints);
   });
 });

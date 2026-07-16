@@ -97,7 +97,13 @@ const boldTemplateTypographyByMood: Array<{ tokens: string[]; typography: Fronte
   { tokens: ["crafted", "handmade", "tactile"], typography: { display: "Fraunces", body: "DM Sans" } },
 ];
 
+const boldTemplateTypographyOverrides: Record<string, FrontendSlidesStyleSpec["typography"]> = {
+  studio: { display: "Barlow", body: "IBM Plex Mono" },
+};
+
 function getBoldTemplateTypography(template: BoldTemplateIndexItem) {
+  const override = boldTemplateTypographyOverrides[template.slug];
+  if (override) return override;
   const tokens = [...template.mood, ...template.tone].map((token) => token.toLowerCase());
   return boldTemplateTypographyByMood.find((candidate) => candidate.tokens.some((token) => tokens.includes(token)))?.typography
     ?? { display: "Space Grotesk", body: "Inter" };

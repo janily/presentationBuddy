@@ -18,7 +18,8 @@ import { applyReasoningEvent, stopStreamingAssistantMessage } from "./agent-mess
 import { requestsCancelledGenerationRetry } from "./cancelled-generation-retry";
 import { discoverFrontendSlideStyles, listFrontendSlideStyles, type FrontendSlidesStylePreview, type FrontendSlidesStyleSpec } from "@/src/services/frontend-slides/style-catalog";
 import { applyPaletteRevision } from "@/src/services/frontend-slides/palette-revision";
-import { isStructureChangingRevision } from "./revision-routing";
+import { buildFullDeckStyleRevision, isStructureChangingRevision } from "./revision-routing";
+import { removeOutlineVisualDirections } from "@/src/utils/presentation-outline-style";
 import {
   shouldAppendReplayMessage,
   shouldDeferAgentAction,
@@ -347,6 +348,9 @@ export default function PresentationStudio() {
     const baselineOutline = activeArtifact?.outline ?? baseOutline;
     const baselineBrief = activeArtifact?.brief ?? brief;
     if (!baselineOutline || !baselineBrief || revision.requiresOutlineReview) return false;
+    const revisionOutline = revision.kind === "style"
+      ? removeOutlineVisualDirections(baselineOutline)
+      : baselineOutline;
 
     const baseVersion = activeArtifact?.version ?? activeHtmlGenerationStepData?.artifact?.version ?? 0;
     const operation: ArtifactOperation = {
@@ -367,15 +371,17 @@ export default function PresentationStudio() {
       styleSpec: isPaletteRevision
         ? applyPaletteRevision(baselineBrief.styleSpec, revision.instruction)
         : revision.styleSpec ?? baselineBrief.styleSpec,
-      requirements: [baselineBrief.requirements, revision.instruction].filter(Boolean).join("\n\n"),
+      requirements: revision.kind === "style"
+        ? baselineBrief.requirements
+        : [baselineBrief.requirements, revision.instruction].filter(Boolean).join("\n\n"),
     };
 
     setHtmlWatchdogError(null);
     setLastCancelledArtifact(null);
-    setPendingArtifact({ operation, brief: revisedBrief, outline: baselineOutline, revision, mode: "revision" });
+    setPendingArtifact({ operation, brief: revisedBrief, outline: revisionOutline, revision, mode: "revision" });
     sendRevision({
       presentationBrief: toBriefData(revisedBrief),
-      approvedOutline: baselineOutline,
+      approvedOutline: revisionOutline,
       revision,
       artifact: operation,
     });
@@ -489,13 +495,9 @@ export default function PresentationStudio() {
         return;
       }
 
-      beginRevision({
-        kind: "mixed",
-        instruction: nextBrief.requirements || `Apply the requested style: ${nextBrief.style}`,
-        style: nextBrief.style,
-        styleSpec: nextBrief.styleSpec,
-        requiresOutlineReview: false,
-      });
+      if (nextBrief.styleSpec) {
+        beginRevision(buildFullDeckStyleRevision(nextBrief.style, nextBrief.styleSpec));
+      }
       return;
     }
 

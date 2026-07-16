@@ -62,6 +62,9 @@ describe("buildFrontendSlidesMastraPrompt", () => {
     expect(prompt).toContain("Selected style contract (NON-NEGOTIABLE)");
     expect(prompt).toContain('"id": "terminal-green"');
     expect(prompt).toContain("Content density: reading-first");
+    expect(prompt).toContain('data-presentation-style="terminal-green"');
+    expect(prompt).toContain("--presentation-style-background: #0d1117");
+    expect(prompt).toContain("var(--presentation-style-display-font)");
   });
 
   it("includes the selected bold template design recipe when present", () => {
@@ -134,6 +137,27 @@ describe("buildFrontendSlidesMastraPrompt", () => {
     expect(prompt).toContain("丰富第 1 页的 Workflow 实战示例");
     expect(prompt).toContain("Apply it specifically to slide(s): 1");
     expect(prompt).toContain("Do not reinterpret this content revision as a request to change the visual style");
+  });
+
+  it("treats a style revision as a full-deck redesign instead of preserving the previous layout", () => {
+    const prompt = buildFrontendSlidesMastraPrompt(
+      {
+        title: "Mastra",
+        narrativeGoal: "Teach workflows",
+        style: "Studio",
+        designGuidance: [],
+        slides: [{ title: "Workflow", content: "Existing content", layout: "content" }],
+        revisionKind: "style",
+        revisionInstruction: "Restyle the entire presentation using Studio",
+      },
+      { skill: "rules", htmlTemplate: "template", viewportBaseCss: "viewport", animationPatterns: "motion" },
+    );
+
+    expect(prompt).toContain("full-deck visual restyle");
+    expect(prompt).toContain("Apply the new visual system to every slide");
+    expect(prompt).toContain("replace the previous layout composition, typography, palette, and signature elements");
+    expect(prompt).not.toContain("Preserve the approved outline and every unaffected slide");
+    expect(prompt).not.toContain("content revision");
   });
 
   it("builds a full frontend-slides regeneration prompt after validation failure", () => {

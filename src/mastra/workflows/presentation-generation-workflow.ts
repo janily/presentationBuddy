@@ -682,6 +682,7 @@ export const presentationHtmlGenerationStep = createStep({
     const frontendSlidesInput = mapOutlineToFrontendSlides(inputData.outline, inputData.style, {
       density: inputData.density,
       styleSpec: inputData.styleSpec,
+      revisionKind: inputData.revision?.kind,
       revisionInstruction: inputData.revision?.instruction ?? inputData.outlineRevisionContext?.instruction,
       revisionTargetSlides: inputData.revision?.targetSlides ?? inputData.outlineRevisionContext?.targetSlides,
     });
@@ -778,7 +779,11 @@ export const presentationHtmlGenerationStep = createStep({
 
       const validateFrontendSlidesHtml = (result: string) => {
         const document = extractHtmlFromAgentResult(stripHtmlCodeFence(result));
-        assertFrontendSlidesDocument(document, frontendSlidesInput.slides.length);
+        assertFrontendSlidesDocument(
+          document,
+          frontendSlidesInput.slides.length,
+          frontendSlidesInput.styleSpec,
+        );
         return document;
       };
 
@@ -860,7 +865,11 @@ export const presentationHtmlGenerationStep = createStep({
       regenerationReason,
       generatedCharacters: html.length,
     });
-    assertFrontendSlidesDocument(html, frontendSlidesInput.slides.length);
+    assertFrontendSlidesDocument(
+      html,
+      frontendSlidesInput.slides.length,
+      frontendSlidesInput.styleSpec,
+    );
 
     writeHtmlProgress({
       activeStepId: "save",

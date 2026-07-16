@@ -14,6 +14,26 @@ export function buildFrontendSlidesMastraPrompt(
       ].join("\n");
     })
     .join("\n\n---\n\n");
+  const confirmedRevision = input.revisionInstruction
+    ? input.revisionKind === "style"
+      ? `Confirmed full-deck visual restyle (NON-NEGOTIABLE):
+${input.revisionInstruction}
+Apply the new visual system to every slide. Preserve the approved content, narrative, and slide order, but replace the previous layout composition, typography, palette, and signature elements. Do not carry visual vocabulary from the previous theme into the new deck.`
+      : `Confirmed revision (NON-NEGOTIABLE):
+${input.revisionInstruction}
+${input.revisionTargetSlides?.length ? `Apply it specifically to slide(s): ${input.revisionTargetSlides.join(", ")}.` : "Apply it to the relevant slides only."}
+Preserve the approved outline and every unaffected slide. Do not reinterpret this content revision as a request to change the visual style.`
+    : "";
+  const styleConformanceContract = input.styleSpec
+    ? `Style conformance markers (NON-NEGOTIABLE):
+- Add data-presentation-style="${input.styleSpec.id}" to the element with the deck-stage class.
+- Declare these exact canonical CSS custom properties in :root:
+  --presentation-style-background: ${input.styleSpec.palette.background};
+  --presentation-style-accent: ${input.styleSpec.palette.accent};
+  --presentation-style-display-font: "${input.styleSpec.typography.display}";
+  --presentation-style-body-font: "${input.styleSpec.typography.body}";
+- Use var(--presentation-style-background) and var(--presentation-style-body-font) on the deck stage, var(--presentation-style-display-font) on slide headings, and var(--presentation-style-accent) in visible slide styling. Do not merely declare these variables; they must drive the rendered deck.`
+    : "";
 
   return `Generate a complete standalone HTML presentation from this approved outline.
 
@@ -32,6 +52,8 @@ ${JSON.stringify(input.styleSpec, null, 2)}
 
 Preserve this contract's typography, palette, layout grammar, signature elements, and visual rhythm across every slide. Do not substitute another preset or generic theme.` : "No visual style has been selected; infer a distinctive custom system from the brief."}
 
+${styleConformanceContract}
+
 ${context.boldTemplateDesign ? `Selected bold template design recipe (NON-NEGOTIABLE):
 Name: ${context.boldTemplateDesign.name}
 Slug: ${context.boldTemplateDesign.slug}
@@ -42,10 +64,7 @@ Use this design.md as the final deck's style recipe. Preserve its fonts, palette
 === frontend-slides/${context.boldTemplateDesign.path} ===
 ${context.boldTemplateDesign.content}` : ""}
 
-${input.revisionInstruction ? `Confirmed revision (NON-NEGOTIABLE):
-${input.revisionInstruction}
-${input.revisionTargetSlides?.length ? `Apply it specifically to slide(s): ${input.revisionTargetSlides.join(", ")}.` : "Apply it to the relevant slides only."}
-Preserve the approved outline and every unaffected slide. Do not reinterpret this content revision as a request to change the visual style.` : ""}
+${confirmedRevision}
 
 Design guidance:
 ${input.designGuidance.map((item) => `- ${item}`).join("\n") || "- Create a refined, presentation-ready visual system."}

@@ -45,6 +45,14 @@ export const revisionSpecSchema = z.object({
   palette: z.array(z.string().trim().min(1)).min(1).optional(),
   styleSpec: frontendSlidesStyleSpecSchema.optional(),
   requiresOutlineReview: z.boolean(),
+}).superRefine((revision, context) => {
+  if (revision.kind === "style" && !revision.styleSpec) {
+    context.addIssue({
+      code: "custom",
+      path: ["styleSpec"],
+      message: "Style revisions require the selected style contract",
+    });
+  }
 });
 
 export const presentationInputSchema = z.object({

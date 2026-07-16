@@ -1,6 +1,7 @@
 import z from "zod";
 import { presentationRevisionRequestSchema } from "@/src/mastra/workflows/presentation-generation-schemas";
 import { applyPaletteRevision } from "@/src/services/frontend-slides/palette-revision";
+import { removeOutlineVisualDirections } from "@/src/utils/presentation-outline-style";
 import { resolveStructureRevisionPageCount } from "@/src/utils/structure-revision-page-count";
 
 type ValidatedRevisionRequest = z.infer<typeof presentationRevisionRequestSchema>;
@@ -23,6 +24,9 @@ function resolveRevisionStyle({ presentationBrief, revision }: ValidatedRevision
 
 export function buildRevisionWorkflowPlan(request: ValidatedRevisionRequest) {
   const { presentationBrief, approvedOutline, revision, artifact } = request;
+  const revisionOutline = revision.kind === "style"
+    ? removeOutlineVisualDirections(approvedOutline)
+    : approvedOutline;
   const revisedPageCount = revision.requiresOutlineReview
     ? resolveStructureRevisionPageCount(approvedOutline.slides.length, revision.instruction)
     : presentationBrief.pageCount;
@@ -32,11 +36,15 @@ export function buildRevisionWorkflowPlan(request: ValidatedRevisionRequest) {
     style: resolveRevisionStyle(request),
     requirements: [
       presentationBrief.requirements,
-      `Revision request (${revision.kind}): ${revision.instruction}`,
+      revision.kind === "style"
+        ? undefined
+        : `Revision request (${revision.kind}): ${revision.instruction}`,
     ].filter(Boolean).join("\n\n"),
     styleSpec: revision.kind === "palette"
       ? applyPaletteRevision(presentationBrief.styleSpec, revision.instruction)
-      : presentationBrief.styleSpec,
+      : revision.kind === "style"
+        ? revision.styleSpec
+        : presentationBrief.styleSpec,
     artifact,
   };
 
@@ -60,7 +68,7 @@ export function buildRevisionWorkflowPlan(request: ValidatedRevisionRequest) {
     workflowKind: "html-revision" as const,
     inputData: {
       ...commonInput,
-      outline: approvedOutline,
+      outline: revisionOutline,
       revision,
     },
   };

@@ -17,6 +17,17 @@ const outline = {
   designGuidance: [],
 };
 
+const terminalStyle = {
+  id: "terminal-green",
+  name: "Terminal Green",
+  source: "frontend-slides-preset" as const,
+  vibe: "developer focused",
+  layout: "terminal",
+  typography: { display: "JetBrains Mono", body: "JetBrains Mono" },
+  palette: { background: "#0d1117", surface: "#161b22", text: "#e6edf3", accent: "#39d353", secondary: "#58a6ff" },
+  signatureElements: ["scan lines", "blinking cursor"],
+};
+
 describe("analyze request validation", () => {
   it("validates a top-level presentation brief without calling workflow or model code", () => {
     const result = validatePresentationWorkflowRequest({ topic: "AI", audience: "PMs", pageCount: 4, style: "visual" });
@@ -164,6 +175,7 @@ describe("analyze request validation", () => {
           kind: "style",
           instruction: "Use a professional dark visual system",
           style: "Professional dark",
+          styleSpec: terminalStyle,
           requiresOutlineReview: false,
         },
         artifact: {
@@ -183,6 +195,34 @@ describe("analyze request validation", () => {
     }
   });
 
+  it("rejects a style revision without its selected style contract", () => {
+    const result = validatePresentationWorkflowRequest({
+      revisionRequest: {
+        presentationBrief: { topic: "AI agents", pageCount: 4, style: "Notebook Tabs" },
+        approvedOutline: outline,
+        revision: {
+          kind: "style",
+          instruction: "Restyle the entire presentation using Studio",
+          style: "Studio",
+          requiresOutlineReview: false,
+        },
+        artifact: {
+          operationId: "operation-2",
+          deckId: "deck-1",
+          baseVersion: 1,
+          targetVersion: 2,
+        },
+      },
+    });
+
+    expect(result).toMatchObject({ success: false, action: "revise" });
+    if (!result.success) {
+      expect(formatValidationErrors(result.error)).toEqual(expect.arrayContaining([
+        expect.objectContaining({ field: "revision.styleSpec" }),
+      ]));
+    }
+  });
+
   it("preserves the selected frontend-slides style contract in generation input", () => {
     const result = validatePresentationWorkflowRequest({
       presentationBrief: {
@@ -192,16 +232,7 @@ describe("analyze request validation", () => {
         style: "Terminal Green",
         density: "reading-first",
         purpose: "teaching-tutorial",
-        styleSpec: {
-          id: "terminal-green",
-          name: "Terminal Green",
-          source: "frontend-slides-preset",
-          vibe: "developer focused",
-          layout: "terminal",
-          typography: { display: "JetBrains Mono", body: "JetBrains Mono" },
-          palette: { background: "#0d1117", surface: "#161b22", text: "#e6edf3", accent: "#39d353", secondary: "#58a6ff" },
-          signatureElements: ["scan lines", "blinking cursor"],
-        },
+        styleSpec: terminalStyle,
       },
     });
 
