@@ -38,8 +38,18 @@ function escapeRegExp(value: string) {
 }
 
 function getStyleSheets(html: string) {
-  return [...html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi)]
+  const styleBlocks = [...html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi)]
     .map((match) => match[1])
+    .join("\n");
+  const inlineStyles = [...html.matchAll(/\bstyle\s*=\s*(["'])(.*?)\1/gi)]
+    .map((match) => match[2])
+    .join(";\n");
+  const presentationAttributes = [...html.matchAll(/\b(fill|stroke|stop-color|color|font-family)\s*=\s*(["'])(.*?)\2/gi)]
+    .map((match) => `${match[1]}: ${match[3]};`)
+    .join("\n");
+
+  return [styleBlocks, inlineStyles, presentationAttributes]
+    .filter(Boolean)
     .join("\n")
     .replace(/\/\*[\s\S]*?\*\//g, "");
 }
@@ -57,11 +67,67 @@ function cssDeclaresToken(css: string, property: string, value: string) {
   const quotedValue = value.startsWith("#")
     ? escapeRegExp(value)
     : `["']?${escapeRegExp(value)}["']?`;
-  return new RegExp(`${escapeRegExp(property)}\\s*:\\s*${quotedValue}(?:\\s*;|\\s*$)`, "im").test(css);
+  return new RegExp(
+    `${escapeRegExp(property)}\\s*:\\s*${quotedValue}(?=\\s*(?:!important\\s*)?(?:;|}|$))`,
+    "im",
+  ).test(css);
 }
 
 function cssUsesVariable(css: string, property: string) {
-  return new RegExp(`var\\(\\s*${escapeRegExp(property)}\\s*\\)`, "i").test(css);
+  return new RegExp(`var\\(\\s*${escapeRegExp(property)}(?=\\s*[,\\)])`, "i").test(css);
+}
+
+type CssDeclaration = {
+  property: string;
+  value: string;
+};
+
+function getCssDeclarations(css: string): CssDeclaration[] {
+  return [...css.matchAll(/(?:^|[;{])\s*([-\w]+)\s*:\s*([^;{}]*?)(?=\s*(?:;|}))/gim)]
+    .map((match) => ({ property: match[1], value: match[2].trim() }));
+}
+
+function cssValueContainsToken(value: string, token: string) {
+  const normalizedToken = token.trim();
+  const hexMatch = normalizedToken.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+
+  if (hexMatch) {
+    const [, redHex, greenHex, blueHex] = hexMatch;
+    const [red, green, blue] = [redHex, greenHex, blueHex].map((channel) => Number.parseInt(channel, 16));
+    const hexPattern = `${escapeRegExp(normalizedToken)}(?:[0-9a-f]{2})?(?![0-9a-f])`;
+    const rgbPattern = `rgba?\\(\\s*${red}\\s*(?:,\\s*|\\s+)${green}\\s*(?:,\\s*|\\s+)${blue}(?:\\s*(?:,|/)\\s*[\\d.]+%?)?\\s*\\)`;
+    return new RegExp(`(?:${hexPattern}|${rgbPattern})`, "i").test(value);
+  }
+
+  const escapedToken = escapeRegExp(normalizedToken);
+  return new RegExp(`(?:^|[^a-z0-9_-])["']?${escapedToken}["']?(?![a-z0-9_-])`, "i").test(value);
+}
+
+function declarationFeedsRenderedStyle(
+  declarations: CssDeclaration[],
+  property: string,
+  visited = new Set<string>(),
+): boolean {
+  if (visited.has(property)) return false;
+  visited.add(property);
+
+  return declarations.some((declaration) => {
+    if (!cssUsesVariable(declaration.value, property)) return false;
+    if (!declaration.property.startsWith("--")) return true;
+    return declarationFeedsRenderedStyle(declarations, declaration.property, new Set(visited));
+  });
+}
+
+function cssUsesEquivalentToken(css: string, token: string) {
+  const declarations = getCssDeclarations(css).filter(
+    (declaration) => !declaration.property.startsWith("--presentation-style-"),
+  );
+
+  return declarations.some((declaration) => {
+    if (!cssValueContainsToken(declaration.value, token)) return false;
+    if (!declaration.property.startsWith("--")) return true;
+    return declarationFeedsRenderedStyle(declarations, declaration.property);
+  });
 }
 
 function getMissingStyleGrammar(css: string, styleSpec: FrontendSlidesStyleSpec) {
@@ -113,13 +179,9 @@ export function assertFrontendSlidesDocument(
       message: "document is truncated or missing a closing html tag",
     },
     {
-      passed: /\bwidth\s*:\s*1920px\b/i.test(html) && /\bheight\s*:\s*1080px\b/i.test(html),
-      message: "missing fixed 1920x1080 stage rules",
-    },
-    {
       passed: /class=["'][^"']*\bdeck-viewport\b[^"']*["']/i.test(html)
         && /class=["'][^"']*\bdeck-stage\b[^"']*["']/i.test(html),
-      message: "missing frontend-slides viewport or fixed stage elements",
+      message: "missing frontend-slides viewport or stage elements",
     },
     {
       passed: countExactClassToken(html, "slide") > 0,
@@ -140,11 +202,6 @@ export function assertFrontendSlidesDocument(
     {
       passed: /prefers-reduced-motion\s*:\s*reduce/i.test(html),
       message: "missing prefers-reduced-motion support",
-    },
-    {
-      passed: /Math\.min\s*\(\s*window\.innerWidth\s*\/\s*1920\s*,\s*window\.innerHeight\s*\/\s*1080\s*\)/i.test(html)
-        && /style\.transform\s*=/i.test(html),
-      message: "missing uniform 1920x1080 stage scaling",
     },
     {
       passed: /addEventListener\s*\(\s*["']keydown["']/i.test(html),
@@ -170,7 +227,10 @@ export function assertFrontendSlidesDocument(
       ["--presentation-style-body-font", styleSpec.typography.body],
     ] as const;
     const missingProperties = requiredProperties
-      .filter(([property, value]) => !cssDeclaresToken(css, property, value) || !cssUsesVariable(css, property))
+      .filter(([property, value]) => {
+        if (!cssDeclaresToken(css, property, value)) return true;
+        return !cssUsesVariable(css, property) && !cssUsesEquivalentToken(css, value);
+      })
       .map(([property]) => property);
     const missingStyleGrammar = getMissingStyleGrammar(css, styleSpec);
     const hasStyleIdentity = deckStageHasStyleIdentity(html, styleSpec.id);

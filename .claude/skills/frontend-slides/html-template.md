@@ -1,6 +1,6 @@
 # HTML Presentation Template
 
-Reference architecture for generating slide presentations. Every presentation follows a fixed 16:9 stage model: slides are authored at 1920×1080 and the whole stage scales to fit the browser window.
+Reference architecture for generating slide presentations. Every presentation fills the current browser viewport directly. Do not create or scale a fixed-size canvas.
 
 ## Base HTML Structure
 
@@ -29,16 +29,16 @@ Reference architecture for generating slide presentations. Every presentation fo
             --accent: #00ffcc;
             --accent-glow: rgba(0, 255, 204, 0.3);
 
-            /* Typography — authored at 1920×1080 stage size */
+            /* Typography — responsive to the browser viewport */
             --font-display: 'Clash Display', sans-serif;
             --font-body: 'Satoshi', sans-serif;
-            --title-size: 112px;
-            --subtitle-size: 34px;
-            --body-size: 28px;
+            --title-size: clamp(3rem, 7vw, 8rem);
+            --subtitle-size: clamp(1.4rem, 2.3vw, 2.5rem);
+            --body-size: clamp(1rem, 1.6vw, 1.8rem);
 
-            /* Spacing — authored at 1920×1080 stage size */
-            --slide-padding: 72px;
-            --content-gap: 32px;
+            /* Spacing — responsive to the browser viewport */
+            --slide-padding: clamp(24px, 5vw, 96px);
+            --content-gap: clamp(16px, 2vw, 40px);
 
             /* Animation */
             --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
@@ -104,22 +104,9 @@ Reference architecture for generating slide presentations. Every presentation fo
             constructor() {
                 this.slides = document.querySelectorAll('.slide');
                 this.currentSlide = 0;
-                this.stage = document.getElementById('deckStage');
-                this.setupStageScale();
                 this.setupKeyboardNav();
                 this.setupTouchNav();
                 this.showSlide(0);
-            }
-
-            setupStageScale() {
-                const scale = () => {
-                    const factor = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
-                    const x = (window.innerWidth - 1920 * factor) / 2;
-                    const y = (window.innerHeight - 1080 * factor) / 2;
-                    this.stage.style.transform = `translate(${x}px, ${y}px) scale(${factor})`;
-                };
-                scale();
-                window.addEventListener('resize', scale);
             }
 
             setupKeyboardNav() {
@@ -155,10 +142,10 @@ Every presentation must include:
    - Mouse wheel navigation
    - Optional progress indicator or page count, kept outside the slide stage
 
-2. **Stage Scaling** — For fixed 16:9 presentation behavior:
-   - Keep all slides at 1920×1080 inside `.deck-stage`
-   - Scale the whole stage with one transform
-   - Letterbox/pillarbox as needed; never reflow slide content per device
+2. **Viewport Layout** — For full-browser presentation behavior:
+   - Keep `.deck-viewport`, `.deck-stage`, and every slide at the current viewport size
+   - Use CSS grid/flex, percentages, viewport units, and `clamp()` for layout
+   - Do not apply whole-stage scaling, letterboxing, or pillarboxing
 
 3. **Optional Enhancements** (match to chosen style):
    - Custom cursor with trail

@@ -9,7 +9,7 @@ export const frontendSlidesComposerAgent = new Agent({
   instructions: `You generate production-ready standalone HTML presentations from approved outlines.
 
 You must follow the frontend-slides rules provided in the user prompt exactly:
-- fixed 1920x1080 stage
+- full-viewport stage that fills the browser without canvas scaling
 - self-contained HTML/CSS/JS
 - .slide elements with visibility-based switching
 - distinctive design, typography, and motion

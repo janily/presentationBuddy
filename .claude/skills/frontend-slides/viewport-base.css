@@ -1,7 +1,7 @@
 /* ===========================================
-   FIXED 16:9 STAGE: MANDATORY BASE STYLES
+   FULL-VIEWPORT STAGE: MANDATORY BASE STYLES
    Include this ENTIRE file in every presentation.
-   Slides are authored at 1920×1080 and scaled as a whole.
+   Slides fill the current browser viewport directly.
    =========================================== */
 
 /* 1. Lock the browser viewport */
@@ -22,26 +22,24 @@ body {
     background: var(--stage-bg, #000);
 }
 
-/* 3. Fixed 16:9 design canvas.
-   JavaScript sets transform: translate(...) scale(...). */
+/* 3. Full-window design canvas. */
 .deck-stage {
     position: absolute;
-    left: 0;
-    top: 0;
-    width: 1920px;
-    height: 1080px;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
     overflow: hidden;
-    transform-origin: 0 0;
+    transform: none;
     background: var(--slide-bg, #fff);
 }
 
-/* 4. Slides stack inside the fixed stage.
-   Content must be laid out at 1920×1080, not reflowed per device. */
+/* 4. Slides stack inside the viewport-filling stage. */
 .slide {
     position: absolute;
     inset: 0;
-    width: 1920px;
-    height: 1080px;
+    width: 100%;
+    height: 100%;
     overflow: hidden;
     display: block;
     visibility: hidden;
@@ -76,11 +74,11 @@ svg {
     z-index: 1000;
 }
 
-/* 7. Print one fixed-size slide per page */
+/* 7. Print one viewport-proportioned slide per page */
 @media print {
     html,
     body {
-        width: 1920px;
+        width: 100%;
         height: auto;
         overflow: visible;
         background: #fff;
@@ -106,8 +104,8 @@ svg {
         visibility: visible !important;
         opacity: 1 !important;
         pointer-events: auto !important;
-        width: 1920px;
-        height: 1080px;
+        width: 100vw;
+        height: 100vh;
         break-after: page;
         page-break-after: always;
     }

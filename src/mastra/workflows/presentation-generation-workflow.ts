@@ -5,6 +5,8 @@ import {
   extractHtmlFromAgentResult,
   stripHtmlCodeFence,
 } from "@/src/services/frontend-slides/html-validator";
+import { ensureFrontendSlidesViewportFill } from "@/src/services/frontend-slides/viewport-fill";
+import { ensureFrontendSlidesStyleContract } from "@/src/services/frontend-slides/style-contract";
 import { loadFrontendSlidesFinalContext } from "@/src/services/frontend-slides/skill-loader";
 import {
   buildFrontendSlidesMastraPrompt,
@@ -779,12 +781,16 @@ export const presentationHtmlGenerationStep = createStep({
 
       const validateFrontendSlidesHtml = (result: string) => {
         const document = extractHtmlFromAgentResult(stripHtmlCodeFence(result));
+        const normalizedDocument = ensureFrontendSlidesStyleContract(
+          ensureFrontendSlidesViewportFill(document),
+          frontendSlidesInput.styleSpec,
+        );
         assertFrontendSlidesDocument(
-          document,
+          normalizedDocument,
           frontendSlidesInput.slides.length,
           frontendSlidesInput.styleSpec,
         );
-        return document;
+        return normalizedDocument;
       };
 
       writeHtmlProgress({
