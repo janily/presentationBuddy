@@ -52,6 +52,8 @@ ${JSON.stringify(input.styleSpec, null, 2)}
 
 Preserve this contract's typography, palette, layout grammar, signature elements, and visual rhythm across every slide. Do not substitute another preset or generic theme.` : "No visual style has been selected; infer a distinctive custom system from the brief."}
 
+${input.styleSpec ? `Treat the selected contract's layout and signatureElements as testable implementation requirements, not descriptive mood words. Encode recurring structural grammar in shared CSS. When the selected recipe specifies an exact grid, implement its column count, row count, and gap exactly.` : ""}
+
 ${styleConformanceContract}
 
 ${context.boldTemplateDesign ? `Selected bold template design recipe (NON-NEGOTIABLE):

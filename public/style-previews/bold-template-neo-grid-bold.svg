@@ -1,24 +1,32 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" role="img" aria-label="Neo-Grid Bold">
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="#fdfae7"/>
-      <stop offset="1" stop-color="#ffffff"/>
-    </linearGradient>
-    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
-      <path d="M48 0H0V48" fill="none" stroke="#00000018" stroke-width="1"/>
-    </pattern>
-  </defs>
-  <rect width="960" height="540" fill="url(#bg)"/>
-  <rect width="960" height="540" fill="url(#grid)" opacity=".75"/>
-  <circle cx="820" cy="92" r="92" fill="#1e2bfa" opacity=".9"/>
-  <rect x="620" y="208" width="260" height="210" fill="#1e2bfa" opacity=".18" stroke="#1e2bfa" stroke-width="4"/>
-  <rect x="78" y="74" width="520" height="334" fill="#ffffffb8" stroke="#1e2bfa" stroke-width="4"/>
-  <path d="M92 96H218M92 388H316M576 96V214" stroke="#1e2bfa" stroke-width="8" stroke-linecap="square"/>
-  <text x="105" y="145" fill="#1e2bfa" font-family="Arial, sans-serif" font-size="22" font-weight="700" letter-spacing="5">CONFIDENT / PUNCHY / EDITORIAL</text>
-  <text x="105" y="258" fill="#111111" font-family="Arial Black, Arial, sans-serif" font-size="68" font-weight="900">MAKE IT LAND</text>
-  <text x="105" y="318" fill="#111111" font-family="Arial Black, Arial, sans-serif" font-size="68" font-weight="900">WITH STYLE</text>
-  <text x="105" y="370" fill="#6b6b6b" font-family="Arial, sans-serif" font-size="20" font-weight="700" letter-spacing="2">EDITORIAL NEO-BRUTALISM WITH A SINGLE NEON YELLOW ACCENT ...</text>
-  <text x="640" y="286" fill="#1e2bfa" font-family="Arial Black, Arial, sans-serif" font-size="74" font-weight="900">01</text>
-  <text x="640" y="340" fill="#111111" font-family="Arial, sans-serif" font-size="22" font-weight="700">Playfair Display</text>
-  <text x="640" y="374" fill="#6b6b6b" font-family="Arial, sans-serif" font-size="18">grid-led composition</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" role="img" aria-label="Neo-Grid Bold title slide" data-template-slug="neo-grid-bold">
+  <rect width="960" height="540" fill="#ECECE8"/>
+
+  <g id="frame" data-grid="12x8" transform="translate(20 20)">
+    <rect width="614" height="336" fill="#E6FF3D"/>
+    <rect x="626" width="294" height="336" fill="#0A0A0A"/>
+    <rect y="348" width="920" height="172" fill="#F5F4EF"/>
+
+    <g font-family="Space Grotesk, Noto Sans SC, Helvetica Neue, Arial, sans-serif" fill="#0A0A0A">
+      <text x="20" y="34" font-size="12" font-weight="500" letter-spacing="1.6">AGENT SKILLS 创作教程</text>
+      <text x="20" y="132" font-size="82" font-weight="700" letter-spacing="-3">BUILD</text>
+      <text x="20" y="220" font-size="82" font-weight="700" letter-spacing="-3">AGENT</text>
+      <text x="20" y="308" font-size="82" font-weight="700" letter-spacing="-3">SKILLS</text>
+
+      <text x="646" y="78" fill="#F5F4EF" font-size="16" font-weight="700">从零构建可复用的智能体能力模块</text>
+
+      <text x="20" y="386" font-family="JetBrains Mono, Noto Sans SC, monospace" font-size="12" letter-spacing="1.4">SESSION FRAME / DEVELOPERS</text>
+      <text x="20" y="432" font-size="22" font-weight="700">设定基调，带开发者走完创作全流程</text>
+    </g>
+
+    <g transform="translate(870 22)" fill="#E6FF3D">
+      <rect width="14" height="14"/>
+      <rect x="18" width="14" height="14"/>
+      <rect y="18" width="14" height="14"/>
+    </g>
+
+    <g transform="translate(0 484)">
+      <rect width="72" height="36" fill="#E6FF3D"/>
+      <text x="12" y="24" fill="#0A0A0A" font-family="JetBrains Mono, monospace" font-size="14">01 / 10</text>
+    </g>
+  </g>
 </svg>

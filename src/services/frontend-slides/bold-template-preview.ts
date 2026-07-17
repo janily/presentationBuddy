@@ -34,7 +34,7 @@ const familyBySlug: Record<string, BoldPreviewFamily> = {
   "long-table": "cartesian",
   mat: "modular",
   monochrome: "paper",
-  "neo-grid-bold": "cartesian",
+  "neo-grid-bold": "modular",
   "peoples-platform": "brutalist",
   "pin-and-paper": "paper",
   "pink-script": "organic",

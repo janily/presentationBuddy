@@ -1,7 +1,7 @@
 import type { FrontendSlidesDensity, FrontendSlidesPurpose, FrontendSlidesStylePreview, FrontendSlidesStyleSpec } from "./style-schema";
 export type { FrontendSlidesDensity, FrontendSlidesPurpose, FrontendSlidesStylePreview, FrontendSlidesStyleSpec } from "./style-schema";
 import boldTemplateSelectionIndex from "../../../.claude/skills/frontend-slides/bold-template-pack/selection-index.json";
-import { createBoldTemplatePreviewDataUri, getBoldPreviewFamily } from "./bold-template-preview";
+import { getBoldPreviewFamily } from "./bold-template-preview";
 
 export type FrontendSlidesDiscoveryInput = {
   topic: string;
@@ -72,7 +72,7 @@ const boldTemplatePaletteOverrides: Record<string, FrontendSlidesStyleSpec["pale
   "long-table": { background: "#FAF1E2", surface: "#F2E5CF", text: "#8E2D1F", accent: "#B53D2A", secondary: "#E8D7B6" },
   mat: { background: "#232E26", surface: "#EDE6D0", text: "#F0E8D2", accent: "#C07030", secondary: "#7A4E24" },
   monochrome: { background: "#FAFADF", surface: "#F5F0E4", text: "#1A1A16", accent: "#5E5E54", secondary: "#8A8A80" },
-  "neo-grid-bold": { background: "#F5F4EF", surface: "#ECECE8", text: "#0A0A0A", accent: "#E6FF3D", secondary: "#8A8A85" },
+  "neo-grid-bold": { background: "#ECECE8", surface: "#F5F4EF", text: "#0A0A0A", accent: "#E6FF3D", secondary: "#8A8A85" },
   "peoples-platform": { background: "#F4E9D6", surface: "#2C2CDC", text: "#1B1BB0", accent: "#F2A03A", secondary: "#E83A2A" },
   "pin-and-paper": { background: "#EFE56A", surface: "#F8F1D6", text: "#1F3A8A", accent: "#C9A66B", secondary: "#FBE6A4" },
   "pink-script": { background: "#F5EDF1", surface: "#0F0D11", text: "#060507", accent: "#ED3D8C", secondary: "#FF66A8" },
@@ -98,7 +98,21 @@ const boldTemplateTypographyByMood: Array<{ tokens: string[]; typography: Fronte
 ];
 
 const boldTemplateTypographyOverrides: Record<string, FrontendSlidesStyleSpec["typography"]> = {
+  "neo-grid-bold": { display: "Space Grotesk", body: "Space Grotesk" },
   studio: { display: "Barlow", body: "IBM Plex Mono" },
+};
+
+const boldTemplateLayoutOverrides: Record<string, string> = {
+  "neo-grid-bold": "Dense 12-column by 8-row editorial panel grid with a 40px putty frame and square lemon, ink, and paper blocks.",
+};
+
+const boldTemplateSignatureOverrides: Record<string, string[]> = {
+  "neo-grid-bold": [
+    "dense 12-column by 8-row panel grid",
+    "lemon, ink, and paper color-block adjacency",
+    "heavy uppercase grotesk display type with mono metadata",
+    "square blockmarks and persistent page-number tags",
+  ],
 };
 
 function getBoldTemplateTypography(template: BoldTemplateIndexItem) {
@@ -128,6 +142,9 @@ function getBoldTemplatePalette(template: BoldTemplateIndexItem) {
 }
 
 function getBoldTemplateSignatureElements(template: BoldTemplateIndexItem) {
+  const override = boldTemplateSignatureOverrides[template.slug];
+  if (override) return override;
+
   const signatures = new Set<string>();
   const haystack = `${template.tagline} ${template.mood.join(" ")} ${template.tone.join(" ")}`.toLowerCase();
 
@@ -147,7 +164,7 @@ const boldTemplateStyles: FrontendSlidesStyleSpec[] = (boldTemplateSelectionInde
   name: template.name,
   source: "frontend-slides-bold-template",
   vibe: [...template.mood.slice(0, 3), ...template.tone.slice(0, 2)].join("、"),
-  layout: template.tagline,
+  layout: boldTemplateLayoutOverrides[template.slug] ?? template.tagline,
   typography: getBoldTemplateTypography(template),
   palette: getBoldTemplatePalette(template),
   signatureElements: getBoldTemplateSignatureElements(template),
@@ -304,9 +321,7 @@ export function discoverFrontendSlideStyles(
     }
     return {
       style,
-      previewImage: style.source === "frontend-slides-bold-template"
-        ? createBoldTemplatePreviewDataUri(style, input)
-        : `/style-previews/${style.id}.svg`,
+      previewImage: `/style-previews/${style.id}.svg`,
     };
   });
 }

@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
 import { discoverFrontendSlideStyles, getFrontendSlideStyle, listFrontendSlideStyles } from "./style-catalog";
 import { getBoldPreviewFamily } from "./bold-template-preview";
 
@@ -17,7 +19,7 @@ describe("frontend-slides style catalog", () => {
     expect(result.some((item) => item.style.source === "frontend-slides-bold-template")).toBe(true);
     expect(result.some((item) => item.style.source === "frontend-slides-custom")).toBe(true);
     expect(new Set(result.map((item) => item.previewImage)).size).toBe(3);
-    expect(result.every((item) => item.previewImage.startsWith("/style-previews/") || item.previewImage.startsWith("data:image/svg+xml"))).toBe(true);
+    expect(result.every((item) => item.previewImage.startsWith("/style-previews/"))).toBe(true);
   });
 
   it("exposes bold template metadata needed for final generation", () => {
@@ -44,29 +46,42 @@ describe("frontend-slides style catalog", () => {
     });
   });
 
-  it("assigns every bold template a generated preview family", () => {
+  it("has a local static preview image for every bold template", () => {
     const boldTemplateStyles = listFrontendSlideStyles().filter((style) => style.source === "frontend-slides-bold-template");
 
     expect(boldTemplateStyles).toHaveLength(34);
     for (const style of boldTemplateStyles) {
       expect(getBoldPreviewFamily(style.boldTemplate!.slug)).toBeTruthy();
+      expect(existsSync(path.join(process.cwd(), "public", "style-previews", `${style.id}.svg`))).toBe(true);
     }
   });
 
-  it("renders bold previews from the real topic with visually distinct composition families", () => {
-    const boldIds = ["bold-template-raw-grid", "bold-template-capsule", "bold-template-editorial-forest"];
-    const result = discoverFrontendSlideStyles({
-      topic: "Mastra Agent 开发框架入门",
-      audience: "TypeScript 开发者",
-      purpose: "teaching-tutorial",
-      density: "reading-first",
-    }, undefined, { limit: listFrontendSlideStyles().length })
-      .filter((item) => boldIds.includes(item.style.id));
+  it("keeps the Neo-Grid Bold preview promise aligned with its final design recipe", () => {
+    const style = getFrontendSlideStyle("bold-template-neo-grid-bold");
+    const previewPath = path.join(process.cwd(), "public", "style-previews", "bold-template-neo-grid-bold.svg");
+    const preview = readFileSync(previewPath, "utf8");
 
-    const decoded = result.map((item) => decodeURIComponent(item.previewImage.split(",")[1]));
-    expect(decoded).toHaveLength(3);
-    expect(decoded.every((svg) => svg.includes("Mastra Agent"))).toBe(true);
-    expect(new Set(decoded.map((svg) => svg.match(/data-preview-family="([^"]+)"/)?.[1])).size).toBe(3);
+    expect(style).toMatchObject({
+      typography: { display: "Space Grotesk", body: "Space Grotesk" },
+      palette: {
+        background: "#ECECE8",
+        surface: "#F5F4EF",
+        text: "#0A0A0A",
+        accent: "#E6FF3D",
+      },
+      layout: expect.stringContaining("12-column by 8-row"),
+      signatureElements: expect.arrayContaining([
+        "dense 12-column by 8-row panel grid",
+        "square blockmarks and persistent page-number tags",
+      ]),
+    });
+    expect(getBoldPreviewFamily("neo-grid-bold")).toBe("modular");
+    expect(preview).toContain('data-template-slug="neo-grid-bold"');
+    expect(preview).toContain("#E6FF3D");
+    expect(preview).toContain("#0A0A0A");
+    expect(preview).toContain("Space Grotesk");
+    expect(preview).not.toContain("Playfair Display");
+    expect(preview).not.toContain("#1e2bfa");
   });
 
   it("returns the complete preset contract by stable style id", () => {

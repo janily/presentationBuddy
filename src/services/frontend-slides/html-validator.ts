@@ -64,6 +64,27 @@ function cssUsesVariable(css: string, property: string) {
   return new RegExp(`var\\(\\s*${escapeRegExp(property)}\\s*\\)`, "i").test(css);
 }
 
+function getMissingStyleGrammar(css: string, styleSpec: FrontendSlidesStyleSpec) {
+  if (styleSpec.id !== "bold-template-neo-grid-bold") return [];
+
+  const rules = [
+    {
+      passed: /grid-template-columns\s*:\s*repeat\(\s*12\s*,\s*1fr\s*\)/i.test(css),
+      label: "12-column grid",
+    },
+    {
+      passed: /grid-template-rows\s*:\s*repeat\(\s*8\s*,\s*1fr\s*\)/i.test(css),
+      label: "8-row grid",
+    },
+    {
+      passed: /(?:^|[;{])\s*(?:gap|grid-gap)\s*:\s*12px\b/im.test(css),
+      label: "12px grid gap",
+    },
+  ];
+
+  return rules.filter((rule) => !rule.passed).map((rule) => rule.label);
+}
+
 export function countGeneratedSlides(html: string) {
   const sectionCount = html.match(/<section(?:\s|>)/gi)?.length ?? 0;
   const slideClassCount = countExactClassToken(html, "slide");
@@ -151,13 +172,15 @@ export function assertFrontendSlidesDocument(
     const missingProperties = requiredProperties
       .filter(([property, value]) => !cssDeclaresToken(css, property, value) || !cssUsesVariable(css, property))
       .map(([property]) => property);
+    const missingStyleGrammar = getMissingStyleGrammar(css, styleSpec);
     const hasStyleIdentity = deckStageHasStyleIdentity(html, styleSpec.id);
 
-    if (!hasStyleIdentity || missingProperties.length > 0) {
+    if (!hasStyleIdentity || missingProperties.length > 0 || missingStyleGrammar.length > 0) {
       throw new Error(
         `frontend-slides output failed selected style contract: ${[
           !hasStyleIdentity ? `missing deck style identity ${styleSpec.id}` : "",
           missingProperties.length > 0 ? `missing or unused ${missingProperties.join(", ")}` : "",
+          missingStyleGrammar.length > 0 ? `missing visual grammar ${missingStyleGrammar.join(", ")}` : "",
         ].filter(Boolean).join("; ")}`,
       );
     }

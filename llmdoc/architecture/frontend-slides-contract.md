@@ -48,6 +48,12 @@
 - `style` revision 是全稿视觉重设计：保留内容、叙事和页序，但清除旧大纲的 `designGuidance`/`designSuggestion`，并要求每一页替换旧布局、字体、配色和标志性元素；内容 revision 才使用“保留未影响页面和当前视觉风格”的约束。
 - `artifact-store`（内存元数据）与 `save-html-to-file`（磁盘产物）是两个不同职责的存储，命名容易混淆，改落盘逻辑时认准 `save-html-to-file.ts`。
 
+## Style Preview Fidelity
+
+- Bold-template discovery serves the curated assets in `public/style-previews/bold-template-<slug>.svg`; it does not synthesize a generic preview family at request time. The static cover is the visual promise shown before generation.
+- The selected `FrontendSlidesStyleSpec` must agree with the template `design.md` on canonical canvas/surface colors, display/body fonts, layout grammar, and signature elements. Mood-tag inference is only a fallback when a template has no exact override.
+- Neo-Grid Bold has an additional runtime grammar gate: generated CSS must implement `repeat(12, 1fr)` columns, `repeat(8, 1fr)` rows, and a `12px` gap. Declaring the right palette and style ID without the promised panel grid is rejected and triggers the existing full repair regeneration.
+
 ## Related Docs
 - `llmdoc/architecture/request-lifecycle-and-workflows.md`：Step 2 在整条 workflow 中的位置、repair 重试与 workflow 失败处理。
 - `llmdoc/must/project-basics.md`：落盘目录优先级速查。

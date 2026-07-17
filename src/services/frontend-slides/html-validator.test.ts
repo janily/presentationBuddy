@@ -45,6 +45,17 @@ const studioStyle = {
   signatureElements: ["type-as-graphic-mass"],
 };
 
+const neoGridStyle = {
+  id: "bold-template-neo-grid-bold",
+  name: "Neo-Grid Bold",
+  source: "frontend-slides-bold-template" as const,
+  vibe: "confident editorial",
+  layout: "12-column by 8-row grid",
+  typography: { display: "Space Grotesk", body: "Space Grotesk" },
+  palette: { background: "#ECECE8", surface: "#F5F4EF", text: "#0A0A0A", accent: "#E6FF3D", secondary: "#8A8A85" },
+  signatureElements: ["dense 12-column by 8-row panel grid"],
+};
+
 describe("frontend-slides html validator", () => {
   it.each(["", "   \n\t  "])("reports empty agent output separately: %j", (output) => {
     expect(() => extractHtmlFromAgentResult(output)).toThrow(
@@ -106,6 +117,33 @@ describe("frontend-slides html validator", () => {
       )
       .replace('class="deck-stage"', 'class="deck-stage" data-presentation-style="bold-template-studio"');
     expect(() => assertFrontendSlidesDocument(styledHtml, 2, studioStyle)).not.toThrow();
+  });
+
+  it("requires Neo-Grid Bold to implement the grid promised by its preview", () => {
+    const styledHtml = validHtml
+      .replace(
+        "<style>",
+        `<style>
+    :root {
+      --presentation-style-background: #ECECE8;
+      --presentation-style-accent: #E6FF3D;
+      --presentation-style-display-font: "Space Grotesk";
+      --presentation-style-body-font: "Space Grotesk";
+    }
+    .deck-stage { background: var(--presentation-style-background); font-family: var(--presentation-style-body-font); }
+    .slide h1, .slide h2 { color: var(--presentation-style-accent); font-family: var(--presentation-style-display-font); }`,
+      )
+      .replace('class="deck-stage"', 'class="deck-stage" data-presentation-style="bold-template-neo-grid-bold"');
+
+    expect(() => assertFrontendSlidesDocument(styledHtml, 2, neoGridStyle)).toThrow(
+      "missing visual grammar 12-column grid, 8-row grid, 12px grid gap",
+    );
+
+    const gridHtml = styledHtml.replace(
+      ".slide { visibility: hidden; opacity: 0; pointer-events: none; }",
+      ".neo-grid-frame { display: grid; grid-template-columns: repeat(12, 1fr); grid-template-rows: repeat(8, 1fr); gap: 12px; }\n    .slide { visibility: hidden; opacity: 0; pointer-events: none; }",
+    );
+    expect(() => assertFrontendSlidesDocument(gridHtml, 2, neoGridStyle)).not.toThrow();
   });
 
   it("requires an exact slide class token even when section fallback can count pages", () => {
