@@ -1,24 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" role="img" aria-label="Vellum">
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="#0a0e27"/>
-      <stop offset="1" stop-color="#111827"/>
-    </linearGradient>
-    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
-      <path d="M48 0H0V48" fill="none" stroke="#ffffff22" stroke-width="1"/>
-    </pattern>
-  </defs>
-  <rect width="960" height="540" fill="url(#bg)"/>
-  <rect width="960" height="540" fill="url(#grid)" opacity=".75"/>
-  <circle cx="820" cy="92" r="92" fill="#5edcf4" opacity=".9"/>
-  <rect x="620" y="208" width="260" height="210" fill="#5edcf4" opacity=".18" stroke="#5edcf4" stroke-width="4"/>
-  <rect x="78" y="74" width="520" height="334" fill="#00000055" stroke="#5edcf4" stroke-width="4"/>
-  <path d="M92 96H218M92 388H316M576 96V214" stroke="#5edcf4" stroke-width="8" stroke-linecap="square"/>
-  <text x="105" y="145" fill="#5edcf4" font-family="Arial, sans-serif" font-size="22" font-weight="700" letter-spacing="5">SCHOLARLY / LITERARY / CONSIDERED</text>
-  <text x="105" y="258" fill="#ffffff" font-family="Arial Black, Arial, sans-serif" font-size="68" font-weight="900">MAKE IT LAND</text>
-  <text x="105" y="318" fill="#ffffff" font-family="Arial Black, Arial, sans-serif" font-size="68" font-weight="900">WITH STYLE</text>
-  <text x="105" y="370" fill="#f0a6ca" font-family="Arial, sans-serif" font-size="20" font-weight="700" letter-spacing="2">DEEP NAVY CANVAS WITH WARM-YELLOW CORMORANT SERIFS AND A ...</text>
-  <text x="640" y="286" fill="#5edcf4" font-family="Arial Black, Arial, sans-serif" font-size="74" font-weight="900">01</text>
-  <text x="640" y="340" fill="#ffffff" font-family="Arial, sans-serif" font-size="22" font-weight="700">Playfair Display</text>
-  <text x="640" y="374" fill="#f0a6ca" font-family="Arial, sans-serif" font-size="18">editorial type hierarchy</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" role="img" aria-label="Vellum title slide preview" data-template-slug="vellum" data-preview-family="vellum" data-contract-hash="bba157dbb367fa49f49d587d01ef7aaaf064ffd673484dac5c5a976be5721ba9" data-display-font="Cormorant Garamond" data-body-font="DM Sans">
+<title>Vellum title slide preview</title>
+<rect width="960" height="540" fill="#2A3870"/><rect x="56" y="52" width="848" height="436" fill="none" stroke="#E8D85C" stroke-opacity=".22"/><text x="770" y="214" fill="#3A7878" font-family="Cormorant Garamond" font-size="210" font-style="italic" opacity=".72">“</text><text x="82" y="92" fill="#3A7878" font-family="Courier Prime,Noto Sans SC,monospace" font-size="15" letter-spacing="2" >VELLUM / NOTE 01</text><text x="78" y="250" fill="#E8D85C" font-family="Cormorant Garamond,Noto Sans SC,sans-serif" font-size="82"   font-weight="400" font-style="italic" letter-spacing="-1"><tspan x="78" dy="0">Agent</tspan><tspan x="78" dy="73.8">Skills</tspan></text><path d="M80 344H410" stroke="#F5E168" stroke-width="28"/><text x="80" y="424" fill="#E8D85C" font-family="DM Sans" font-size="22">A reusable capability system</text>
 </svg>

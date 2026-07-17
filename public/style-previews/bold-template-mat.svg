@@ -1,24 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" role="img" aria-label="Mat">
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="#111111"/>
-      <stop offset="1" stop-color="#f7f1e1"/>
-    </linearGradient>
-    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
-      <path d="M48 0H0V48" fill="none" stroke="#ffffff22" stroke-width="1"/>
-    </pattern>
-  </defs>
-  <rect width="960" height="540" fill="url(#bg)"/>
-  <rect width="960" height="540" fill="url(#grid)" opacity=".75"/>
-  <circle cx="820" cy="92" r="92" fill="#ff5b2e" opacity=".9"/>
-  <rect x="620" y="208" width="260" height="210" fill="#ff5b2e" opacity=".18" stroke="#ff5b2e" stroke-width="4"/>
-  <rect x="78" y="74" width="520" height="334" fill="#00000055" stroke="#ff5b2e" stroke-width="4"/>
-  <path d="M92 96H218M92 388H316M576 96V214" stroke="#ff5b2e" stroke-width="8" stroke-linecap="square"/>
-  <text x="105" y="145" fill="#ff5b2e" font-family="Arial, sans-serif" font-size="22" font-weight="700" letter-spacing="5">WARM-MODERN / CONSIDERED / TACTILE</text>
-  <text x="105" y="258" fill="#fff8e8" font-family="Arial Black, Arial, sans-serif" font-size="68" font-weight="900">MAKE IT LAND</text>
-  <text x="105" y="318" fill="#fff8e8" font-family="Arial Black, Arial, sans-serif" font-size="68" font-weight="900">WITH STYLE</text>
-  <text x="105" y="370" fill="#99e885" font-family="Arial, sans-serif" font-size="20" font-weight="700" letter-spacing="2">DARK SAGE CANVAS WITH BONE PAPER AND BURNT-ORANGE ACCENT;...</text>
-  <text x="640" y="286" fill="#ff5b2e" font-family="Arial Black, Arial, sans-serif" font-size="74" font-weight="900">01</text>
-  <text x="640" y="340" fill="#fff8e8" font-family="Arial, sans-serif" font-size="22" font-weight="700">Fraunces</text>
-  <text x="640" y="374" fill="#99e885" font-family="Arial, sans-serif" font-size="18">paper texture rhythm</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" role="img" aria-label="Mat title slide preview" data-template-slug="mat" data-preview-family="mat" data-contract-hash="bcb350947fc036bcd6c71ec9be632f3b46adb08f9e115dd1860423fa6a9ddf0a" data-display-font="Bricolage Grotesque" data-body-font="DM Sans">
+<title>Mat title slide preview</title>
+<defs><radialGradient id="wood" cx="88%" cy="92%"><stop stop-color="#7A4E24" stop-opacity=".45"/><stop offset="1" stop-color="#232E26" stop-opacity="0"/></radialGradient></defs><rect width="960" height="540" fill="#232E26"/><rect width="960" height="540" fill="url(#wood)"/><text x="58" y="72" fill="#C07030" font-family="DM Mono,Noto Sans SC,monospace" font-size="15" letter-spacing="2" >MAT / SESSION 01</text><text x="56" y="250" fill="#F0E8D2" font-family="Bricolage Grotesque,Noto Sans SC,sans-serif" font-size="82" font-weight="800"  letter-spacing="-1"><tspan x="56" dy="0">Agent</tspan><tspan x="56" dy="73.8">Skills</tspan></text><rect x="646" y="92" width="246" height="330" fill="#EDE6D0"/><text x="676" y="148" fill="#232E26" font-family="DM Mono" font-size="15" letter-spacing="2">PRACTICE</text><text x="676" y="206" fill="#232E26" font-family="DM Sans" font-size="26">Build on a</text><text x="676" y="240" fill="#232E26" font-family="DM Sans" font-size="26">steady surface.</text>
 </svg>

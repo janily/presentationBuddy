@@ -1,24 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" role="img" aria-label="Creative Mode">
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="#fdfae7"/>
-      <stop offset="1" stop-color="#ffffff"/>
-    </linearGradient>
-    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
-      <path d="M48 0H0V48" fill="none" stroke="#00000018" stroke-width="1"/>
-    </pattern>
-  </defs>
-  <rect width="960" height="540" fill="url(#bg)"/>
-  <rect width="960" height="540" fill="url(#grid)" opacity=".75"/>
-  <circle cx="820" cy="92" r="92" fill="#1e2bfa" opacity=".9"/>
-  <rect x="620" y="208" width="260" height="210" fill="#1e2bfa" opacity=".18" stroke="#1e2bfa" stroke-width="4"/>
-  <rect x="78" y="74" width="520" height="334" fill="#ffffffb8" stroke="#1e2bfa" stroke-width="4"/>
-  <path d="M92 96H218M92 388H316M576 96V214" stroke="#1e2bfa" stroke-width="8" stroke-linecap="square"/>
-  <text x="105" y="145" fill="#1e2bfa" font-family="Arial, sans-serif" font-size="22" font-weight="700" letter-spacing="5">CREATIVE / CONFIDENT / PLAYFUL</text>
-  <text x="105" y="258" fill="#111111" font-family="Arial Black, Arial, sans-serif" font-size="68" font-weight="900">MAKE IT LAND</text>
-  <text x="105" y="318" fill="#111111" font-family="Arial Black, Arial, sans-serif" font-size="68" font-weight="900">WITH STYLE</text>
-  <text x="105" y="370" fill="#6b6b6b" font-family="Arial, sans-serif" font-size="20" font-weight="700" letter-spacing="2">CREAM PAPER CANVAS WITH CONFIDENT MULTI-COLOR (GREEN, PIN...</text>
-  <text x="640" y="286" fill="#1e2bfa" font-family="Arial Black, Arial, sans-serif" font-size="74" font-weight="900">01</text>
-  <text x="640" y="340" fill="#111111" font-family="Arial, sans-serif" font-size="22" font-weight="700">Inter</text>
-  <text x="640" y="374" fill="#6b6b6b" font-family="Arial, sans-serif" font-size="18">grid-led composition</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" role="img" aria-label="Creative Mode title slide preview" data-template-slug="creative-mode" data-preview-family="creative" data-contract-hash="8eb499963e2e1ad1fb0de1dad33be5c5fd7697aea6af5c3fb70f65d2163071fd" data-display-font="Archivo Black" data-body-font="Space Grotesk">
+<title>Creative Mode title slide preview</title>
+<rect width="960" height="540" fill="#EFE9D9"/><rect x="58" y="54" width="548" height="330" fill="#E4DCC4" stroke="#0F0F0F" stroke-width="4"/><rect x="76" y="72" width="548" height="330" fill="#1F8A4C" stroke="#0F0F0F" stroke-width="4"/><rect x="654" y="54" width="250" height="180" fill="#F06CA8" stroke="#0F0F0F" stroke-width="4"/><rect x="654" y="254" width="250" height="194" fill="#EFE9D9" stroke="#0F0F0F" stroke-width="4"/><text x="106" y="116" fill="#0F0F0F" font-family="JetBrains Mono,Noto Sans SC,monospace" font-size="15" letter-spacing="2" >CREATIVE MODE / ON</text><text x="106" y="232" fill="#0F0F0F" font-family="Archivo Black,Noto Sans SC,sans-serif" font-size="70" font-weight="800" letter-spacing="-2" ><tspan x="106" dy="0">AGENT</tspan><tspan x="106" dy="63">SKILLS</tspan></text><text x="106" y="350" fill="#0F0F0F" font-family="Space Grotesk" font-size="20">MAKE · TEST · REFINE</text>
 </svg>

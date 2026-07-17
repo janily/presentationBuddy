@@ -1,24 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" role="img" aria-label="People&#39;s Platform (Block &amp; Bold)">
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="#fdfae7"/>
-      <stop offset="1" stop-color="#ffffff"/>
-    </linearGradient>
-    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
-      <path d="M48 0H0V48" fill="none" stroke="#00000018" stroke-width="1"/>
-    </pattern>
-  </defs>
-  <rect width="960" height="540" fill="url(#bg)"/>
-  <rect width="960" height="540" fill="url(#grid)" opacity=".75"/>
-  <circle cx="820" cy="92" r="92" fill="#1e2bfa" opacity=".9"/>
-  <rect x="620" y="208" width="260" height="210" fill="#1e2bfa" opacity=".18" stroke="#1e2bfa" stroke-width="4"/>
-  <rect x="78" y="74" width="520" height="334" fill="#ffffffb8" stroke="#1e2bfa" stroke-width="4"/>
-  <path d="M92 96H218M92 388H316M576 96V214" stroke="#1e2bfa" stroke-width="8" stroke-linecap="square"/>
-  <text x="105" y="145" fill="#1e2bfa" font-family="Arial, sans-serif" font-size="22" font-weight="700" letter-spacing="5">ACTIVIST / LOUD / GRAPHIC</text>
-  <text x="105" y="258" fill="#111111" font-family="Arial Black, Arial, sans-serif" font-size="68" font-weight="900">MAKE IT LAND</text>
-  <text x="105" y="318" fill="#111111" font-family="Arial Black, Arial, sans-serif" font-size="68" font-weight="900">WITH STYLE</text>
-  <text x="105" y="370" fill="#6b6b6b" font-family="Arial, sans-serif" font-size="20" font-weight="700" letter-spacing="2">ACTIVIST POSTER ENERGY: BLUE, ORANGE, RED ON CREAM, WITH ...</text>
-  <text x="640" y="286" fill="#1e2bfa" font-family="Arial Black, Arial, sans-serif" font-size="74" font-weight="900">01</text>
-  <text x="640" y="340" fill="#111111" font-family="Arial, sans-serif" font-size="22" font-weight="700">Inter</text>
-  <text x="640" y="374" fill="#6b6b6b" font-family="Arial, sans-serif" font-size="18">grid-led composition</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" role="img" aria-label="People&apos;s Platform (Block &amp; Bold) title slide preview" data-template-slug="peoples-platform" data-preview-family="platform" data-contract-hash="87f8eb3b2b0611298c285082bb125ce382cf82456cb543350ca900fd102f85e9" data-display-font="Alfa Slab One" data-body-font="Archivo Narrow">
+<title>People&apos;s Platform (Block &amp; Bold) title slide preview</title>
+<rect width="960" height="540" fill="#F5F2EA"/><rect x="42" y="42" width="876" height="456" fill="#2C2CDC" stroke="#0E0E14" stroke-width="6"/><rect x="62" y="62" width="360" height="116" fill="#F2A03A" stroke="#0E0E14" stroke-width="6"/><text x="86" y="112" fill="#0E0E14" font-family="DM Mono,Noto Sans SC,monospace" font-size="15" letter-spacing="2" >PEOPLE / PLATFORM 01</text><text x="86" y="286" fill="#F5F2EA" font-family="Alfa Slab One,Noto Sans SC,sans-serif" font-size="80" font-weight="800" letter-spacing="-2" style="paint-order:stroke;stroke:${secondary};stroke-width:10px"><tspan x="86" dy="0">BUILD</tspan><tspan x="86" dy="72">TOGETHER</tspan></text><rect x="646" y="220" width="220" height="220" fill="#F2A03A" stroke="#0E0E14" stroke-width="6"/><text x="756" y="350" text-anchor="middle" fill="#0E0E14" font-family="Alfa Slab One" font-size="72">01</text>
 </svg>

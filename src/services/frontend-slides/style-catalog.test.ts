@@ -3,6 +3,8 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { discoverFrontendSlideStyles, getFrontendSlideStyle, listFrontendSlideStyles } from "./style-catalog";
 import { getBoldPreviewFamily } from "./bold-template-preview";
+import boldTemplateContracts from "./bold-template-contracts.generated.json";
+import presetStyleContracts from "./preset-style-contracts.generated.json";
 
 describe("frontend-slides style catalog", () => {
   it("returns three distinct local static image previews for a technical tutorial", () => {
@@ -37,7 +39,7 @@ describe("frontend-slides style catalog", () => {
 
   it("uses the Studio design recipe typography in the selectable style contract", () => {
     expect(getFrontendSlideStyle("bold-template-studio")).toMatchObject({
-      typography: { display: "Barlow", body: "IBM Plex Mono" },
+      typography: { display: "Barlow", body: "Barlow" },
       palette: {
         background: "#1C1C1C",
         text: "#F5D200",
@@ -56,6 +58,62 @@ describe("frontend-slides style catalog", () => {
     }
   });
 
+  it("keeps every generated bold-template cover aligned with the runtime style contract", () => {
+    expect(boldTemplateContracts.contracts).toHaveLength(34);
+
+    for (const contract of boldTemplateContracts.contracts) {
+      const style = getFrontendSlideStyle(`bold-template-${contract.slug}`);
+      const preview = readFileSync(
+        path.join(process.cwd(), "public", "style-previews", `bold-template-${contract.slug}.svg`),
+        "utf8",
+      );
+
+      expect(style).toMatchObject({
+        name: contract.name,
+        layout: contract.layout,
+        typography: contract.typography,
+        palette: contract.palette,
+        signatureElements: contract.signatureElements,
+      });
+      expect(preview).toContain(`data-template-slug="${contract.slug}"`);
+      expect(preview).toContain(`data-contract-hash="${contract.sourceHash}"`);
+      expect(preview).toContain(`data-display-font="${contract.typography.display}"`);
+      expect(preview).toContain(contract.palette.background);
+      expect(preview).not.toContain("MAKE IT LAND");
+      expect(preview).not.toContain("WITH STYLE");
+      expect(preview).not.toContain('font-family="Arial Black');
+    }
+  });
+
+  it("keeps every preset/custom cover aligned with the selectable style contract", () => {
+    expect(presetStyleContracts.contracts).toHaveLength(13);
+
+    for (const contract of presetStyleContracts.contracts) {
+      const style = getFrontendSlideStyle(contract.id);
+      const preview = readFileSync(
+        path.join(process.cwd(), "public", "style-previews", `${contract.id}.svg`),
+        "utf8",
+      );
+
+      expect(style).toMatchObject({
+        id: contract.id,
+        name: contract.name,
+        source: contract.source,
+        vibe: contract.vibe,
+        layout: contract.layout,
+        typography: contract.typography,
+        palette: contract.palette,
+        signatureElements: contract.signatureElements,
+      });
+      expect(preview).toContain(`data-style-id="${contract.id}"`);
+      expect(preview).toContain(`data-preview-family="${contract.family}"`);
+      expect(preview).toContain(`data-contract-hash="${contract.sourceHash}"`);
+      expect(preview).toContain(`data-display-font="${contract.typography.display}"`);
+      expect(preview).toContain(contract.palette.background);
+      expect(preview).toContain(contract.palette.accent);
+    }
+  });
+
   it("keeps the Neo-Grid Bold preview promise aligned with its final design recipe", () => {
     const style = getFrontendSlideStyle("bold-template-neo-grid-bold");
     const previewPath = path.join(process.cwd(), "public", "style-previews", "bold-template-neo-grid-bold.svg");
@@ -69,14 +127,14 @@ describe("frontend-slides style catalog", () => {
         text: "#0A0A0A",
         accent: "#E6FF3D",
       },
-      layout: expect.stringContaining("12-column by 8-row"),
-      signatureElements: expect.arrayContaining([
-        "dense 12-column by 8-row panel grid",
-        "square blockmarks and persistent page-number tags",
-      ]),
+      layout: expect.stringContaining("12-column × 8-row"),
     });
+    expect(style?.signatureElements.join(" ")).toContain("12-column × 8-row");
+    expect(style?.signatureElements.join(" ")).toContain("page number");
     expect(getBoldPreviewFamily("neo-grid-bold")).toBe("modular");
     expect(preview).toContain('data-template-slug="neo-grid-bold"');
+    expect(preview).toContain('data-grid="12x8"');
+    expect(preview).toContain("01 / 10");
     expect(preview).toContain("#E6FF3D");
     expect(preview).toContain("#0A0A0A");
     expect(preview).toContain("Space Grotesk");

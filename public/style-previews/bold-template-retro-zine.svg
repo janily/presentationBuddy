@@ -1,24 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" role="img" aria-label="Retro Zine">
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="#fdfae7"/>
-      <stop offset="1" stop-color="#ffffff"/>
-    </linearGradient>
-    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
-      <path d="M48 0H0V48" fill="none" stroke="#00000018" stroke-width="1"/>
-    </pattern>
-  </defs>
-  <rect width="960" height="540" fill="url(#bg)"/>
-  <rect width="960" height="540" fill="url(#grid)" opacity=".75"/>
-  <circle cx="820" cy="92" r="92" fill="#1e2bfa" opacity=".9"/>
-  <rect x="620" y="208" width="260" height="210" fill="#1e2bfa" opacity=".18" stroke="#1e2bfa" stroke-width="4"/>
-  <rect x="78" y="74" width="520" height="334" fill="#ffffffb8" stroke="#1e2bfa" stroke-width="4"/>
-  <path d="M92 96H218M92 388H316M576 96V214" stroke="#1e2bfa" stroke-width="8" stroke-linecap="square"/>
-  <text x="105" y="145" fill="#1e2bfa" font-family="Arial, sans-serif" font-size="22" font-weight="700" letter-spacing="5">CRAFTED / LO-FI / UNDERGROUND</text>
-  <text x="105" y="258" fill="#111111" font-family="Arial Black, Arial, sans-serif" font-size="68" font-weight="900">MAKE IT LAND</text>
-  <text x="105" y="318" fill="#111111" font-family="Arial Black, Arial, sans-serif" font-size="68" font-weight="900">WITH STYLE</text>
-  <text x="105" y="370" fill="#6b6b6b" font-family="Arial, sans-serif" font-size="20" font-weight="700" letter-spacing="2">BEIGE PAPER WITH GREEN ACCENT AND BEBAS NEUE + CAVEAT: A ...</text>
-  <text x="640" y="286" fill="#1e2bfa" font-family="Arial Black, Arial, sans-serif" font-size="74" font-weight="900">01</text>
-  <text x="640" y="340" fill="#111111" font-family="Arial, sans-serif" font-size="22" font-weight="700">Fraunces</text>
-  <text x="640" y="374" fill="#6b6b6b" font-family="Arial, sans-serif" font-size="18">editorial type hierarchy</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" role="img" aria-label="Retro Zine title slide preview" data-template-slug="retro-zine" data-preview-family="zine" data-contract-hash="99a3bbde328e072586ebaf31bc9af41859b46e3edc2793d464bd99efbde8b194" data-display-font="Bebas Neue" data-body-font="Space Grotesk">
+<title>Retro Zine title slide preview</title>
+<defs><pattern id="grain" width="10" height="10" patternUnits="userSpaceOnUse"><circle cx="2" cy="3" r="1" fill="#1A1A1A" fill-opacity=".11"/><circle cx="8" cy="7" r="1" fill="#008F4D" fill-opacity=".13"/></pattern></defs><rect width="960" height="540" fill="#C8B99A"/><rect width="960" height="540" fill="url(#grain)"/><rect x="72" y="56" width="548" height="380" fill="#008F4D" stroke="#1A1A1A" stroke-width="3"/><rect x="86" y="70" width="548" height="380" fill="#F4EFE6" stroke="#1A1A1A" stroke-width="3" transform="rotate(-2 360 260)"/><text x="116" y="116" fill="#008F4D" font-family="Caveat,Noto Sans SC,monospace" font-size="15" letter-spacing="2" >ISSUE 01 / ZINE</text><text x="112" y="250" fill="#1A1A1A" font-family="Bebas Neue,Noto Sans SC,sans-serif" font-size="80" font-weight="800" letter-spacing="-2" ><tspan x="112" dy="0">AGENT</tspan><tspan x="112" dy="72">SKILLS</tspan></text><text x="680" y="124" fill="#1A1A1A" font-family="Space Grotesk" font-size="24">CUT</text><text x="680" y="164" fill="#008F4D" font-family="Space Grotesk" font-size="24">PASTE</text><text x="680" y="204" fill="#1A1A1A" font-family="Space Grotesk" font-size="24">SHIP</text>
 </svg>

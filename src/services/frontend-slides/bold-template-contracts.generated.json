@@ -1,0 +1,1093 @@
+{
+  "generatedFrom": "bold-template-pack/templates/*/{preview,design}.md",
+  "contracts": [
+    {
+      "slug": "8-bit-orbit",
+      "name": "8-Bit Orbit",
+      "family": "pixel",
+      "palette": {
+        "background": "#0A0E27",
+        "surface": "#0F1B3D",
+        "text": "#FFFFFF",
+        "accent": "#5EDCF4",
+        "secondary": "#F0A6CA"
+      },
+      "typography": {
+        "display": "Tektur",
+        "body": "Chakra Petch"
+      },
+      "fonts": {
+        "display": "Tektur",
+        "body": "Chakra Petch",
+        "label": "Space Mono"
+      },
+      "layout": "A retro-futuristic pixel-art presentation system that fuses 16-bit arcade nostalgia with editorial discipline. Display type runs in Tektur (a chunky geometric display face built on pixel-grid logic) paired with Chakra Petch for body and Space Mono for code-flavored labels and tabular data. The palette pivots on a deep cosmic navy (#0F1B3D / #0A0E27) lit by three saturated neons — cyan, hot pink, and a high-key yellow — with a soft lavender pastel for warm reprieves. Depth is built from stacked hard offset shadows in 4px increments (the pixel unit), CRT scanlines, atmospheric grain, vignettes, and animated starfields. The effect sits between an arcade cabinet and a Tron-era boardroom — unmistakably digital, intentionally lo-fi, and engineered to feel as if it just booted up.",
+      "signatureElements": [
+        "Three-font stack: Tektur (display), Chakra Petch (body), Space Mono (HUD/labels) — never substitute, never mix outside their roles.",
+        "Navy ground (the canonical token / the canonical token) alternates with colored-grid surfaces (pink, cyan, lavender) — both carry the 40px etched grid.",
+        "Three neons (cyan, pink, yellow) reserved for display, stats, rules, and label fills — never for body text.",
+        "All measurements snap to the 4px pixel unit: borders 2-4px, shadow offsets 4px / 8px, corner brackets 24×24 with 4px stroke.",
+        "Stacked hard offset shadows are the system's depth language — never blurred, never colored on text shadows except in the yellow→navy cascade."
+      ],
+      "sourceHash": "0075b060459c63874c0a2878d5ed0ba53f48d02acbd7db9080f27f3b8f8ccf32",
+      "previewMd": "bold-template-pack/templates/8-bit-orbit/preview.md",
+      "designMd": "bold-template-pack/templates/8-bit-orbit/design.md"
+    },
+    {
+      "slug": "biennale-yellow",
+      "name": "Biennale Yellow",
+      "family": "solar",
+      "palette": {
+        "background": "#E9E5DB",
+        "surface": "#F8F39B",
+        "text": "#1B2566",
+        "accent": "#F1EE2E",
+        "secondary": "#E26B4A"
+      },
+      "typography": {
+        "display": "Instrument Serif",
+        "body": "Archivo"
+      },
+      "fonts": {
+        "display": "Instrument Serif",
+        "body": "Archivo",
+        "label": "JetBrains Mono"
+      },
+      "layout": "A literary-editorial presentation system in the visual register of an art biennale catalogue or quiet exhibition poster. The aesthetic is built on warm parchment grounds (#E9E5DB) flooded with soft solar yellow (#F1EE2E) radial blooms, set against a single deep indigo navy ink color. Display type is Instrument Serif — a contemporary high-contrast serif with tall ascenders and elegant italics — paired with Archivo for sans-serif chrome and JetBrains Mono for numerical and metadata callouts. No drop shadows, no rounded corners, no bordered cards: the only structural lines are hairline 1px rules in ink. The mood sits between a folded museum brochure, a slow-reading literary quarterly, and a Mediterranean exhibition poster — confident, atmospheric, and deeply restrained.",
+      "signatureElements": [
+        "Warm parchment ground (the canonical token) on every surface; never white, never gray.",
+        "Single ink color (the canonical token) for all text and all rules — no secondary text colors.",
+        "Solar yellow (the canonical token) deployed three ways: as a flooded panel, as a soft radial bloom, as a translucent geometric tile underprint.",
+        "Instrument Serif handles every display moment at scales from 40px to 720px+.",
+        "Archivo Bold uppercase + 0.16–0.32em tracking is the universal label voice."
+      ],
+      "sourceHash": "25b1159407e4bbea8ac1d5d1a25e17ffa86811950c5984d0cb5b027d56bcb048",
+      "previewMd": "bold-template-pack/templates/biennale-yellow/preview.md",
+      "designMd": "bold-template-pack/templates/biennale-yellow/design.md"
+    },
+    {
+      "slug": "block-frame",
+      "name": "BlockFrame",
+      "family": "block",
+      "palette": {
+        "background": "#FFFDF5",
+        "surface": "#FFFFFF",
+        "text": "#000000",
+        "accent": "#FE90E8",
+        "secondary": "#99E885"
+      },
+      "typography": {
+        "display": "Inter",
+        "body": "Inter"
+      },
+      "fonts": {
+        "display": "Inter",
+        "body": "Inter",
+        "label": "Space Grotesk"
+      },
+      "layout": "A maximalist neobrutalist presentation system built on 4px solid black borders, 8px hard offset shadows, and a high-key candy palette of five saturated pastels plus cream and off-white. Display type runs Inter at weight 800-900 in tight uppercase; secondary chrome uses Space Grotesk as a quasi-monospace label face. Tilted decorative shapes (rotated stars, rectangles, badges) puncture the borders and break the grid intentionally. Pastels are paired loudly: pink + blue + green + yellow + cream cycle through every region with deliberate juxtaposition. The aesthetic borrows from zine layout, 1990s-revival sticker books, and contemporary toy packaging — bold, joyful, slightly chaotic, never timid.",
+      "signatureElements": [
+        "4px solid black borders on primary cards, 3px on secondary chrome — never thinner.",
+        "8px hard offset shadows on primary cards, 4px on secondary chrome — solid black, zero blur.",
+        "Five-pastel palette (pink, blue, green, yellow, cream) plus black, white, off-white — cycled across surfaces.",
+        "Inter weight 800-900 uppercase with negative tracking is the display voice; Space Grotesk weight 600 uppercase with 0.08em tracking is the label voice.",
+        "Square corners everywhere except a single circular accent dot on stat cards."
+      ],
+      "sourceHash": "a9e231837440358be17b5617b881b610b55dbb2db7d5864c144ea83de8e0da5d",
+      "previewMd": "bold-template-pack/templates/block-frame/preview.md",
+      "designMd": "bold-template-pack/templates/block-frame/design.md"
+    },
+    {
+      "slug": "blue-professional",
+      "name": "Blue Professional",
+      "family": "corporate",
+      "palette": {
+        "background": "#FDFAE7",
+        "surface": "#FDFAE7",
+        "text": "#111111",
+        "accent": "#1E2BFA",
+        "secondary": "#6B6B6B"
+      },
+      "typography": {
+        "display": "Space Grotesk",
+        "body": "Inter"
+      },
+      "fonts": {
+        "display": "Space Grotesk",
+        "body": "Inter",
+        "label": "Space Grotesk"
+      },
+      "layout": "A restrained, consulting-grade presentation system on a warm cream canvas (#fdfae7) with a single saturated cobalt blue (#1e2bfa) as the only accent color. Display type runs Space Grotesk for headlines and numerical callouts; Inter handles body and chrome. Cards are soft-tinted cobalt at 4% opacity with 1.5px translucent borders and 10-14px rounded corners — quiet, never bordered in solid color. The aesthetic borrows from investment-research reports, McKinsey-grade quarterly briefings, and contemporary financial dashboards — measured, data-dense without feeling crowded, and unmistakably professional. The system is built for executive readability at distance, with strong typographic hierarchy and a single accent color carrying every emphasis moment.",
+      "signatureElements": [
+        "Warm cream ground (the canonical token) on every surface — never pure white, never gray.",
+        "Single saturated cobalt (the canonical token) as the only accent — used for every eyebrow, metric, CTA, chart fill, and progress indicator.",
+        "Space Grotesk (display + chrome) + Inter (body) — never substitute either.",
+        "Cards are 4% cobalt tints with 1.5px cobalt-at-20% borders and 10-14px rounded corners.",
+        "Soft pill-shaped chrome (the canonical token, the canonical token) with full 100px border-radius."
+      ],
+      "sourceHash": "6516acce32da55530b7ddd89969185720b04353640db8bd1d4241f02b2ad1ea6",
+      "previewMd": "bold-template-pack/templates/blue-professional/preview.md",
+      "designMd": "bold-template-pack/templates/blue-professional/design.md"
+    },
+    {
+      "slug": "bold-poster",
+      "name": "Bold Poster",
+      "family": "poster",
+      "palette": {
+        "background": "#FFFFFF",
+        "surface": "#1C1410",
+        "text": "#1C1410",
+        "accent": "#D8000F",
+        "secondary": "#F5F2EF"
+      },
+      "typography": {
+        "display": "Shrikhand",
+        "body": "Libre Baskerville"
+      },
+      "fonts": {
+        "display": "Shrikhand",
+        "body": "Libre Baskerville",
+        "label": "Space Grotesk"
+      },
+      "layout": "A populist editorial poster system that mashes vintage Italian sports-magazine display lettering with classical serif body and tight monospace metadata. The display face is Shrikhand — a heavy slab/script hybrid with playful italic personality — rendered at poster scale (often 200-320px) and routinely tilted off-axis. Body runs Libre Baskerville for a literary editorial register; Space Grotesk handles tiny uppercase labels and chrome. The palette is uncompromising: white canvas, deep brown-black ink (#1C1410), single saturated tomato red (#D8000F), and a warm off-white (#F5F2EF) for alternating panels. Borders are bold 1.5-3px ink rules; the only shadow is a single stacked offset behind red display text. The aesthetic is loud, confident, and unmistakably print-poster — closer to a 1970s European brand annual report or a wine merchant's catalogue than a contemporary slide deck.",
+      "signatureElements": [
+        "White (the canonical token) canvas alternating with off-white (the canonical token) panels for striping, plus dark (the canonical token) and red (the canonical token) full-bleed panel surfaces for statement moments.",
+        "Single tomato red (the canonical token) as the only accent — used for every numerical figure, every section rule, every label, every left-bar marker.",
+        "Three-face stack: Shrikhand (display + numerical), Libre Baskerville (body), Space Grotesk (mono labels + bullets + chrome).",
+        "Display Shrikhand is routinely tilted (-6° to +2°) — the rotation is the system's signature movement.",
+        "Heavy ink borders: 3px on tabular grid containers, 1.5-2px on cells, 4px red on editorial leftbar cards, 1px hairlines between bullet rows."
+      ],
+      "sourceHash": "f0370c7e0a9effe5fc3ee68b869037ca0939eb0c3178db3535dd8d635673b141",
+      "previewMd": "bold-template-pack/templates/bold-poster/preview.md",
+      "designMd": "bold-template-pack/templates/bold-poster/design.md"
+    },
+    {
+      "slug": "broadside",
+      "name": "Broadside",
+      "family": "broadside",
+      "palette": {
+        "background": "#111111",
+        "surface": "#E85D26",
+        "text": "#F0ECE5",
+        "accent": "#E85D26",
+        "secondary": "#888880"
+      },
+      "typography": {
+        "display": "Barlow",
+        "body": "Barlow"
+      },
+      "fonts": {
+        "display": "Barlow",
+        "body": "Barlow",
+        "label": "IBM Plex Mono"
+      },
+      "layout": "A protest-poster editorial system built on massive Barlow type and a single fire-orange environment color. The aesthetic is \"ink on fire\" — dark slides for documentation, orange slides for declaration. Display type is enormous (13vw, roughly 187px at 1440 width) in weight 900 lowercase, treating words as graphic elements rather than reading copy. The cultural reference is broadside printing, SPACE10 reports, and Wim Crouwel grids reinterpreted with one loud color and zero decoration.",
+      "signatureElements": [
+        "Massive Barlow display type at weight 900 in lowercase — never uppercase on display elements.",
+        "Two-register color system: dark slides with cream text, or orange slides with dark ink. No cream/white slides exist.",
+        "the canonical token is both accent (on dark) and environment (on orange) — never a secondary color, always *the* color.",
+        "Single-typeface system on Barlow + IBM Plex Mono for chrome only. No serif, no script, no third face.",
+        "1px hairline dividers (the canonical token on dark; rgba(17,17,17,0.2) on orange) provide all hierarchy structure."
+      ],
+      "sourceHash": "5c159bc7b4e82e055c02c260cba8fea2add327f718e80bf70f5af02a5fdf7a49",
+      "previewMd": "bold-template-pack/templates/broadside/preview.md",
+      "designMd": "bold-template-pack/templates/broadside/design.md"
+    },
+    {
+      "slug": "capsule",
+      "name": "Capsule",
+      "family": "capsule",
+      "palette": {
+        "background": "#F5F5F0",
+        "surface": "#FFFFFF",
+        "text": "#1A1A1A",
+        "accent": "#E85D4E",
+        "secondary": "#C5B5E0"
+      },
+      "typography": {
+        "display": "Bodoni Moda",
+        "body": "Space Grotesk"
+      },
+      "fonts": {
+        "display": "Bodoni Moda",
+        "body": "Space Grotesk",
+        "label": "Space Grotesk"
+      },
+      "layout": "A playful editorial system built on pill-shaped containers, a sun-bleached cream canvas, and a nine-color candy palette. Bodoni Moda serif headlines pair with Space Grotesk body to suggest a literary magazine that took a holiday at a 1970s ice-cream parlor. Every container that holds text is a pill (border-radius 9999px) outlined with a 2px ink stroke, casting a soft 6–12px offset shadow. The aesthetic is \"Memphis-meets-editorial\" — confident typography, generous bordered shapes, and decorative floating pills as atmospheric wallpaper.",
+      "signatureElements": [
+        "Universal pill geometry — border-radius: 9999px for small containers, 2rem for larger cards/frames.",
+        "2px solid the canonical token stroke wraps every pill, icon, and card.",
+        "Bodoni Moda serif for every display/headline/stat; Space Grotesk sans for every body/label/pill text.",
+        "Sun-bleached cream canvas the canonical token with soft radial glows in candy accent colors at 6–15% opacity for background atmosphere.",
+        "Hard-offset shadows in low-opacity ink (the canonical token) at 4/6/8/12px offsets, always solid, always bottom-right."
+      ],
+      "sourceHash": "1982452fd42da31daf7494a24dc3ed332cc2041b3b5402686bc586a4f272d71f",
+      "previewMd": "bold-template-pack/templates/capsule/preview.md",
+      "designMd": "bold-template-pack/templates/capsule/design.md"
+    },
+    {
+      "slug": "cartesian",
+      "name": "Cartesian",
+      "family": "cartesian",
+      "palette": {
+        "background": "#EDE8E0",
+        "surface": "#E2DBD1",
+        "text": "#1A1A1A",
+        "accent": "#8A8178",
+        "secondary": "#5A5A5A"
+      },
+      "typography": {
+        "display": "Playfair Display",
+        "body": "Inter"
+      },
+      "fonts": {
+        "display": "Playfair Display",
+        "body": "Inter",
+        "label": "Inter"
+      },
+      "layout": "A quiet, museum-catalog editorial system built on Playfair Display serif headlines, Inter sans body, and a five-tone warm-stone palette. The aesthetic is \"consulting deck meets architectural monograph\" — minimal geometric line decorations (thin circles, dashed arcs, vertical and horizontal hairlines) drift behind content, suggesting drafting paper and compass work. Every divider is a single 1px line in a muted taupe; nothing is bold, nothing is loud. The cultural reference is Massimo Vignelli's editorial work, the Cooper Hewitt catalog, and pencil-and-tracing-paper urban planning documents.",
+      "signatureElements": [
+        "Warm sandstone canvas the canonical token with single 1px taupe the canonical token dividers as the universal structural element.",
+        "Playfair Display serif at weight 400 for every headline/numeral/quote-mark; Inter sans for every body/label/attribution.",
+        "Five-tone monochrome palette: two stones, two grays, one ink. No vivid accent colors anywhere.",
+        "Decorative geometric rings (thin solid + dashed circles, 20–50% opacity) drift behind content as compass-drafted atmosphere.",
+        "Every label, attribution, and micro-text is uppercase Inter with 2–3px letter-spacing."
+      ],
+      "sourceHash": "3592c862132588aeeb660ee4cff30cd90fd419e01ddde49c1b6a7f1b90137cee",
+      "previewMd": "bold-template-pack/templates/cartesian/preview.md",
+      "designMd": "bold-template-pack/templates/cartesian/design.md"
+    },
+    {
+      "slug": "cobalt-grid",
+      "name": "Cobalt Grid",
+      "family": "blueprint",
+      "palette": {
+        "background": "#F0EBDE",
+        "surface": "#E6E0CE",
+        "text": "#1F2BE0",
+        "accent": "#1F2BE0",
+        "secondary": "#5560E5"
+      },
+      "typography": {
+        "display": "Newsreader",
+        "body": "Hanken Grotesk"
+      },
+      "fonts": {
+        "display": "Newsreader",
+        "body": "Hanken Grotesk",
+        "label": "DM Mono"
+      },
+      "layout": "A Japanese-magazine trend-report system built on warm cream paper, electric cobalt ink, and a graph-paper grid that lives permanently behind every slide. Newsreader serif headlines tower at 18vh while DM Mono carries chrome and ticker text. The signature decoration is a pixel-glitch column — vertical scanlines stair-stepped down the right edge of declarative slides — paired with QR-style 8×8 grid patches. The cultural reference is WIRED Japan, Shift magazine, and architectural trend reports printed in two-color risograph: cream + one cobalt.",
+      "signatureElements": [
+        "The 1.5px cobalt hairline frame (top and bottom of every slide).",
+        "1.5px cobalt topbar rule under section headers.",
+        "1px faint-cobalt row dividers between table or index entries.",
+        "The 10%-opacity graph paper grid behind everything.",
+        "The pixel-glitch and QR-block decorative SVG patches as compositional accents."
+      ],
+      "sourceHash": "68d6429144ae274748b7cb8fa999a5fe4d2ad4cb62a9ccc6013c8964c252a28b",
+      "previewMd": "bold-template-pack/templates/cobalt-grid/preview.md",
+      "designMd": "bold-template-pack/templates/cobalt-grid/design.md"
+    },
+    {
+      "slug": "coral",
+      "name": "Coral",
+      "family": "split",
+      "palette": {
+        "background": "#F5F0E8",
+        "surface": "#E85D5D",
+        "text": "#1A1A1A",
+        "accent": "#D44A4A",
+        "secondary": "#FFFFFF"
+      },
+      "typography": {
+        "display": "Bebas Neue",
+        "body": "Inter"
+      },
+      "fonts": {
+        "display": "Bebas Neue",
+        "body": "Inter",
+        "label": "Inter"
+      },
+      "layout": "A bold magazine-poster system that runs on three surface registers — coral fire, ink black, and warm cream — animated by Bebas Neue display caps and a constant 45° diagonal hatch pattern. Inter handles body copy; Bebas Neue handles every headline, stat, title, and meta-figure at heavy letter-spacing. The cultural reference is mid-century travel posters, Saul Bass film titles, and modern editorial sport magazines: solid color planes meeting at hard edges, oversized condensed caps as architectural elements, and a single coral hue used both as accent and as full-slide environment.",
+      "signatureElements": [
+        "Solid color region splits — coral / ink / cream regions meeting at hard edges.",
+        "Accent borders — 4px coral left, 5px coral top, 3px ink top, 4px ink horizontal.",
+        "45° diagonal hatch — a signature 6%-opacity black diagonal repeating pattern overlaid on coral regions, providing texture.",
+        "Oversized decorative typography — background numerals at 12% opacity, giant quote marks at 35% opacity, sitting behind or beside primary content.",
+        "Three-surface system: the canonical token (fire), the canonical token (ink), the canonical token (paper) — used as solid regions meeting at hard edges."
+      ],
+      "sourceHash": "c223dd9d5601010b584015867962c56198d6e906d3b2b7d4a988a0abbe33b3d9",
+      "previewMd": "bold-template-pack/templates/coral/preview.md",
+      "designMd": "bold-template-pack/templates/coral/design.md"
+    },
+    {
+      "slug": "creative-mode",
+      "name": "Creative Mode",
+      "family": "creative",
+      "palette": {
+        "background": "#EFE9D9",
+        "surface": "#E4DCC4",
+        "text": "#0F0F0F",
+        "accent": "#1F8A4C",
+        "secondary": "#F06CA8"
+      },
+      "typography": {
+        "display": "Archivo Black",
+        "body": "Space Grotesk"
+      },
+      "fonts": {
+        "display": "Archivo Black",
+        "body": "Space Grotesk",
+        "label": "JetBrains Mono"
+      },
+      "layout": "A neo-brutalist editorial presentation system built for 1920x1080 slides. The deck anchors on a warm cream canvas with heavy 4px ink borders, hard offset drop-shadows, and a bold four-color accent palette (forest green, hot pink, burnt orange, sunshine yellow). Display headlines run Archivo Black in pure uppercase — aggressive, loud, zero letter-spacing softness. Monospace labels in JetBrains Mono echo a typesetting rule-sheet. Body copy sits in Space Grotesk. Every slide uses flat color-blocking with no gradients, no rounded cards, and no subtlety. The aesthetic is part Bauhaus grid, part punk zine, part Swiss editorial.",
+      "signatureElements": [
+        "Cream canvas (the canonical token — #EFE9D9) as the universal background; green (the canonical token — #1F8A4C) used for the closing slide only.",
+        "4px solid ink borders on every structural element — cards, panels, table cells, chart axes.",
+        "Hard offset box-shadows in place of blurred drops: 24px 24px 0 color, 24px 24px 0 4px ink on featured blocks.",
+        "Archivo Black display type in uppercase with 0.92 line-height for extreme tightness.",
+        "Four accent colors used as flat fills; each slide uses two or three of the four, never all simultaneously."
+      ],
+      "sourceHash": "8eb499963e2e1ad1fb0de1dad33be5c5fd7697aea6af5c3fb70f65d2163071fd",
+      "previewMd": "bold-template-pack/templates/creative-mode/preview.md",
+      "designMd": "bold-template-pack/templates/creative-mode/design.md"
+    },
+    {
+      "slug": "daisy-days",
+      "name": "Daisy Days",
+      "family": "playful",
+      "palette": {
+        "background": "#F5F0E6",
+        "surface": "#FDE68A",
+        "text": "#2D2D2D",
+        "accent": "#7ECDC0",
+        "secondary": "#F7C8D4"
+      },
+      "typography": {
+        "display": "Fredoka One",
+        "body": "Quicksand"
+      },
+      "fonts": {
+        "display": "Fredoka One",
+        "body": "Quicksand",
+        "label": "Quicksand"
+      },
+      "layout": "A cheerful, childlike presentation system built around the chunky display face Fredoka One and the rounded humanist sans Quicksand. The palette is a sunny garden — cream canvas, turquoise, soft pink, butter yellow, mint, lavender, peach, sky blue, and a single coral accent — with charcoal-brown 2D outlines wrapping every shape. Hard offset shadows in dark charcoal, generous border-radius, and hand-drawn SVG decorations (daisies, stars, suns, clouds, rainbows) anchor the aesthetic somewhere between a children's storybook spread and a sticker-sheet kawaii zine.",
+      "signatureElements": [
+        "Cream (the canonical token) default canvas with rotating pastel surfaces — every slide may pick a different surface color.",
+        "Fredoka One for all headline / display / quote text; Quicksand 500/600 for all body and meta text.",
+        "Every shape and card carries a 3px solid charcoal outline (the canonical token) plus a hard offset shadow (the canonical token or the canonical token).",
+        "Generous border-radius: 20px on standard cards, 28px on featured cards, pill (the canonical token) on badges, full circle on dots and avatars.",
+        "Hand-drawn SVG ornaments (daisies, stars, suns, clouds, rainbows) cluster at corners and crop past slide edges as atmospheric layer."
+      ],
+      "sourceHash": "7c6901b259e1064ddc7065be385e3fd938c8b99967a4c8e597bd0fee2a61a7d3",
+      "previewMd": "bold-template-pack/templates/daisy-days/preview.md",
+      "designMd": "bold-template-pack/templates/daisy-days/design.md"
+    },
+    {
+      "slug": "editorial-forest",
+      "name": "Editorial Forest",
+      "family": "editorial",
+      "palette": {
+        "background": "#EFE7D4",
+        "surface": "#2E4A2A",
+        "text": "#1A1A17",
+        "accent": "#E89CB1",
+        "secondary": "#D27E96"
+      },
+      "typography": {
+        "display": "Source Serif 4",
+        "body": "Source Serif 4"
+      },
+      "fonts": {
+        "display": "Source Serif 4",
+        "body": "Source Serif 4",
+        "label": "JetBrains Mono"
+      },
+      "layout": "A serif-led editorial presentation system in the register of a literary quarterly or art-book monograph. Display type runs in Source Serif 4 at weight 500 with optical-size axis engaged, scaling up to 220px for cover and stat moments. The palette pairs a deep forest green (#2e4a2a) with a dusty rose pink (#e89cb1) over an oat-cream paper ground (#efe7d4), with JetBrains Mono as the editorial chrome (labels, captions, axis ticks). The aesthetic is closer to a Penguin classic, Apartamento spread, or quiet annual report than a tech keynote — confident, paper-feeling, and committed to a small color vocabulary.",
+      "signatureElements": [
+        "Three-color editorial palette: deep forest green, dusty rose pink, oat cream paper. Two surface tones per slide is typical; three is loud.",
+        "Source Serif 4 at weight 500 for every headline, body, and display moment. Optical-size axis engaged for size-aware letterforms.",
+        "JetBrains Mono at weight 500 uppercase with wide tracking (0.14em–0.18em) for every label, caption, axis tick, and footline.",
+        "Display type scales to 220px for cover and stat-figure moments; 96px for primary headlines; 56–84px for card titles.",
+        "2px hairline rules separate stacked sections — never thicker, never colored beyond region context."
+      ],
+      "sourceHash": "eb15a2406565a436803d784c4c62b008ece3774df386cff0b3c8c79b905a11de",
+      "previewMd": "bold-template-pack/templates/editorial-forest/preview.md",
+      "designMd": "bold-template-pack/templates/editorial-forest/design.md"
+    },
+    {
+      "slug": "editorial-tri-tone",
+      "name": "Editorial Tri-Tone",
+      "family": "tritone",
+      "palette": {
+        "background": "#F2B6C6",
+        "surface": "#F2D86A",
+        "text": "#7A1F35",
+        "accent": "#7A1F35",
+        "secondary": "#F2D86A"
+      },
+      "typography": {
+        "display": "Bricolage Grotesque",
+        "body": "Bricolage Grotesque"
+      },
+      "fonts": {
+        "display": "Bricolage Grotesque",
+        "body": "Bricolage Grotesque",
+        "label": "JetBrains Mono"
+      },
+      "layout": "A literary magazine-meets-annual-report presentation system built on a strict three-color palette — blush pink, golden butter, and deep burgundy wine. Despite having eleven CSS variable names, only three hex values exist in the entire system; every alias is a semantic rename of one of those three. Headlines run Bricolage Grotesque (a variable grotesque with an optical-size axis) at extreme weights and negative letter-spacing. Instrument Serif (italic-cut only) appears as the expressive accent face for chapter numerals, pull-quotes, years, and signatures. JetBrains Mono carries all metadata, labels, and section markers at tight uppercase tracking. The aesthetic is \"independent arts publication\" — the kind with a colophon, hand-numbered editions, and an editorial desk.",
+      "signatureElements": [
+        "Three-color palette with semantic aliases: blush pink (#F2B6C6), golden butter (#F2D86A), deep burgundy (#7A1F35).",
+        "Mixed typography: Bricolage Grotesque grotesque for display and body; Instrument Serif for expressive accent numerals, quotes, and years; JetBrains Mono for all labels.",
+        "The em tag within Bricolage Grotesque headlines always triggers a switch to Instrument Serif italic — the system's primary typographic mix.",
+        "Pills (border-radius 999px) are the universal tag component; used at three different sizes across cover, chart legend, and closer.",
+        "Value cards have a generous 28px border-radius — soft, rounded, not brutalist."
+      ],
+      "sourceHash": "a563bca014d1cbdbb640d1d77435cb8230378c0face1b145395c9a544c441ff6",
+      "previewMd": "bold-template-pack/templates/editorial-tri-tone/preview.md",
+      "designMd": "bold-template-pack/templates/editorial-tri-tone/design.md"
+    },
+    {
+      "slug": "emerald-editorial",
+      "name": "Emerald Editorial",
+      "family": "emerald",
+      "palette": {
+        "background": "#3CD896",
+        "surface": "#F1E9D6",
+        "text": "#0F1A5C",
+        "accent": "#0F1A5C",
+        "secondary": "#F1E9D6"
+      },
+      "typography": {
+        "display": "Bodoni Moda",
+        "body": "Manrope"
+      },
+      "fonts": {
+        "display": "Bodoni Moda",
+        "body": "Manrope",
+        "label": "Manrope"
+      },
+      "layout": "A bold display-serif editorial system in the register of a fashion masthead or vintage magazine cover. Bodoni Moda runs at weight 900 across a wide scale (44–460px), set against a saturated emerald-green canvas with deep navy ink and oat-paper accents. The signature treatment is a stacked double-rule ornament that brackets centered display words like a 19th-century theatrical playbill. The aesthetic borrows from Harper's Bazaar / Vogue / Wallpaper covers: confident, theatrical, paper-and-ink committed, with a tight three-color palette and zero gradients or shadows.",
+      "signatureElements": [
+        "Bodoni Moda at weight 900 for every display moment; Manrope at weight 500/700/800 for every body and label moment.",
+        "Saturated emerald canvas (the canonical token) with deep navy ink (the canonical token) text and inverse panels.",
+        "Double-rule ornament with centered serif word is the signature decorative device.",
+        "4px ink horizontal rules separate every stacked section, every list row, every chart border. The 4px weight is the system's default rule.",
+        "No corner radius anywhere. Every shape is a strict rectangle, except for the round logo/typographic glyphs themselves."
+      ],
+      "sourceHash": "2e1a6d8719ce9a57dcf1d1ebc77d73e2c5b4cc3fa40b2aa8f7b77221b06cfa2f",
+      "previewMd": "bold-template-pack/templates/emerald-editorial/preview.md",
+      "designMd": "bold-template-pack/templates/emerald-editorial/design.md"
+    },
+    {
+      "slug": "grove",
+      "name": "Grove",
+      "family": "grove",
+      "palette": {
+        "background": "#192B1B",
+        "surface": "#E8E4D6",
+        "text": "#D4CFBF",
+        "accent": "#C8524A",
+        "secondary": "#DEDAD0"
+      },
+      "typography": {
+        "display": "Playfair Display",
+        "body": "Jost"
+      },
+      "fonts": {
+        "display": "Playfair Display",
+        "body": "Jost",
+        "label": "JetBrains Mono"
+      },
+      "layout": "A quiet, editorial-serif presentation system in the register of a well-bound monograph or boutique brand book. Playfair Display at weight 400 (never bold) carries every headline, italicized in terracotta coral for accent emphasis as the signature move. Jost weight 300 carries every paragraph as the \"good paper\" body face. JetBrains Mono at weight 300 holds labels, kickers, and the thin chrome bars. The palette pairs a deep forest green canvas (#192b1b) with warm cream text (#d4cfbf) and a single terracotta coral accent (#c8524a). Generous negative space, hairline 1px borders, and a near-invisible serif watermark numeral give it the calm authority of a literary journal.",
+      "signatureElements": [
+        "Playfair Display at weight 400 carries every headline, every quote, every stat figure, and every watermark numeral. Bold serif is not permitted — the no-bold rule is the system's most important typographic commitment. Italicized Playfair in the canonical token co...",
+        "Jost at weight 300 carries every paragraph and bullet body. The light weight is the \"good paper\" feel — it sits back and lets the serif lead.",
+        "JetBrains Mono at weight 300 carries every label, kicker, footline, slide counter, and stat caption. Always uppercase, always with at least 0.12em letter-spacing.",
+        "Noto Serif SC / Noto Sans SC at weight 300–500 are loaded as Chinese fallbacks for every role. The deck is built bilingually-aware — Chinese characters render through the Noto cuts when present in the content.",
+        "Playfair Display at weight 400 — never bold — for every serif moment. Italic in the canonical token is the headline accent."
+      ],
+      "sourceHash": "c7743b986c611d9002852f39267465855d446d1566b9462665b1a600eab1e6b7",
+      "previewMd": "bold-template-pack/templates/grove/preview.md",
+      "designMd": "bold-template-pack/templates/grove/design.md"
+    },
+    {
+      "slug": "long-table",
+      "name": "Long Table",
+      "family": "table",
+      "palette": {
+        "background": "#FAF1E2",
+        "surface": "#F2E5CF",
+        "text": "#8E2D1F",
+        "accent": "#B53D2A",
+        "secondary": "#E8D7B6"
+      },
+      "typography": {
+        "display": "Bricolage Grotesque",
+        "body": "Fraunces"
+      },
+      "fonts": {
+        "display": "Bricolage Grotesque",
+        "body": "Fraunces",
+        "label": "Fraunces"
+      },
+      "layout": "A warm, single-ink editorial system in the register of a supper-club poster, a small-batch zine, or a Risograph-printed program. The entire system runs in one ink color — a warm rust terracotta (#B53D2A) — on a buttery cream paper ground (#FAF1E2), with a subtle 4px radial-dot texture overlay giving the surface its \"printed paper\" quality. Display type runs in Bricolage Grotesque at weight 700–800 in uppercase; body and metadata run in Fraunces serif at weight 400–600 with optical-size axis engaged. Pill buttons, outlined edition badges, italic-edition numerals, and dashed/solid 1.5px borders complete the printed-program vocabulary.",
+      "signatureElements": [
+        "Bricolage Grotesque at weights 700 and 800 in strict uppercase carries every display moment — covers, headlines, card titles, course names, quote bodies, info values, who-tags. Bricolage is a wide, slightly-condensed grotesque with strong personality; its upp...",
+        "Fraunces at weight 400–600 carries every body paragraph, every metadata field, every pill, every page number, every edition label. Italic Fraunces is the default body style — the slanted serif is the system's body voice, lending warmth and editorial personali...",
+        "One ink color (the canonical token — warm rust terracotta) on cream paper (the canonical token). Opacity variants are the only color variation.",
+        "Bricolage Grotesque weight 700–800 uppercase for every display moment; Fraunces 400–600 italic-default for every body and metadata moment.",
+        "Subtle 4px radial-dot paper texture on every slide via .stage::before — invisible at distance, present up close."
+      ],
+      "sourceHash": "ba724627e6d6c7ad1b2ee369bb55005a0cdfe92be6fd7c48f83274144cd35729",
+      "previewMd": "bold-template-pack/templates/long-table/preview.md",
+      "designMd": "bold-template-pack/templates/long-table/design.md"
+    },
+    {
+      "slug": "mat",
+      "name": "Mat",
+      "family": "mat",
+      "palette": {
+        "background": "#232E26",
+        "surface": "#EDE6D0",
+        "text": "#F0E8D2",
+        "accent": "#C07030",
+        "secondary": "#7A4E24"
+      },
+      "typography": {
+        "display": "Bricolage Grotesque",
+        "body": "DM Sans"
+      },
+      "fonts": {
+        "display": "Bricolage Grotesque",
+        "body": "DM Sans",
+        "label": "DM Mono"
+      },
+      "layout": "A warm, material-tactile presentation system inspired by a high-end product landing page. Dark forest green is the dominant environment, warmed by a low atmospheric wood-brown glow from the bottom-right corner of every dark slide. Cream type floats directly on the field; warm orange acts as the single accent. The typeface stack pairs Bricolage Grotesque (a heavy, rounded grotesque) for display with DM Sans for body and DM Mono for labels — the result reads as industrial-design portfolio meets boutique product launch, never tech demo.",
+      "signatureElements": [
+        "Dark forest green canvas (the canonical token) with a warm wood-brown radial glow (the canonical token) anchored to the bottom-right corner of every dark slide.",
+        "Cream text (the canonical token) floats directly on the green field with no card, panel, or frame around it.",
+        "Bricolage Grotesque display type is always mixed case — never uppercase. Uppercase is reserved for DM Mono labels.",
+        "A single accent color, warm orange (the canonical token), used only as small inline emphasis (kicker, bullet marker, inline <em>, quote glyph, one chart bar).",
+        "The cream info-card (the canonical token) is the signature material-contrast component — a warm paper rectangle inset on the dark field."
+      ],
+      "sourceHash": "bcb350947fc036bcd6c71ec9be632f3b46adb08f9e115dd1860423fa6a9ddf0a",
+      "previewMd": "bold-template-pack/templates/mat/preview.md",
+      "designMd": "bold-template-pack/templates/mat/design.md"
+    },
+    {
+      "slug": "monochrome",
+      "name": "Monochrome",
+      "family": "monochrome",
+      "palette": {
+        "background": "#FAFADF",
+        "surface": "#F5F0E4",
+        "text": "#1A1A16",
+        "accent": "#1A1A16",
+        "secondary": "#8A8A80"
+      },
+      "typography": {
+        "display": "Jost",
+        "body": "Jost"
+      },
+      "fonts": {
+        "display": "Jost",
+        "body": "Jost",
+        "label": "JetBrains Mono"
+      },
+      "layout": "A literary editorial system rendered in black ink on cream paper. Ultra-light geometric sans (Jost at weight 200–300) carries every headline; Lora italic serif handles quote text and insight-card titles; JetBrains Mono provides the structural chrome. There are no chromatic accents — every color in the palette is a graphite or cream tone, and \"accent\" simply means \"darker ink.\" The aesthetic borrows from independent research reports, scholarly monographs, and the quietest end of contemporary editorial design — closer to a printed journal than a tech presentation.",
+      "signatureElements": [
+        "Cream paper background (the canonical token) on every slide — never white, never dark by default. The cream is the surface, not a stylistic choice.",
+        "Ultra-light Jost (weight 200 for display, weight 300 for body) is the dominant typographic voice.",
+        "Lora italic serif appears in two specific moments: pull-quote bodies and insight-card titles. Nowhere else.",
+        "JetBrains Mono uppercase with 0.12em+ tracking handles every structural label, chrome tag, axis, and bullet marker.",
+        "The system has no chromatic accent. The accent color is the canonical token — slightly darker ink."
+      ],
+      "sourceHash": "983350baf1b781fa19aeb28dc09e1dbb82e9e5a5abd68b445fb4b50c05947057",
+      "previewMd": "bold-template-pack/templates/monochrome/preview.md",
+      "designMd": "bold-template-pack/templates/monochrome/design.md"
+    },
+    {
+      "slug": "neo-grid-bold",
+      "name": "Neo-Grid Bold",
+      "family": "neo-grid",
+      "palette": {
+        "background": "#ECECE8",
+        "surface": "#F5F4EF",
+        "text": "#0A0A0A",
+        "accent": "#E6FF3D",
+        "secondary": "#8A8A85"
+      },
+      "typography": {
+        "display": "Space Grotesk",
+        "body": "Space Grotesk"
+      },
+      "fonts": {
+        "display": "Space Grotesk",
+        "body": "Space Grotesk",
+        "label": "JetBrains Mono"
+      },
+      "layout": "A heavy editorial poster system built on a strict 12-column × 8-row block grid with neon-yellow accents on putty-ecru. Space Grotesk at weight 700 in strict uppercase carries every display moment; JetBrains Mono carries every label and metadata tag. Each slide reads as a magazine spread divided into colored panels — paper-ecru, ink-black, and electric lemon-yellow trading roles across cells. The aesthetic borrows from contemporary editorial print, brutalist annual reports, and the populist-poster end of design week showcases.",
+      "signatureElements": [
+        "Universal 12-column × 8-row CSS grid (the canonical token) inset 40px from each slide edge, with 12px gaps between cells.",
+        "Three-color panel system: paper ecru (the canonical token) as default, ink black (the canonical token) for inverted blocks, accent lemon (the canonical token) for signal blocks.",
+        "Space Grotesk weight 700 uppercase with negative letter-spacing for every display element.",
+        "JetBrains Mono uppercase with 0.08–0.12em tracking for every label, page number, axis tag.",
+        "A signature corner-mark and blockmark — small 2×2 block stamps that act as decorative identity tags."
+      ],
+      "sourceHash": "3b7f8f202e695437ee1bb23b1c6ffd139229d0a8cc2ae1b5cc1f70a92615ceab",
+      "previewMd": "bold-template-pack/templates/neo-grid-bold/preview.md",
+      "designMd": "bold-template-pack/templates/neo-grid-bold/design.md"
+    },
+    {
+      "slug": "peoples-platform",
+      "name": "People's Platform (Block & Bold)",
+      "family": "platform",
+      "palette": {
+        "background": "#F5F2EA",
+        "surface": "#2C2CDC",
+        "text": "#0E0E14",
+        "accent": "#F2A03A",
+        "secondary": "#E83A2A"
+      },
+      "typography": {
+        "display": "Alfa Slab One",
+        "body": "Archivo Narrow"
+      },
+      "fonts": {
+        "display": "Alfa Slab One",
+        "body": "Archivo Narrow",
+        "label": "DM Mono"
+      },
+      "layout": "A WPA-poster-meets-political-campaign presentation system built on three typefaces and a five-color palette that reduces to three functional roles. Alfa Slab One — a compressed slab serif — does all the heavy lifting at extreme sizes in pure uppercase. Caveat Brush drops in as a handwritten human interrupt: lowercase, slightly rotated, emotionally warm. DM Mono carries all metadata at tight uppercase tracking. The palette is electric cobalt blue, amber orange, and hot red — with red functioning exclusively as a shadow/depth color, never as a surface fill. Every slide gets a paper grain overlay that makes the whole deck feel screen-printed. The aesthetic is loud, confident, and populist — the kind of visual language that belongs on a protest placard, a union newsletter, or a campaign bus.",
+      "signatureElements": [
+        "Paper canvas (the canonical token — #F5F2EA) with grain overlay via CSS pseudo-element on every slide.",
+        "Stacked double text-shadow: Npx Npx 0 the canonical token, 2Npx 2Npx 0 the canonical token. Shadow size scales with font size.",
+        "Alfa Slab One for all display and structural type — uppercase, line-height 0.82–1.04, letter-spacing 0.005em.",
+        "Red (the canonical token) functions exclusively as a shadow color — never a surface background.",
+        "Heavy 6px ink borders for all major structural divisions (topbars, section headers, column separators, inset frames)."
+      ],
+      "sourceHash": "87f8eb3b2b0611298c285082bb125ce382cf82456cb543350ca900fd102f85e9",
+      "previewMd": "bold-template-pack/templates/peoples-platform/preview.md",
+      "designMd": "bold-template-pack/templates/peoples-platform/design.md"
+    },
+    {
+      "slug": "pin-and-paper",
+      "name": "Pin & Paper",
+      "family": "pin",
+      "palette": {
+        "background": "#EFE56A",
+        "surface": "#F8F1D6",
+        "text": "#1F3A8A",
+        "accent": "#2D4FB8",
+        "secondary": "#C9A66B"
+      },
+      "typography": {
+        "display": "Space Grotesk",
+        "body": "Caveat"
+      },
+      "fonts": {
+        "display": "Space Grotesk",
+        "body": "Caveat",
+        "label": "DM Mono"
+      },
+      "layout": "A field-notebook editorial system rendered as yellow legal-pad paper with deep cobalt-blue ink. Every slide carries a fractalnoise paper-grain overlay, hand-drawn safety-pin SVG illustrations that \"pin\" cards to the page, and a hand-script Caveat face for personal annotations. Space Grotesk at heavy weights carries the printed headlines; DM Mono handles archival labels. The aesthetic borrows from analog field reports, vintage public-notice boards, and the diary pages of scientific notebooks — closer to a lab journal pinned to a corkboard than a polished deck.",
+      "signatureElements": [
+        "Yellow paper background (the canonical token) with two layered radial gradients and a non-optional fractal-noise grain overlay (the canonical token) on every slide.",
+        "Deep cobalt-blue ink (the canonical token) as the universal text, border, divider, and pin-illustration color.",
+        "Cream card surfaces (the canonical token) with 1.5px ink borders, 4px micro-radius, and a hard ink-blue offset shadow (5px–6px, zero blur).",
+        "Hand-drawn safety-pin SVG illustrations (the canonical token) — closed and open variants — pinned to cards at slight rotation angles.",
+        "Three-voice typography: Space Grotesk for print headlines, Caveat hand-script for personal voice, DM Mono for archival labels."
+      ],
+      "sourceHash": "e03ef521edc67b0750e1c6986a3089d62128c287c3cd616605ba3aae6390f127",
+      "previewMd": "bold-template-pack/templates/pin-and-paper/preview.md",
+      "designMd": "bold-template-pack/templates/pin-and-paper/design.md"
+    },
+    {
+      "slug": "pink-script",
+      "name": "Pink Script — After Hours",
+      "family": "script",
+      "palette": {
+        "background": "#0F0D11",
+        "surface": "#060507",
+        "text": "#F5EDF1",
+        "accent": "#ED3D8C",
+        "secondary": "#FF66A8"
+      },
+      "typography": {
+        "display": "DM Serif Display",
+        "body": "Inter"
+      },
+      "fonts": {
+        "display": "DM Serif Display",
+        "body": "Inter",
+        "label": "JetBrains Mono"
+      },
+      "layout": "A nocturnal couture editorial system rendered in hot fuchsia ink on dim warm-black paper, with a soft film-grain overlay and a hairline interior frame. DM Serif Display carries every script and editorial moment at sizes up to 600px; Inter at weight 300 carries the body voice; JetBrains Mono carries the boutique-catalog metadata. The aesthetic borrows from glossy fashion magazine spreads, late-night perfume advertising, and the editorial pages of high-end zines — closer to a Maison's seasonal lookbook than a startup deck.",
+      "signatureElements": [
+        "Deep warm-black surface (the canonical token) lit from the upper-left by a radial gradient ellipse.",
+        "A subtle film-grain overlay (the canonical token) on every slide — opacity 0.08, screen blend.",
+        "A 1px paper-blush interior frame (the canonical token) inset 36px from each edge, present on every slide.",
+        "Hot fuchsia pink (the canonical token) is the single chromatic accent — used as script color, kicker color, line color, pill outline, inline emphasis, and the soft halo behind hero scripts.",
+        "DM Serif Display carries every editorial moment, scaling from 32px to 600px. There is no second display face."
+      ],
+      "sourceHash": "546134f98dda7eb82f26b1e9b7ab8b3f642b6f6c7dffe95a8aa3fd50553c3984",
+      "previewMd": "bold-template-pack/templates/pink-script/preview.md",
+      "designMd": "bold-template-pack/templates/pink-script/design.md"
+    },
+    {
+      "slug": "playful",
+      "name": "Playful",
+      "family": "blob",
+      "palette": {
+        "background": "#F0C8A0",
+        "surface": "#F7DEC6",
+        "text": "#1A1A1A",
+        "accent": "#1A1A1A",
+        "secondary": "#F7DEC6"
+      },
+      "typography": {
+        "display": "Syne",
+        "body": "Space Grotesk"
+      },
+      "fonts": {
+        "display": "Syne",
+        "body": "Space Grotesk",
+        "label": "Space Grotesk"
+      },
+      "layout": "A warm, hand-crafted editorial system built on a peach-clay canvas with charcoal ink as the only \"color.\" Display type runs in Syne (weight 700–800, tight negative tracking); body type runs in Space Grotesk at weight 400–500. The aesthetic borrows from independent studio decks, risograph zines, and sketchbook spreads: organic blob frames, scribbled SVG doodles, slightly rotated cards, and double-stroke offset borders give every slide a hand-touched, unpolished warmth. The effect is creative-studio editorial, not corporate pitch — confident but human, structured but loose.",
+      "signatureElements": [
+        "Peach-clay canvas (the canonical token) with charcoal ink (the canonical token) as the only color. No secondary brand palette.",
+        "Syne at weight 700–800 with negative letter-spacing for every display and numeric moment; Space Grotesk at 400–500 for body.",
+        "Double-stroke offset borders on cards — a 3px outline plus a 6–8px offset ghost border via ::before.",
+        "Small ±0.5deg to ±3deg rotations on cards, blocks, and statistics for a hand-placed feel.",
+        "Organic blob shapes with asymmetric border-radius act as decorative frames and fills."
+      ],
+      "sourceHash": "c1c78ec4b8f8aa1bf42a7bd3bf67c38422a9ac4041cf60ed4693d5b3d355786b",
+      "previewMd": "bold-template-pack/templates/playful/preview.md",
+      "designMd": "bold-template-pack/templates/playful/design.md"
+    },
+    {
+      "slug": "raw-grid",
+      "name": "Raw Grid",
+      "family": "raw-grid",
+      "palette": {
+        "background": "#FFFFFF",
+        "surface": "#F5F5F5",
+        "text": "#0A0A0A",
+        "accent": "#F2D4CF",
+        "secondary": "#E5EDD6"
+      },
+      "typography": {
+        "display": "Segoe UI",
+        "body": "Segoe UI"
+      },
+      "fonts": {
+        "display": "Segoe UI",
+        "body": "Segoe UI",
+        "label": "Segoe UI"
+      },
+      "layout": "A neobrutalist presentation system where 3px solid black borders ARE the layout. Display type runs in the native system sans-serif stack (Segoe UI / system-ui) at weight 900 in strict uppercase — no web fonts loaded. The palette is white canvas + black structure + two muted pastel accents (blush pink #F2D4CF and sage green #E5EDD6) + a neutral gray. Depth comes from hard offset shadows in solid black at 4px and 6px — never blurred, never colored. The aesthetic borrows from brutalist editorial web design and zine layout: borders meet without gaps, contrast is high but warmed by the pastel accents, and large numerals sit at very low opacity behind content as decorative wallpaper. The effect is sharp, system-native, and unmistakably digital — closer to a Notion-meets-protest-poster than a polished pitch deck.",
+      "signatureElements": [
+        "White (the canonical token) canvas with 3px solid black (the canonical token) borders dividing every region. No gaps between cells — borders meet edge-to-edge.",
+        "System sans-serif at weight 900 uppercase for all display type; weight 500 sentence case for all body type.",
+        "Hard offset shadows at 6px and 4px in solid black, no blur, ever.",
+        "Two muted pastel accent surfaces — blush pink and sage green — used as region fills, never as text colors.",
+        "A signature black-pill label component (the canonical token) — white uppercase text in a small black rectangle — appears as the universal section tag."
+      ],
+      "sourceHash": "75a3bded3bd1a339630df37bc41e08beb2d1536f467cb43dc5149a614b549b94",
+      "previewMd": "bold-template-pack/templates/raw-grid/preview.md",
+      "designMd": "bold-template-pack/templates/raw-grid/design.md"
+    },
+    {
+      "slug": "retro-windows",
+      "name": "Retro Windows",
+      "family": "window",
+      "palette": {
+        "background": "#C0C0C0",
+        "surface": "#FFFFFF",
+        "text": "#000000",
+        "accent": "#000080",
+        "secondary": "#808080"
+      },
+      "typography": {
+        "display": "MS Sans Serif",
+        "body": "MS Sans Serif"
+      },
+      "fonts": {
+        "display": "MS Sans Serif",
+        "body": "MS Sans Serif",
+        "label": "MS Sans Serif"
+      },
+      "layout": "A Windows 95 / 98 desktop-OS aesthetic rendered as a presentation system. Every slide is a window — beveled chrome, navy gradient title bar, MS Sans Serif body type, with chart areas, group boxes, and panels arranged as if they were software UI from 1995. The palette is the original Win9x system colors (gray button-face, navy title bars, white sunken inputs) with retro accent hues (DOS green, brick red, mustard yellow, teal cyan) reserved for status text and chart data. Pixel-font (Press Start 2P) and terminal-font (VT323) appear sparingly for nostalgic punctuation. The effect is half playful nostalgia, half functional dashboard — a deck that reads as a software product running on a CRT monitor.",
+      "signatureElements": [
+        "Every slide is a the canonical token — beveled chrome with navy-gradient title bar and three system buttons (_, [], X).",
+        "A fixed 3px-period CRT scanline overlay (the canonical token) sits above all content at 3% opacity.",
+        "Bevel-based depth: raised (the canonical token, the canonical token) and sunken (the canonical token, the canonical token) — no blurred shadows.",
+        "The font stack is MS Sans Serif / Segoe UI / Tahoma fallback, with Press Start 2P and VT323 as nostalgic accents.",
+        "Status colors (green / red / yellow / cyan) carry semantic meaning: green = OK, red = warning, yellow = moderate, cyan = tertiary data."
+      ],
+      "sourceHash": "4fbc30a3e84efe351f877bf2d1641f3ebb36e8789454b2a6bacf04c665dcdf0e",
+      "previewMd": "bold-template-pack/templates/retro-windows/preview.md",
+      "designMd": "bold-template-pack/templates/retro-windows/design.md"
+    },
+    {
+      "slug": "retro-zine",
+      "name": "Retro Zine",
+      "family": "zine",
+      "palette": {
+        "background": "#C8B99A",
+        "surface": "#F4EFE6",
+        "text": "#1A1A1A",
+        "accent": "#008F4D",
+        "secondary": "#00A85D"
+      },
+      "typography": {
+        "display": "Bebas Neue",
+        "body": "Space Grotesk"
+      },
+      "fonts": {
+        "display": "Bebas Neue",
+        "body": "Space Grotesk",
+        "label": "Caveat"
+      },
+      "layout": "A risograph-zine editorial system on warm khaki paper with a deep forest-green accent and ink-black structure. Display type runs in Bebas Neue (condensed industrial sans, uppercase, generously tracked); body type runs in Space Grotesk at weight 300–500; handwritten emphasis runs in Caveat. A subtle SVG grain overlay sits over every slide, reinforcing the printed-paper feel. The aesthetic borrows from independent press, mid-century activist posters, and DIY zine culture: slightly rotated stamp marks, masking-tape pieces in collage layouts, drop caps, and offset paper-on-paper shadows. The effect is hand-printed editorial — warm but disciplined, confident but tactile.",
+      "signatureElements": [
+        "Warm khaki paper canvas (the canonical token) + deep forest-green accent (the canonical token) + ink-black structure (the canonical token).",
+        "An SVG grain overlay (the canonical token) sits over every slide at 0.07 opacity, reinforcing the printed-paper register.",
+        "Bebas Neue uppercase + tracked for every display moment; Space Grotesk at small sizes for body; Caveat for hand-script emphasis.",
+        "3px solid black structural borders divide regions; 2px and 1.5px borders subdivide.",
+        "Paper-on-paper offset cards: green slab sits 12px behind a white card via ::before."
+      ],
+      "sourceHash": "99a3bbde328e072586ebaf31bc9af41859b46e3edc2793d464bd99efbde8b194",
+      "previewMd": "bold-template-pack/templates/retro-zine/preview.md",
+      "designMd": "bold-template-pack/templates/retro-zine/design.md"
+    },
+    {
+      "slug": "sakura-chroma",
+      "name": "Sakura Chroma",
+      "family": "sakura",
+      "palette": {
+        "background": "#F1E6CB",
+        "surface": "#E5D6B0",
+        "text": "#3A2516",
+        "accent": "#E5392A",
+        "secondary": "#E54489"
+      },
+      "typography": {
+        "display": "Big Shoulders Display",
+        "body": "Albert Sans"
+      },
+      "fonts": {
+        "display": "Big Shoulders Display",
+        "body": "Albert Sans",
+        "label": "JetBrains Mono"
+      },
+      "layout": "A cassette-package editorial system on warm cream paper with a six-color primary palette and warm-brown ink. Display type runs in Big Shoulders Display (condensed industrial display sans at weight 900); body in Albert Sans; tabular and tag content in JetBrains Mono; occasional Japanese accents in Noto Sans JP. The aesthetic borrows from 1970s consumer cassette packaging, Japanese print catalogues, and lo-fi product zines: petal-cluster blob clusters, diagonal multi-color ribbon bands, 12-point starburst seals, red rectangular stamps, and tracked uppercase micro-labels. The effect is hand-curated industrial editorial — warm but disciplined, playful but tightly typeset, with the cassette as its visual metaphor.",
+      "signatureElements": [
+        "Warm cream paper canvas (the canonical token) with warm-brown ink (the canonical token) as structure and six primary accent colors.",
+        "A 4px-period halftone-dot paper texture (the canonical token) sits over every slide at 16% opacity. Required.",
+        "Big Shoulders Display weight 900 with negative tracking for every display moment; Albert Sans for body; JetBrains Mono for tabular / data; Noto Sans JP for Japanese accents.",
+        "Petal-cluster blob marks (4–5 overlapping perfect circles) as the signature decorative element.",
+        "Diagonal multi-color ribbon bands (5 stacked colored bars at -22° or +22°) as atmospheric layering."
+      ],
+      "sourceHash": "dd36cca687e000a35ffc6184fd353c8d15e6647fa0117761124eb1b7a2b3efb5",
+      "previewMd": "bold-template-pack/templates/sakura-chroma/preview.md",
+      "designMd": "bold-template-pack/templates/sakura-chroma/design.md"
+    },
+    {
+      "slug": "scatterbrain",
+      "name": "Scatterbrain",
+      "family": "sticky",
+      "palette": {
+        "background": "#FAF8F3",
+        "surface": "#FFE066",
+        "text": "#2D2A26",
+        "accent": "#FF9F9F",
+        "secondary": "#74C0FC"
+      },
+      "typography": {
+        "display": "Shrikhand",
+        "body": "Zilla Slab"
+      },
+      "fonts": {
+        "display": "Shrikhand",
+        "body": "Zilla Slab",
+        "label": "Caveat"
+      },
+      "layout": "A Post-it-note-and-cork-board presentation system. Every content block is a colored sticky note on a textured paper or cork surface, layered with red thumbtacks, masking tape, and decorative doodles. Display type runs in Shrikhand (a chunky decorative display serif) on every headline; body type runs in Zilla Slab (a friendly slab serif); handwritten emphasis runs in Caveat. The palette is pastel sticky-note colors (yellow, blue, pink, green, orange, purple) on cream paper / cork / warm gradient backgrounds. The aesthetic borrows from creative-workshop wall art, brainstorming boards, and indie-studio mood boards: scattered slight rotations, multiple background texture variants per slide, pin / tape / drop-shadow combinations. The effect is warmth, play, and tactile creative-process energy.",
+      "signatureElements": [
+        "Three textured background variants: cork (the canonical token), paper (the canonical token), warm gradient (the canonical token). Each slide picks one.",
+        "A fixed SVG grain overlay at 4% opacity sits above all content, reinforcing the paper register.",
+        "Seven sticky-note colors: yellow, blue, pink, green, orange, purple, white-bordered. Each gradient-filled (except orange / purple / white).",
+        "Every post-it carries a soft drop shadow + small rotation. Rotations alternate direction across adjacent notes.",
+        "Red thumbtacks (and blue / green / gold variants) via ::before. Masking tape via ::after. Often combined on a single note."
+      ],
+      "sourceHash": "5a40f82aa35c28f35317f35fd134e5743505cd7488ad2607ff636b0c486deae8",
+      "previewMd": "bold-template-pack/templates/scatterbrain/preview.md",
+      "designMd": "bold-template-pack/templates/scatterbrain/design.md"
+    },
+    {
+      "slug": "signal",
+      "name": "Signal",
+      "family": "signal",
+      "palette": {
+        "background": "#1C2644",
+        "surface": "#F0ECE3",
+        "text": "#E2DCD0",
+        "accent": "#C8A870",
+        "secondary": "#8A96A8"
+      },
+      "typography": {
+        "display": "Source Serif 4",
+        "body": "DM Sans"
+      },
+      "fonts": {
+        "display": "Source Serif 4",
+        "body": "DM Sans",
+        "label": "IBM Plex Mono"
+      },
+      "layout": "A literary editorial presentation system in the spirit of a long-form magazine — The Economist's restraint crossed with a private intelligence briefing. Source Serif 4 carries every headline with roman/italic mixing mid-sentence in antique gold, DM Sans steps back for body, and IBM Plex Mono runs all the timestamps, kickers, and chrome. The dual surface system is warm cream paper (#F0ECE3) and deep editorial navy (#1C2644), connected by a single hot accent — antique gold (#C8A870) — used only on rules, italic emphasis, and numerical figures. A near-invisible 80px grid texture overlays every dark slide as a fingerprint. The effect is sober, considered, and a little bit aristocratic.",
+      "signatureElements": [
+        "Source Serif 4 carries every headline with a roman/italic mix mid-sentence; italics in headlines are always gold.",
+        "DM Sans for body and IBM Plex Mono for every timestamp, kicker, label, and chrome element.",
+        "Dual surfaces — the canonical token (dark) and the canonical token (light) — used interchangeably, never blended in the same slide except in special split layouts.",
+        "Antique gold (the canonical token) is the only accent. It marks rules, italic emphasis, and numerical figures, and appears nowhere else.",
+        "Hairline 1px borders in the canonical token / the canonical token separate every region. No card chrome, no rounded panels."
+      ],
+      "sourceHash": "b8051bbf39adc94582c4b087ed1b726d90f14e922f20e1f07cc89516f8b4224f",
+      "previewMd": "bold-template-pack/templates/signal/preview.md",
+      "designMd": "bold-template-pack/templates/signal/design.md"
+    },
+    {
+      "slug": "soft-editorial",
+      "name": "Soft Editorial",
+      "family": "soft",
+      "palette": {
+        "background": "#F2EEDF",
+        "surface": "#ECE6D2",
+        "text": "#2A241B",
+        "accent": "#E1A4C2",
+        "secondary": "#D6DD63"
+      },
+      "typography": {
+        "display": "Cormorant Garamond",
+        "body": "Work Sans"
+      },
+      "fonts": {
+        "display": "Cormorant Garamond",
+        "body": "Work Sans",
+        "label": "Work Sans"
+      },
+      "layout": "A warm magazine spread aesthetic — the kind of layout a small print quarterly with field-notes pretensions would commission. Cormorant Garamond carries every headline and ornamental moment with mixed roman and italic; Work Sans recedes into supporting body. The palette is cream paper with a quartet of pastel candy accents (dusty pink, chartreuse lemon, soft peach blush, sage green, lilac) used as colored card backgrounds. Generous rounded cards (24–36px radius) float on translucent white over the cream field. The mood is editorial calm with a sprinkling of riso-print color — closer to a literary research notebook than a corporate deck.",
+      "signatureElements": [
+        "Single warm cream surface (the canonical token) across every slide; pastels appear only as card fills, never as the slide background (except the full-bleed closer slide which fills with the canonical token).",
+        "Cormorant Garamond carries every display, headline, kicker, and ornamental moment; Work Sans is reserved for body and eyebrows.",
+        "Mixed roman + italic inside headlines is the system's typographic signal — italic phrases drop to weight 400 from the headline's weight 500.",
+        "Saturated pastels (the canonical token, the canonical token, the canonical token, the canonical token, the canonical token) are interchangeable card fills with no fixed semantic meaning.",
+        "Rounded cards (24–36px radius) are the default container; pills are fully rounded (999px); translucent white (the canonical token) is the default card fill."
+      ],
+      "sourceHash": "0a4d516fcded367d5465bcb93e7bac9dd0a322fd7d34ddf963a354aa05a26dee",
+      "previewMd": "bold-template-pack/templates/soft-editorial/preview.md",
+      "designMd": "bold-template-pack/templates/soft-editorial/design.md"
+    },
+    {
+      "slug": "stencil-tablet",
+      "name": "Stencil & Tablet",
+      "family": "stencil",
+      "palette": {
+        "background": "#E2DCC9",
+        "surface": "#F4EFE0",
+        "text": "#000000",
+        "accent": "#C73B7A",
+        "secondary": "#2D7E73"
+      },
+      "typography": {
+        "display": "Stardos Stencil",
+        "body": "Inter"
+      },
+      "fonts": {
+        "display": "Stardos Stencil",
+        "body": "Inter",
+        "label": "Barlow Condensed"
+      },
+      "layout": "A West Coast skate-poster meets municipal stencil signage system. Stardos Stencil carries every headline, numeral, and chunky display moment with its characteristic ink-break gaps; Barlow Condensed runs all metadata and uppercase chrome at extra-heavy weights; Inter handles body. The palette is bone (#E2DCC9) and black, energized by a saturated retro-print accent set — sienna, magenta, orange, teal, blue, mustard, olive. Soft rounded \"tablet\" cards (22–26px radius) tile across slides in colored blocks. Type runs huge and uppercase, numerals dominate at 160–540px, and color blocks act as the layout. The mood is industrial poster, vintage workshop sign, and music festival lineup all at once.",
+      "signatureElements": [
+        "Bone (the canonical token) field on most slides; black field with bone type on agenda-style and bold-divider slides.",
+        "Stardos Stencil for every headline, every numeral, every featured stencil moment — the ink-break stencil glyphs are the system's identity.",
+        "Barlow Condensed extra-heavy uppercase for all chrome, metadata, pills, legends, and labels. Generous letter-spacing (0.06–0.14em).",
+        "Inter for body — small role, supporting the loud type above.",
+        "Seven-color accent palette (the canonical token, the canonical token, the canonical token, the canonical token, the canonical token, the canonical token, the canonical token) plus paper (the canonical token) — used as full card fills."
+      ],
+      "sourceHash": "00b2cf2daf699fb631955134c6ba0c767add5f51690395ff51d12f489f8bdbce",
+      "previewMd": "bold-template-pack/templates/stencil-tablet/preview.md",
+      "designMd": "bold-template-pack/templates/stencil-tablet/design.md"
+    },
+    {
+      "slug": "studio",
+      "name": "Studio",
+      "family": "studio",
+      "palette": {
+        "background": "#1C1C1C",
+        "surface": "#242422",
+        "text": "#F5D200",
+        "accent": "#F5D200",
+        "secondary": "#2E2E2C"
+      },
+      "typography": {
+        "display": "Barlow",
+        "body": "Barlow"
+      },
+      "fonts": {
+        "display": "Barlow",
+        "body": "Barlow",
+        "label": "IBM Plex Mono"
+      },
+      "layout": "A \"Boring Studios\" agency presentation system — type-as-graphic-mass in the spirit of contemporary design-studio decks (Pentagram, Anti, Order). The entire system runs on Barlow at weight 900 uppercase, with type so heavy at display scale that it stops being type and starts being a shape. The palette is binary plus one: near-black field (#1C1C1C), acid yellow type (#F5D200), and the same yellow as a full slide background. IBM Plex Mono carries every footer metadata, slide counter, and three-column lockup. No drop shadows, no rounded corners, no accent colors — the headline IS the design, and the only chromatic decision per slide is dark-yellow-on-near-black or near-black-on-acid-yellow.",
+      "signatureElements": [
+        "Binary palette — the canonical token field with the canonical token type, or the canonical token field with the canonical token type. No third color.",
+        "Barlow at weight 900 uppercase for every headline at every scale; Barlow 400/500 for body; IBM Plex Mono only for metadata chrome.",
+        "Headlines run massive — cover display at 12vw (~230px at 1920px viewport), statements at 7.5vw, section headers at 4.8vw.",
+        "Tight negative letter-spacing on all display type (-0.01 to -0.03em); uppercase non-negotiable.",
+        "Flat: no drop shadows, no rounded corners, no gradients, no accent colors beyond the yellow/dark binary."
+      ],
+      "sourceHash": "34ebedfaa3bec46290ebeb57053078a048cdb00cef87d3cdd9fe5ba8c94bbfa9",
+      "previewMd": "bold-template-pack/templates/studio/preview.md",
+      "designMd": "bold-template-pack/templates/studio/design.md"
+    },
+    {
+      "slug": "vellum",
+      "name": "Vellum",
+      "family": "vellum",
+      "palette": {
+        "background": "#2A3870",
+        "surface": "#343F80",
+        "text": "#E8D85C",
+        "accent": "#F5E168",
+        "secondary": "#3A7878"
+      },
+      "typography": {
+        "display": "Cormorant Garamond",
+        "body": "DM Sans"
+      },
+      "fonts": {
+        "display": "Cormorant Garamond",
+        "body": "DM Sans",
+        "label": "Courier Prime"
+      },
+      "layout": "An essay-pinned-to-a-wall presentation system — a single monochromatic field of deep periwinkle (#2A3870) with warm chartreuse-yellow type (#E8D85C) floating centered on it, every slide. Italic Cormorant Garamond carries every headline at all sizes — the italic serif is the personality, against the bold colorfield. DM Sans handles body in a quiet supporting role. Courier Prime mono provides the typed annotation voice — appearing as a \"pin-note\" attribution sitting in the bottom-left corner of every slide. The mood is gallery exhibition wall meets archive folder — quiet, monochromatic, deeply still. One color, two warm typefaces, zero motion.",
+      "signatureElements": [
+        "Single monochromatic field — the canonical token (deep periwinkle) — on every slide. No light theme, no inversion.",
+        "Italic Cormorant Garamond at weight 400 for every headline, every numeral, every featured serif moment.",
+        "DM Sans for body and lead paragraphs; Courier Prime mono for chrome labels and the pin-note signature.",
+        "Yellow type (the canonical token) is the primary; brighter the canonical token is the only <em> color inside headlines.",
+        "Dusty teal (the canonical token) is the second accent — used only for the large quote-mark glyph, the pin-note text, kickers, the 28px rule, and list counter markers."
+      ],
+      "sourceHash": "bba157dbb367fa49f49d587d01ef7aaaf064ffd673484dac5c5a976be5721ba9",
+      "previewMd": "bold-template-pack/templates/vellum/preview.md",
+      "designMd": "bold-template-pack/templates/vellum/design.md"
+    }
+  ]
+}

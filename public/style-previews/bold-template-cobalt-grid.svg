@@ -1,24 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" role="img" aria-label="Cobalt Grid">
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="#fdfae7"/>
-      <stop offset="1" stop-color="#ffffff"/>
-    </linearGradient>
-    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
-      <path d="M48 0H0V48" fill="none" stroke="#00000018" stroke-width="1"/>
-    </pattern>
-  </defs>
-  <rect width="960" height="540" fill="url(#bg)"/>
-  <rect width="960" height="540" fill="url(#grid)" opacity=".75"/>
-  <circle cx="820" cy="92" r="92" fill="#1e2bfa" opacity=".9"/>
-  <rect x="620" y="208" width="260" height="210" fill="#1e2bfa" opacity=".18" stroke="#1e2bfa" stroke-width="4"/>
-  <rect x="78" y="74" width="520" height="334" fill="#ffffffb8" stroke="#1e2bfa" stroke-width="4"/>
-  <path d="M92 96H218M92 388H316M576 96V214" stroke="#1e2bfa" stroke-width="8" stroke-linecap="square"/>
-  <text x="105" y="145" fill="#1e2bfa" font-family="Arial, sans-serif" font-size="22" font-weight="700" letter-spacing="5">EDITORIAL / DESIGN-RESEARCH / STUDIOUS</text>
-  <text x="105" y="258" fill="#111111" font-family="Arial Black, Arial, sans-serif" font-size="68" font-weight="900">MAKE IT LAND</text>
-  <text x="105" y="318" fill="#111111" font-family="Arial Black, Arial, sans-serif" font-size="68" font-weight="900">WITH STYLE</text>
-  <text x="105" y="370" fill="#6b6b6b" font-family="Arial, sans-serif" font-size="20" font-weight="700" letter-spacing="2">ELECTRIC COBALT SERIFS ON A GRAPH-PAPER CANVAS, ANCHORED ...</text>
-  <text x="640" y="286" fill="#1e2bfa" font-family="Arial Black, Arial, sans-serif" font-size="74" font-weight="900">01</text>
-  <text x="640" y="340" fill="#111111" font-family="Arial, sans-serif" font-size="22" font-weight="700">Tektur</text>
-  <text x="640" y="374" fill="#6b6b6b" font-family="Arial, sans-serif" font-size="18">grid-led composition</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" role="img" aria-label="Cobalt Grid title slide preview" data-template-slug="cobalt-grid" data-preview-family="blueprint" data-contract-hash="68d6429144ae274748b7cb8fa999a5fe4d2ad4cb62a9ccc6013c8964c252a28b" data-display-font="Newsreader" data-body-font="Hanken Grotesk">
+<title>Cobalt Grid title slide preview</title>
+<defs><pattern id="grid" width="36" height="36" patternUnits="userSpaceOnUse"><path d="M36 0H0V36" fill="none" stroke="#1F2BE0" stroke-opacity=".12"/></pattern></defs><rect width="960" height="540" fill="#F0EBDE"/><rect width="960" height="540" fill="url(#grid)"/><path d="M0 46H960M0 494H960" stroke="#1F2BE0" stroke-width="3"/><text x="54" y="86" fill="#1F2BE0" font-family="DM Mono,Noto Sans SC,monospace" font-size="15" letter-spacing="2" >X.024 / Y.108</text><text x="54" y="246" fill="#1F2BE0" font-family="Newsreader,Noto Sans SC,sans-serif" font-size="78" font-weight="800" letter-spacing="-2" ><tspan x="54" dy="0">AGENT</tspan><tspan x="54" dy="70.2">SKILLS</tspan></text><path d="M674 112h174v108H674zm-56 232h142v90H618zM760 344h112v90H760z" fill="none" stroke="#1F2BE0" stroke-width="3"/><text x="54" y="430" fill="#5560E5" font-family="Hanken Grotesk" font-size="22">GRID / SIGNAL / SYSTEM</text>
 </svg>

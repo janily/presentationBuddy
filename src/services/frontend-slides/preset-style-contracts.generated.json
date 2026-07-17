@@ -1,0 +1,330 @@
+{
+  "generatedFrom": ".claude/skills/frontend-slides/STYLE_PRESETS.md",
+  "contracts": [
+    {
+      "id": "bold-signal",
+      "name": "Bold Signal",
+      "source": "frontend-slides-preset",
+      "vibe": "自信、现代、高冲击力",
+      "layout": "深色渐变舞台上的高饱和焦点卡片",
+      "family": "signal-card",
+      "typography": {
+        "display": "Archivo Black",
+        "body": "Space Grotesk"
+      },
+      "palette": {
+        "background": "#1a1a1a",
+        "surface": "#2d2d2d",
+        "text": "#ffffff",
+        "accent": "#ff5722",
+        "secondary": "#ffd166"
+      },
+      "signatureElements": [
+        "bold colored card",
+        "large section numbers",
+        "navigation breadcrumbs"
+      ],
+      "sourceHash": "1524344c076bdfff73e11d6ba95e65e477a575f4eca8ca5b815d53c4e22eae29"
+    },
+    {
+      "id": "electric-studio",
+      "name": "Electric Studio",
+      "source": "frontend-slides-preset",
+      "vibe": "大胆、干净、专业、高对比",
+      "layout": "白色与电光蓝上下分屏",
+      "family": "vertical-split",
+      "typography": {
+        "display": "Manrope",
+        "body": "Manrope"
+      },
+      "palette": {
+        "background": "#ffffff",
+        "surface": "#4361ee",
+        "text": "#0a0a0a",
+        "accent": "#4361ee",
+        "secondary": "#ffffff"
+      },
+      "signatureElements": [
+        "two-panel split",
+        "accent edge bar",
+        "hero quote typography"
+      ],
+      "sourceHash": "2588768c53365cd4a7748c51fa3de705778ebcbcf849076457f5e7585c74af64"
+    },
+    {
+      "id": "creative-voltage",
+      "name": "Creative Voltage",
+      "source": "frontend-slides-preset",
+      "vibe": "创意、活力、复古未来感",
+      "layout": "电光蓝与深靛双栏构图",
+      "family": "halftone-split",
+      "typography": {
+        "display": "Syne",
+        "body": "Space Mono"
+      },
+      "palette": {
+        "background": "#0066ff",
+        "surface": "#1a1a2e",
+        "text": "#ffffff",
+        "accent": "#d4ff00",
+        "secondary": "#1a1a2e"
+      },
+      "signatureElements": [
+        "halftone texture",
+        "neon badges",
+        "script accents"
+      ],
+      "sourceHash": "8d65fcc15dfa35c7ec5ed8ed64f09441548bbf499d021fe4af2ff3ebee317863"
+    },
+    {
+      "id": "dark-botanical",
+      "name": "Dark Botanical",
+      "source": "frontend-slides-preset",
+      "vibe": "优雅、艺术、精致、高级",
+      "layout": "暗色居中构图与柔和抽象光晕",
+      "family": "soft-botanical",
+      "typography": {
+        "display": "Cormorant Garamond",
+        "body": "IBM Plex Sans"
+      },
+      "palette": {
+        "background": "#0f0f0f",
+        "surface": "#191919",
+        "text": "#e8e4df",
+        "accent": "#d4a574",
+        "secondary": "#e8b4b8"
+      },
+      "signatureElements": [
+        "soft gradient circles",
+        "warm accents",
+        "thin vertical lines"
+      ],
+      "sourceHash": "4001728c436de99b7de5bd29839d9f0bba111e1c51324652bcb6134a1bb50f8d"
+    },
+    {
+      "id": "notebook-tabs",
+      "name": "Notebook Tabs",
+      "source": "frontend-slides-preset",
+      "vibe": "编辑感、井然有序、优雅、触感",
+      "layout": "深色背景上的奶油纸张与彩色索引",
+      "family": "tabbed-paper",
+      "typography": {
+        "display": "Bodoni Moda",
+        "body": "DM Sans"
+      },
+      "palette": {
+        "background": "#2d2d2d",
+        "surface": "#f8f6f1",
+        "text": "#1a1a1a",
+        "accent": "#98d4bb",
+        "secondary": "#c7b8ea"
+      },
+      "signatureElements": [
+        "paper container",
+        "colorful section tabs",
+        "binder holes"
+      ],
+      "sourceHash": "cfa774b98e08d4be72689c424c46b7373bb729077ab73fdd3294b0962409dda0"
+    },
+    {
+      "id": "pastel-geometry",
+      "name": "Pastel Geometry",
+      "source": "frontend-slides-preset",
+      "vibe": "友好、有序、现代、亲和",
+      "layout": "粉彩背景上的白色卡片与右缘竖向胶囊",
+      "family": "edge-pills",
+      "typography": {
+        "display": "Plus Jakarta Sans",
+        "body": "Plus Jakarta Sans"
+      },
+      "palette": {
+        "background": "#c8d9e6",
+        "surface": "#faf9f7",
+        "text": "#1a1a1a",
+        "accent": "#f0b4d4",
+        "secondary": "#7c6aad"
+      },
+      "signatureElements": [
+        "soft card",
+        "vertical pills",
+        "subtle shadow"
+      ],
+      "sourceHash": "f193391fc7ecd1e9054517644d1253a8ecc7dd8b2fec82f979f3dd497d2e60a3"
+    },
+    {
+      "id": "split-pastel",
+      "name": "Split Pastel",
+      "source": "frontend-slides-preset",
+      "vibe": "轻松、现代、友好、富有创意",
+      "layout": "桃色与薰衣草双色分屏",
+      "family": "pastel-split",
+      "typography": {
+        "display": "Outfit",
+        "body": "Outfit"
+      },
+      "palette": {
+        "background": "#f5e6dc",
+        "surface": "#e4dff0",
+        "text": "#1a1a1a",
+        "accent": "#c8f0d8",
+        "secondary": "#f0d4e0"
+      },
+      "signatureElements": [
+        "split background",
+        "playful badges",
+        "grid overlay"
+      ],
+      "sourceHash": "57212e8195586a018c7fc7673e9541ec60d2148020e3661ccbf4e6932ee54649"
+    },
+    {
+      "id": "vintage-editorial",
+      "name": "Vintage Editorial",
+      "source": "frontend-slides-preset",
+      "vibe": "机智、自信、编辑感、个性鲜明",
+      "layout": "暖白画布上的大标题与几何装饰",
+      "family": "vintage-geometry",
+      "typography": {
+        "display": "Fraunces",
+        "body": "Work Sans"
+      },
+      "palette": {
+        "background": "#f5f3ee",
+        "surface": "#ffffff",
+        "text": "#1a1a1a",
+        "accent": "#c45b3c",
+        "secondary": "#e8d4c0"
+      },
+      "signatureElements": [
+        "abstract geometry",
+        "bordered callouts",
+        "editorial rhythm"
+      ],
+      "sourceHash": "37fb36c5b557ecf9605cc8275a5d669e9d147fd15892aace0234cf3d8077d8e7"
+    },
+    {
+      "id": "neon-cyber",
+      "name": "Neon Cyber",
+      "source": "frontend-slides-preset",
+      "vibe": "未来、科技、自信",
+      "layout": "深海军蓝空间中的霓虹网格",
+      "family": "neon-grid",
+      "typography": {
+        "display": "Clash Display",
+        "body": "Satoshi"
+      },
+      "palette": {
+        "background": "#0a0f1c",
+        "surface": "#111a2d",
+        "text": "#f4ffff",
+        "accent": "#00ffcc",
+        "secondary": "#ff00aa"
+      },
+      "signatureElements": [
+        "particle background",
+        "neon glow",
+        "grid patterns"
+      ],
+      "sourceHash": "a1faef59b26ff54e5a9a240b8d3bc07f28f001a8ceed0193e02206ab5e68e0a6"
+    },
+    {
+      "id": "terminal-green",
+      "name": "Terminal Green",
+      "source": "frontend-slides-preset",
+      "vibe": "开发者、黑客终端、硬核技术",
+      "layout": "GitHub 深色终端界面与代码层级",
+      "family": "terminal",
+      "typography": {
+        "display": "JetBrains Mono",
+        "body": "JetBrains Mono"
+      },
+      "palette": {
+        "background": "#0d1117",
+        "surface": "#161b22",
+        "text": "#e6edf3",
+        "accent": "#39d353",
+        "secondary": "#58a6ff"
+      },
+      "signatureElements": [
+        "scan lines",
+        "blinking cursor",
+        "code syntax styling"
+      ],
+      "sourceHash": "224cd3a0b0fd41ca0e7d829e7270c15c7fcddcb31417feaa8ab45dfe2e658417"
+    },
+    {
+      "id": "swiss-modern",
+      "name": "Swiss Modern",
+      "source": "frontend-slides-preset",
+      "vibe": "干净、精确、包豪斯理性",
+      "layout": "可见网格上的非对称黑白红构图",
+      "family": "swiss-grid",
+      "typography": {
+        "display": "Archivo",
+        "body": "Nunito"
+      },
+      "palette": {
+        "background": "#ffffff",
+        "surface": "#f2f2f2",
+        "text": "#000000",
+        "accent": "#ff3300",
+        "secondary": "#111111"
+      },
+      "signatureElements": [
+        "visible grid",
+        "asymmetric layouts",
+        "geometric shapes"
+      ],
+      "sourceHash": "9bf3d48f207d27233ad0f8f18934197d4e35367f2433c976233e1a019360618d"
+    },
+    {
+      "id": "paper-ink",
+      "name": "Paper & Ink",
+      "source": "frontend-slides-preset",
+      "vibe": "文学、克制、深思熟虑",
+      "layout": "温暖纸张上的衬线排版与细线",
+      "family": "literary-paper",
+      "typography": {
+        "display": "Cormorant Garamond",
+        "body": "Source Serif 4"
+      },
+      "palette": {
+        "background": "#faf9f7",
+        "surface": "#fffdf9",
+        "text": "#1a1a1a",
+        "accent": "#c41e3a",
+        "secondary": "#6b625b"
+      },
+      "signatureElements": [
+        "drop caps",
+        "pull quotes",
+        "elegant rules"
+      ],
+      "sourceHash": "80b638f861383a8e9ac591ebcde1d345655e2205c43391bbfafa9a8853ae83bd"
+    },
+    {
+      "id": "circuit-blueprint",
+      "name": "Circuit Blueprint",
+      "source": "frontend-slides-custom",
+      "vibe": "为当前技术主题定制的工程蓝图语言",
+      "layout": "非对称技术图纸、坐标标记与模块连线",
+      "family": "circuit-blueprint",
+      "typography": {
+        "display": "Chakra Petch",
+        "body": "IBM Plex Mono"
+      },
+      "palette": {
+        "background": "#071a2b",
+        "surface": "#0d2942",
+        "text": "#e8f5ff",
+        "accent": "#4de3ff",
+        "secondary": "#ffb84d"
+      },
+      "signatureElements": [
+        "circuit traces",
+        "coordinate labels",
+        "blueprint annotations"
+      ],
+      "sourceHash": "9447d12da6aec6ccb94d9707a349a66885e8dc6a85e4f32c7157845a087204e8"
+    }
+  ]
+}

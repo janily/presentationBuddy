@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "generate:style-previews": "node scripts/generate-bold-template-previews.mjs",
+    "generate:style-previews": "node scripts/generate-style-previews.mjs",
     "mastra": "mastra dev",
     "test": "vitest run",
     "test:watch": "vitest"

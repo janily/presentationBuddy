@@ -1,24 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" role="img" aria-label="Long Table">
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="#fdfae7"/>
-      <stop offset="1" stop-color="#ffffff"/>
-    </linearGradient>
-    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
-      <path d="M48 0H0V48" fill="none" stroke="#00000018" stroke-width="1"/>
-    </pattern>
-  </defs>
-  <rect width="960" height="540" fill="url(#bg)"/>
-  <rect width="960" height="540" fill="url(#grid)" opacity=".75"/>
-  <circle cx="820" cy="92" r="92" fill="#1e2bfa" opacity=".9"/>
-  <rect x="620" y="208" width="260" height="210" fill="#1e2bfa" opacity=".18" stroke="#1e2bfa" stroke-width="4"/>
-  <rect x="78" y="74" width="520" height="334" fill="#ffffffb8" stroke="#1e2bfa" stroke-width="4"/>
-  <path d="M92 96H218M92 388H316M576 96V214" stroke="#1e2bfa" stroke-width="8" stroke-linecap="square"/>
-  <text x="105" y="145" fill="#1e2bfa" font-family="Arial, sans-serif" font-size="22" font-weight="700" letter-spacing="5">WARM / INTIMATE / MODERN</text>
-  <text x="105" y="258" fill="#111111" font-family="Arial Black, Arial, sans-serif" font-size="68" font-weight="900">MAKE IT LAND</text>
-  <text x="105" y="318" fill="#111111" font-family="Arial Black, Arial, sans-serif" font-size="68" font-weight="900">WITH STYLE</text>
-  <text x="105" y="370" fill="#6b6b6b" font-family="Arial, sans-serif" font-size="20" font-weight="700" letter-spacing="2">WARM CREAM AND RUST-RED SUPPER-CLUB AESTHETIC WITH BOLD U...</text>
-  <text x="640" y="286" fill="#1e2bfa" font-family="Arial Black, Arial, sans-serif" font-size="74" font-weight="900">01</text>
-  <text x="640" y="340" fill="#111111" font-family="Arial, sans-serif" font-size="22" font-weight="700">Inter</text>
-  <text x="640" y="374" fill="#6b6b6b" font-family="Arial, sans-serif" font-size="18">editorial type hierarchy</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" role="img" aria-label="Long Table title slide preview" data-template-slug="long-table" data-preview-family="table" data-contract-hash="ba724627e6d6c7ad1b2ee369bb55005a0cdfe92be6fd7c48f83274144cd35729" data-display-font="Bricolage Grotesque" data-body-font="Fraunces">
+<title>Long Table title slide preview</title>
+<defs><pattern id="dots" width="8" height="8" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="1" fill="#B53D2A" fill-opacity=".12"/></pattern></defs><rect width="960" height="540" fill="#FAF1E2"/><rect width="960" height="540" fill="url(#dots)"/><path d="M48 92H912M48 448H912M640 92V448" stroke="#B53D2A" stroke-width="2"/><text x="54" y="72" fill="#B53D2A" font-family="Fraunces,Noto Sans SC,monospace" font-size="15" letter-spacing="2" >LONG TABLE / EDITION 01</text><text x="54" y="246" fill="#8E2D1F" font-family="Bricolage Grotesque,Noto Sans SC,sans-serif" font-size="72" font-weight="800" letter-spacing="-2" ><tspan x="54" dy="0">AGENT</tspan><tspan x="54" dy="64.8">SKILLS</tspan></text><text x="674" y="156" fill="#8E2D1F" font-family="Fraunces" font-size="26" font-style="italic">A shared framework</text><text x="674" y="204" fill="#8E2D1F" font-family="Fraunces" font-size="20">for reusable skills</text>
 </svg>

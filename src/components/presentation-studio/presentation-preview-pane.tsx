@@ -62,7 +62,7 @@ function StyleDiscovery({ previews, selectedStyleId, isLoading, batch, remaining
                   <div className="p-4">
                     <div className="flex items-center justify-between gap-3"><h3 className="font-semibold text-[var(--text-primary)]">{style.name}</h3>{selected ? <CheckCircle2 className="h-5 w-5 text-[var(--accent-terracotta)]" /> : null}</div>
                     <p className="mt-1 text-sm text-[var(--text-secondary)]">{style.vibe}</p>
-                    <p className="mt-2 text-xs text-[var(--text-muted)]">{style.typography.display} · {style.signatureElements.slice(0, 2).join(" · ")}</p>
+                    <p className="mt-2 line-clamp-2 text-xs text-[var(--text-muted)]">{style.typography.display} · {style.signatureElements.slice(0, 2).join(" · ")}</p>
                   </div>
                 </button>
               );

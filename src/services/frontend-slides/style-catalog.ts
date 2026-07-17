@@ -1,6 +1,7 @@
 import type { FrontendSlidesDensity, FrontendSlidesPurpose, FrontendSlidesStylePreview, FrontendSlidesStyleSpec } from "./style-schema";
 export type { FrontendSlidesDensity, FrontendSlidesPurpose, FrontendSlidesStylePreview, FrontendSlidesStyleSpec } from "./style-schema";
 import boldTemplateSelectionIndex from "../../../.claude/skills/frontend-slides/bold-template-pack/selection-index.json";
+import boldTemplateContracts from "./bold-template-contracts.generated.json";
 import { getBoldPreviewFamily } from "./bold-template-preview";
 
 export type FrontendSlidesDiscoveryInput = {
@@ -30,13 +31,25 @@ type BoldTemplateIndexItem = {
   design_md: string;
 };
 
+type BoldTemplateGeneratedContract = {
+  slug: string;
+  layout: string;
+  typography: FrontendSlidesStyleSpec["typography"];
+  palette: FrontendSlidesStyleSpec["palette"];
+  signatureElements: string[];
+};
+
+const boldTemplateContractBySlug = new Map(
+  (boldTemplateContracts.contracts as BoldTemplateGeneratedContract[]).map((contract) => [contract.slug, contract]),
+);
+
 const presetAndCustomStyles: FrontendSlidesStyleSpec[] = [
   { id: "bold-signal", name: "Bold Signal", source: "frontend-slides-preset", vibe: "自信、现代、高冲击力", layout: "深色渐变舞台上的高饱和焦点卡片", typography: { display: "Archivo Black", body: "Space Grotesk" }, palette: { background: "#1a1a1a", surface: "#2d2d2d", text: "#ffffff", accent: "#ff5722", secondary: "#ffd166" }, signatureElements: ["bold colored card", "large section numbers", "navigation breadcrumbs"] },
   { id: "electric-studio", name: "Electric Studio", source: "frontend-slides-preset", vibe: "大胆、干净、专业、高对比", layout: "白色与电光蓝上下分屏", typography: { display: "Manrope", body: "Manrope" }, palette: { background: "#ffffff", surface: "#4361ee", text: "#0a0a0a", accent: "#4361ee", secondary: "#ffffff" }, signatureElements: ["two-panel split", "accent edge bar", "hero quote typography"] },
   { id: "creative-voltage", name: "Creative Voltage", source: "frontend-slides-preset", vibe: "创意、活力、复古未来感", layout: "电光蓝与深靛双栏构图", typography: { display: "Syne", body: "Space Mono" }, palette: { background: "#0066ff", surface: "#1a1a2e", text: "#ffffff", accent: "#d4ff00", secondary: "#1a1a2e" }, signatureElements: ["halftone texture", "neon badges", "script accents"] },
   { id: "dark-botanical", name: "Dark Botanical", source: "frontend-slides-preset", vibe: "优雅、艺术、精致、高级", layout: "暗色居中构图与柔和抽象光晕", typography: { display: "Cormorant Garamond", body: "IBM Plex Sans" }, palette: { background: "#0f0f0f", surface: "#191919", text: "#e8e4df", accent: "#d4a574", secondary: "#e8b4b8" }, signatureElements: ["soft gradient circles", "warm accents", "thin vertical lines"] },
   { id: "notebook-tabs", name: "Notebook Tabs", source: "frontend-slides-preset", vibe: "编辑感、井然有序、优雅、触感", layout: "深色背景上的奶油纸张与彩色索引", typography: { display: "Bodoni Moda", body: "DM Sans" }, palette: { background: "#2d2d2d", surface: "#f8f6f1", text: "#1a1a1a", accent: "#98d4bb", secondary: "#c7b8ea" }, signatureElements: ["paper container", "colorful section tabs", "binder holes"] },
-  { id: "pastel-geometry", name: "Pastel Geometry", source: "frontend-slides-preset", vibe: "友好、有序、现代、亲和", layout: "粉彩背景上的白色卡片与竖向胶囊", typography: { display: "Plus Jakarta Sans", body: "Plus Jakarta Sans" }, palette: { background: "#c8d9e6", surface: "#faf9f7", text: "#1a1a1a", accent: "#f0b4d4", secondary: "#7c6aad" }, signatureElements: ["soft card", "vertical pills", "subtle shadow"] },
+  { id: "pastel-geometry", name: "Pastel Geometry", source: "frontend-slides-preset", vibe: "友好、有序、现代、亲和", layout: "粉彩背景上的白色卡片与右缘竖向胶囊", typography: { display: "Plus Jakarta Sans", body: "Plus Jakarta Sans" }, palette: { background: "#c8d9e6", surface: "#faf9f7", text: "#1a1a1a", accent: "#f0b4d4", secondary: "#7c6aad" }, signatureElements: ["soft card", "vertical pills", "subtle shadow"] },
   { id: "split-pastel", name: "Split Pastel", source: "frontend-slides-preset", vibe: "轻松、现代、友好、富有创意", layout: "桃色与薰衣草双色分屏", typography: { display: "Outfit", body: "Outfit" }, palette: { background: "#f5e6dc", surface: "#e4dff0", text: "#1a1a1a", accent: "#c8f0d8", secondary: "#f0d4e0" }, signatureElements: ["split background", "playful badges", "grid overlay"] },
   { id: "vintage-editorial", name: "Vintage Editorial", source: "frontend-slides-preset", vibe: "机智、自信、编辑感、个性鲜明", layout: "暖白画布上的大标题与几何装饰", typography: { display: "Fraunces", body: "Work Sans" }, palette: { background: "#f5f3ee", surface: "#ffffff", text: "#1a1a1a", accent: "#c45b3c", secondary: "#e8d4c0" }, signatureElements: ["abstract geometry", "bordered callouts", "editorial rhythm"] },
   { id: "neon-cyber", name: "Neon Cyber", source: "frontend-slides-preset", vibe: "未来、科技、自信", layout: "深海军蓝空间中的霓虹网格", typography: { display: "Clash Display", body: "Satoshi" }, palette: { background: "#0a0f1c", surface: "#111a2d", text: "#f4ffff", accent: "#00ffcc", secondary: "#ff00aa" }, signatureElements: ["particle background", "neon glow", "grid patterns"] },
@@ -164,10 +177,10 @@ const boldTemplateStyles: FrontendSlidesStyleSpec[] = (boldTemplateSelectionInde
   name: template.name,
   source: "frontend-slides-bold-template",
   vibe: [...template.mood.slice(0, 3), ...template.tone.slice(0, 2)].join("、"),
-  layout: boldTemplateLayoutOverrides[template.slug] ?? template.tagline,
-  typography: getBoldTemplateTypography(template),
-  palette: getBoldTemplatePalette(template),
-  signatureElements: getBoldTemplateSignatureElements(template),
+  layout: boldTemplateContractBySlug.get(template.slug)?.layout ?? boldTemplateLayoutOverrides[template.slug] ?? template.tagline,
+  typography: boldTemplateContractBySlug.get(template.slug)?.typography ?? getBoldTemplateTypography(template),
+  palette: boldTemplateContractBySlug.get(template.slug)?.palette ?? getBoldTemplatePalette(template),
+  signatureElements: boldTemplateContractBySlug.get(template.slug)?.signatureElements ?? getBoldTemplateSignatureElements(template),
   boldTemplate: {
     slug: template.slug,
     tagline: template.tagline,

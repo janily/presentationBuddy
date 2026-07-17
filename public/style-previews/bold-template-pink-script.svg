@@ -1,24 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" role="img" aria-label="Pink Script - After Hours">
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="#0a0e27"/>
-      <stop offset="1" stop-color="#111827"/>
-    </linearGradient>
-    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
-      <path d="M48 0H0V48" fill="none" stroke="#ffffff22" stroke-width="1"/>
-    </pattern>
-  </defs>
-  <rect width="960" height="540" fill="url(#bg)"/>
-  <rect width="960" height="540" fill="url(#grid)" opacity=".75"/>
-  <circle cx="820" cy="92" r="92" fill="#5edcf4" opacity=".9"/>
-  <rect x="620" y="208" width="260" height="210" fill="#5edcf4" opacity=".18" stroke="#5edcf4" stroke-width="4"/>
-  <rect x="78" y="74" width="520" height="334" fill="#00000055" stroke="#5edcf4" stroke-width="4"/>
-  <path d="M92 96H218M92 388H316M576 96V214" stroke="#5edcf4" stroke-width="8" stroke-linecap="square"/>
-  <text x="105" y="145" fill="#5edcf4" font-family="Arial, sans-serif" font-size="22" font-weight="700" letter-spacing="5">NOCTURNAL / MOODY / INTENTIONAL</text>
-  <text x="105" y="258" fill="#ffffff" font-family="Arial Black, Arial, sans-serif" font-size="68" font-weight="900">MAKE IT LAND</text>
-  <text x="105" y="318" fill="#ffffff" font-family="Arial Black, Arial, sans-serif" font-size="68" font-weight="900">WITH STYLE</text>
-  <text x="105" y="370" fill="#f0a6ca" font-family="Arial, sans-serif" font-size="20" font-weight="700" letter-spacing="2">BLACK CANVAS, HOT PINK ACCENT, PEARL-CREAM PAPER, INSTRUM...</text>
-  <text x="640" y="286" fill="#5edcf4" font-family="Arial Black, Arial, sans-serif" font-size="74" font-weight="900">01</text>
-  <text x="640" y="340" fill="#ffffff" font-family="Arial, sans-serif" font-size="22" font-weight="700">Playfair Display</text>
-  <text x="640" y="374" fill="#f0a6ca" font-family="Arial, sans-serif" font-size="18">editorial type hierarchy</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" role="img" aria-label="Pink Script — After Hours title slide preview" data-template-slug="pink-script" data-preview-family="script" data-contract-hash="546134f98dda7eb82f26b1e9b7ab8b3f642b6f6c7dffe95a8aa3fd50553c3984" data-display-font="DM Serif Display" data-body-font="Inter">
+<title>Pink Script — After Hours title slide preview</title>
+<defs><radialGradient id="halo" cx="28%" cy="22%"><stop stop-color="#ED3D8C" stop-opacity=".22"/><stop offset="1" stop-color="#0F0D11" stop-opacity="0"/></radialGradient></defs><rect width="960" height="540" fill="#0F0D11"/><rect width="960" height="540" fill="url(#halo)"/><rect x="36" y="36" width="888" height="468" fill="none" stroke="#F5EDF1" stroke-opacity=".18"/><text x="62" y="74" fill="#ED3D8C" font-family="JetBrains Mono,Noto Sans SC,monospace" font-size="15" letter-spacing="2" >AFTER HOURS / 01</text><text x="58" y="246" fill="#F5EDF1" font-family="DM Serif Display,Noto Sans SC,sans-serif" font-size="86"  letter-spacing="-2" font-weight="400" font-style="italic"><tspan x="58" dy="0">Agent</tspan><tspan x="58" dy="77.4">Skills</tspan></text><path d="M60 354c210-42 410-42 612 0" fill="none" stroke="#ED3D8C" stroke-width="5"/><text x="60" y="420" fill="#FF66A8" font-family="Inter" font-size="21">Ideas illuminated after dark</text>
 </svg>
