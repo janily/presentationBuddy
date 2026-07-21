@@ -1,6 +1,7 @@
 import { WorkflowDataPart } from "@mastra/ai-sdk";
 import { UIMessage } from "ai";
 import type { FrontendSlidesDensity, FrontendSlidesPurpose, FrontendSlidesStyleSpec } from "@/src/services/frontend-slides/style-catalog";
+import type { StyleConformanceReport } from "@/src/services/frontend-slides/style-conformance";
 
 export type SlideOutlineData = {
   pageNumber: number;
@@ -28,6 +29,8 @@ export type PresentationBriefData = {
   density?: FrontendSlidesDensity;
   contentReadiness?: "ready" | "rough-notes" | "topic-only";
   styleSpec?: FrontendSlidesStyleSpec;
+  styleContract?: { styleId: string; contractVersion: string; sourceHash: string };
+  styleConformanceReport?: StyleConformanceReport;
   artifact?: ArtifactOperation;
 };
 
