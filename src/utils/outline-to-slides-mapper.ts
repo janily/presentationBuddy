@@ -1,5 +1,6 @@
 import type { PresentationOutlineData, RevisionKind, SlideOutlineData } from "@/src/types/presentation-workflow";
 import type { FrontendSlidesDensity, FrontendSlidesStyleSpec } from "@/src/services/frontend-slides/style-catalog";
+import type { StyleGenerationContext } from "@/src/services/frontend-slides/style-conformance";
 
 export type FrontendSlideLayout = "title" | "content" | "split" | "quote";
 
@@ -16,6 +17,7 @@ export type FrontendSlidesInput = {
   designGuidance: string[];
   density?: FrontendSlidesDensity;
   styleSpec?: FrontendSlidesStyleSpec;
+  styleGenerationContext?: StyleGenerationContext;
   revisionKind?: RevisionKind;
   revisionInstruction?: string;
   revisionTargetSlides?: number[];
@@ -28,6 +30,7 @@ export function mapOutlineToFrontendSlides(
   options?: {
     density?: FrontendSlidesDensity;
     styleSpec?: FrontendSlidesStyleSpec;
+    styleGenerationContext?: StyleGenerationContext;
     revisionKind?: RevisionKind;
     revisionInstruction?: string;
     revisionTargetSlides?: number[];
@@ -40,6 +43,7 @@ export function mapOutlineToFrontendSlides(
     designGuidance: outline.designGuidance,
     density: options?.density,
     styleSpec: options?.styleSpec,
+    styleGenerationContext: options?.styleGenerationContext,
     revisionKind: options?.revisionKind,
     revisionInstruction: options?.revisionInstruction,
     revisionTargetSlides: options?.revisionTargetSlides,

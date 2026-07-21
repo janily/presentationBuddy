@@ -24,16 +24,29 @@ ${input.revisionInstruction}
 ${input.revisionTargetSlides?.length ? `Apply it specifically to slide(s): ${input.revisionTargetSlides.join(", ")}.` : "Apply it to the relevant slides only."}
 Preserve the approved outline and every unaffected slide. Do not reinterpret this content revision as a request to change the visual style.`
     : "";
-  const styleConformanceContract = input.styleSpec
-    ? `Style conformance markers (NON-NEGOTIABLE):
+  const styleConformanceContract = input.styleGenerationContext
+    ? `Executable style conformance context (NON-NEGOTIABLE):
+- Add ${input.styleGenerationContext.identityMarker} to the element with the deck-stage class.
+- Contract version: ${input.styleGenerationContext.contractVersion}
+- Declare these exact canonical CSS custom properties in :root:
+${Object.entries(input.styleGenerationContext.cssCustomProperties).map(([property, value]) => `  ${property}: ${value};`).join("\n")}
+- Font roles: display=${input.styleGenerationContext.fontRoles.display}; body=${input.styleGenerationContext.fontRoles.body}; CJK fallback=${input.styleGenerationContext.fontRoles.cjkFallback ?? "system fallback"}.
+- Required core colors: ${input.styleGenerationContext.requiredColors.join(", ")}. Optional supporting colors: ${input.styleGenerationContext.optionalColors.join(", ")}.
+- Layout language: ${input.styleGenerationContext.layoutRules.join("; ")}.
+- Signature elements: ${input.styleGenerationContext.signatureElements.join("; ")}.
+- Forbidden treatments: ${input.styleGenerationContext.forbiddenTreatments.join("; ")}.
+- ${input.styleGenerationContext.flexibilityStatement}
+Use the canonical variables in rendered rules; do not merely declare them.`
+    : input.styleSpec
+      ? `Style conformance markers (NON-NEGOTIABLE):
 - Add data-presentation-style="${input.styleSpec.id}" to the element with the deck-stage class.
 - Declare these exact canonical CSS custom properties in :root:
   --presentation-style-background: ${input.styleSpec.palette.background};
   --presentation-style-accent: ${input.styleSpec.palette.accent};
   --presentation-style-display-font: "${input.styleSpec.typography.display}";
   --presentation-style-body-font: "${input.styleSpec.typography.body}";
-- Use var(--presentation-style-background) and var(--presentation-style-body-font) on the deck stage, var(--presentation-style-display-font) on slide headings, and var(--presentation-style-accent) in visible slide styling. Do not merely declare these variables; they must drive the rendered deck.`
-    : "";
+- Use var(--presentation-style-background), var(--presentation-style-display-font), var(--presentation-style-body-font), and var(--presentation-style-accent) in visible rendered rules.`
+      : "";
 
   return `Generate a complete standalone HTML presentation from this approved outline.
 

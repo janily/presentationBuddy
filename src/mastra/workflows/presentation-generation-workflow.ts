@@ -8,6 +8,7 @@ import {
 import { ensureFrontendSlidesViewportFill } from "@/src/services/frontend-slides/viewport-fill";
 import { ensureFrontendSlidesStyleContract } from "@/src/services/frontend-slides/style-contract";
 import { loadFrontendSlidesFinalContext } from "@/src/services/frontend-slides/skill-loader";
+import { styleConformanceEngine, type StyleConformanceReport } from "@/src/services/frontend-slides/style-conformance";
 import {
   buildFrontendSlidesMastraPrompt,
   buildFrontendSlidesRepairPrompt,
@@ -681,9 +682,17 @@ export const presentationHtmlGenerationStep = createStep({
     let html = "";
     let generator: PresentationHtmlStepData["generator"] | undefined;
     let regenerationReason: string | undefined;
+    const styleContract = inputData.styleSpec
+      ? await styleConformanceEngine.compile(inputData.styleSpec.id)
+      : undefined;
+    const styleGenerationContext = styleContract
+      ? styleConformanceEngine.buildGenerationContext(styleContract)
+      : undefined;
+    let styleConformanceReport: StyleConformanceReport | undefined;
     const frontendSlidesInput = mapOutlineToFrontendSlides(inputData.outline, inputData.style, {
       density: inputData.density,
       styleSpec: inputData.styleSpec,
+      styleGenerationContext,
       revisionKind: inputData.revision?.kind,
       revisionInstruction: inputData.revision?.instruction ?? inputData.outlineRevisionContext?.instruction,
       revisionTargetSlides: inputData.revision?.targetSlides ?? inputData.outlineRevisionContext?.targetSlides,
@@ -784,12 +793,20 @@ export const presentationHtmlGenerationStep = createStep({
         const normalizedDocument = ensureFrontendSlidesStyleContract(
           ensureFrontendSlidesViewportFill(document),
           frontendSlidesInput.styleSpec,
+          styleContract,
         );
         assertFrontendSlidesDocument(
           normalizedDocument,
           frontendSlidesInput.slides.length,
           frontendSlidesInput.styleSpec,
         );
+        if (styleContract) {
+          const report = styleConformanceEngine.evaluate(normalizedDocument, styleContract);
+          styleConformanceReport = report;
+          if (!report.passed) {
+            throw new Error(`frontend-slides output failed style conformance: ${report.violations.map((violation) => violation.message).join("; ") || `overall score ${report.scores.overall.toFixed(2)} below threshold`}`);
+          }
+        }
         return normalizedDocument;
       };
 
@@ -924,6 +941,12 @@ export const presentationHtmlGenerationStep = createStep({
           density: inputData.density,
           contentReadiness: inputData.contentReadiness,
           styleSpec: inputData.styleSpec,
+          styleContract: styleContract ? {
+            styleId: styleContract.identity.id,
+            contractVersion: styleContract.contractVersion,
+            sourceHash: styleContract.sourceHash,
+          } : undefined,
+          styleConformanceReport,
         },
         approvedOutline: inputData.outline,
         html,
