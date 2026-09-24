@@ -249,26 +249,27 @@ export default function PresentationPreviewPane({ step, currentStep, html, gener
     return <StyleDiscovery previews={stylePreviews} selectedStyleId={selectedStyleId} isLoading={isDiscoveringStyles} batch={styleBatch} remaining={remainingStyleCount} onSelect={onSelectStyle} onMore={onMoreStyles} />;
   }
 
-  if (activeStep === "preview" && activeHtml) {
-    return <HtmlPreview html={activeHtml} />;
-  }
-
-  if (activeStep === "generating") {
-    if (preservePreviewDuringGeneration && activeHtml) {
-      return (
-        <div className="relative h-full min-h-[620px] overflow-hidden">
-          <HtmlPreview html={activeHtml} />
-          <div className="absolute left-1/2 top-4 flex max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-3 rounded-lg border border-[var(--border-light)] bg-white/95 px-4 py-3 shadow-lg backdrop-blur">
+  const isRevising = activeStep === "generating" && preservePreviewDuringGeneration;
+  if (activeHtml && (activeStep === "preview" || isRevising)) {
+    // Keep the iframe at the same React tree position while revision status
+    // changes so the current slide, focus and script state are not reset.
+    return (
+      <div className="relative h-full min-h-[620px] overflow-hidden">
+        <HtmlPreview html={activeHtml} />
+        {isRevising ? (
+          <div role="status" aria-live="polite" className="absolute left-1/2 top-4 flex max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-3 rounded-lg border border-[var(--border-light)] bg-white/95 px-4 py-3 shadow-lg backdrop-blur">
             <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[var(--accent-terracotta)]" />
             <div className="min-w-0">
               <p className="text-sm font-semibold text-[var(--text-primary)]">正在生成新版本</p>
               <p className="truncate text-xs text-[var(--text-muted)]">{htmlGeneration?.message ?? "正在保留当前预览并应用修改…"}</p>
             </div>
           </div>
-        </div>
-      );
-    }
+        ) : null}
+      </div>
+    );
+  }
 
+  if (activeStep === "generating") {
     return <GenerationProgress htmlGeneration={htmlGeneration} />;
   }
 

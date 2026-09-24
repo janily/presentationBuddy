@@ -32,8 +32,7 @@ const getWorkflowSteps = (workflowData: unknown) => {
 
 export const usePresentationWorkflow = () => {
   const [approvalError, setApprovalError] = useState<string | null>(null);
-  const { sendMessage, messages, setMessages, status, error, clearError, stop } = useChat<MyUIMessage>({
-    transport: new DefaultChatTransport({
+  const [transport] = useState(() => new DefaultChatTransport<MyUIMessage>({
       api: "/api/analyze",
       prepareSendMessagesRequest: ({ messages }) => {
         const lastMessage = messages[messages.length - 1];
@@ -91,40 +90,49 @@ export const usePresentationWorkflow = () => {
           },
         };
       },
-    }) as never,
+    }));
+  const { sendMessage, messages, setMessages, status, error, clearError, stop } = useChat<MyUIMessage>({
+    transport: transport as never,
   });
 
-  const outlineStep = useMemo(() => {
-    return messages
-      .flatMap((m) => m.parts)
-      .findLast((item) => item.type === "data-presentationOutline");
+  const { outlineStep, htmlGenerationStep, lastWorkflowPart, activeRunId } = useMemo(() => {
+    let outlineStep: Extract<MyUIMessage["parts"][number], { type: "data-presentationOutline" }> | undefined;
+    let htmlGenerationStep: Extract<MyUIMessage["parts"][number], { type: "data-presentationHtml" }> | undefined;
+    let lastWorkflowPart: Extract<MyUIMessage["parts"][number], { type: "data-workflow" }> | undefined;
+    let activeRunId: string | null = null;
+
+    // One backwards pass, no flattened history copies on every streamed update.
+    // A new run ID is a boundary: never combine its status with an older deck.
+    scan: for (let m = messages.length - 1; m >= 0; m--) {
+      if (messages[m].role !== "assistant") continue;
+      const beforeMessage = { outlineStep, htmlGenerationStep, lastWorkflowPart };
+      const parts = messages[m].parts;
+      for (let p = parts.length - 1; p >= 0; p--) {
+        const part = parts[p];
+        const runId = part.type === "data-workflowRunId"
+          ? getNonEmptyString(part.data)
+          : part.type === "data-workflow" ? getWorkflowPayloadRunId(part.data) : null;
+        if (runId && activeRunId && runId !== activeRunId) {
+          // Identifiers can precede content in a message. Discard any content
+          // tentatively collected from this older run while scanning backwards.
+          ({ outlineStep, htmlGenerationStep, lastWorkflowPart } = beforeMessage);
+          break scan;
+        }
+        activeRunId ??= runId;
+        if (part.type === "data-presentationOutline") outlineStep ??= part;
+        if (part.type === "data-presentationHtml") htmlGenerationStep ??= part;
+        if (part.type === "data-workflow") lastWorkflowPart ??= part;
+
+      }
+      if (activeRunId && outlineStep && htmlGenerationStep && lastWorkflowPart) break;
+    }
+    return { outlineStep, htmlGenerationStep, lastWorkflowPart, activeRunId };
   }, [messages]);
-
-  const htmlGenerationStep = useMemo(() => {
-    return messages
-      .flatMap((m) => m.parts)
-      .findLast((item) => item.type === "data-presentationHtml");
-  }, [messages]);
-
-  const lastWorkflowPart = messages
-    .flatMap((m) => m.parts)
-    .findLast((p) => p.type === "data-workflow");
-
-  const lastWorkflowRunIdPart = messages
-    .flatMap((m) => m.parts)
-    .findLast((p) => p.type === "data-workflowRunId");
 
   const workflowFailure = useMemo(
     () => getWorkflowFailureInfo(lastWorkflowPart?.data),
     [lastWorkflowPart],
   );
-
-  const activeRunId = useMemo(() => {
-    const workflowPayloadRunId = getWorkflowPayloadRunId(lastWorkflowPart?.data);
-    if (workflowPayloadRunId) return workflowPayloadRunId;
-
-    return getNonEmptyString(lastWorkflowRunIdPart?.data);
-  }, [lastWorkflowPart, lastWorkflowRunIdPart]);
 
   const sendPresentationBrief = (brief: PresentationBriefData) => {
     setApprovalError(null);
@@ -184,8 +192,8 @@ export const usePresentationWorkflow = () => {
     const steps = getWorkflowSteps(workflowData);
     if (!steps) return null;
 
-    const lastStepKey = Object.keys(steps).pop();
-    const lastStep = lastStepKey ? steps[lastStepKey] : null;
+    const lastStep = steps["presentation-outline-suggestion-step"]
+      ?? Object.values(steps).find((step) => step.suspendPayload?.suggestedOutline);
 
     const outline = lastStep?.suspendPayload?.suggestedOutline as
       | PresentationOutlineData

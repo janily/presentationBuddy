@@ -113,7 +113,12 @@ function classifyProcessingError(error: unknown) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: "Request body must be valid JSON", code: "invalid_json" }, { status: 400 });
+    }
     const validation = validatePresentationWorkflowRequest(body);
 
     if (!validation.success) {
@@ -234,7 +239,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const { topic, audience, pageCount, style, requirements, artifact } =
+    const { topic, audience, pageCount, style, requirements } =
       validation.data;
     const workflow = mastra.getWorkflow("presentationGenerationWorkflow");
 
@@ -252,14 +257,9 @@ export async function POST(request: NextRequest) {
     try {
       run = await workflow.createRunAsync();
       stream = run.stream({
-        inputData: {
-          topic,
-          audience,
-          pageCount,
-          style,
-          requirements,
-          artifact,
-        },
+        // The schema is the boundary: do not silently drop styleSpec, density,
+        // content readiness or outline/revision options after validation.
+        inputData: validation.data,
       });
       request.signal.addEventListener("abort", () => {
         console.info("Presentation generation workflow cancellation requested by client abort", {

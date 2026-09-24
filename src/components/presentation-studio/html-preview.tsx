@@ -1,5 +1,7 @@
 "use client";
 
+import { memo, useMemo } from "react";
+import { buildPreviewDocument } from "@/src/utils/generated-html-security";
 import { Download } from "lucide-react";
 
 interface HtmlPreviewProps {
@@ -18,7 +20,8 @@ function downloadHtml(html: string) {
   URL.revokeObjectURL(url);
 }
 
-export default function HtmlPreview({ html }: HtmlPreviewProps) {
+function HtmlPreview({ html }: HtmlPreviewProps) {
+  const previewDocument = useMemo(() => buildPreviewDocument(html), [html]);
   return (
     <div className="flex h-full min-h-[620px] flex-col bg-white">
       <div className="flex items-center justify-end border-b border-[var(--border-light)] bg-[var(--bg-card)]/95 px-4 py-3 backdrop-blur">
@@ -26,7 +29,10 @@ export default function HtmlPreview({ html }: HtmlPreviewProps) {
           <Download className="h-4 w-4" />下载 HTML
         </button>
       </div>
-      <iframe title="Generated HTML presentation" sandbox="allow-scripts allow-same-origin" srcDoc={html} className="min-h-0 flex-1" />
+      <iframe title="Generated HTML presentation" sandbox="allow-scripts"
+        referrerPolicy="no-referrer" srcDoc={previewDocument} className="min-h-0 flex-1" />
     </div>
   );
 }
+
+export default memo(HtmlPreview);

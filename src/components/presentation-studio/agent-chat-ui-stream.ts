@@ -18,6 +18,8 @@ export function dispatchAgentChatUIChunk(
   chunk: AgentChatUIChunk,
   callbacks: AgentChatStreamCallbacks,
 ): AgentChatDispatchResult {
+  if (callbacks.signal.aborted) return {};
+
   switch (chunk.type) {
     case "text-delta":
       callbacks.onAssistantDelta(chunk.delta);

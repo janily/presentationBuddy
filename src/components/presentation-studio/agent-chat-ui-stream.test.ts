@@ -55,3 +55,20 @@ describe("agent chat UI stream", () => {
     });
   });
 });
+
+it("ignores every late chunk after the request has been cancelled", () => {
+  const { callbacks, state } = createCallbacks();
+  const controller = new AbortController();
+  callbacks.signal = controller.signal;
+  controller.abort();
+  const chunks: AgentChatUIChunk[] = [
+    { type: "text-delta", id: "late", delta: "stale text" },
+    { type: "data-agentStatus", data: { operationId: "old", state: "connecting", message: "stale progress" } },
+    { type: "data-agentReasoning", data: { operationId: "old", delta: "stale reasoning", state: "delta" } },
+    { type: "data-assistantSnapshot", data: { operationId: "old", text: "stale snapshot" } },
+    { type: "data-agentDecision", data: { operationId: "old", payload: { reply: "stale decision", readyToGenerate: true, brief: null } } },
+    { type: "error", errorText: "stale error" },
+  ];
+  for (const chunk of chunks) expect(dispatchAgentChatUIChunk(chunk, callbacks)).toEqual({});
+  expect(state).toEqual({ progress: [], text: "", decision: null, reasoning: "" });
+});

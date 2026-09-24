@@ -13,7 +13,8 @@ import type {
 import AgentPanel, { type AgentMessage } from "./agent-panel";
 import { getQuickActionDefinition, type AgentQuickActionChoice, type AgentQuickCommand } from "./agent-quick-actions";
 import { appendCompletionMessage } from "./agent-message-model";
-import { dispatchAgentChatUIChunk, type AgentChatStreamCallbacks } from "./agent-chat-ui-stream";
+import type { AgentChatStreamCallbacks } from "./agent-chat-ui-stream";
+import { consumeAgentStream } from "./consume-agent-stream";
 import { applyReasoningEvent, stopStreamingAssistantMessage } from "./agent-message-stream-state";
 import { requestsCancelledGenerationRetry } from "./cancelled-generation-retry";
 import { discoverFrontendSlideStyles, listFrontendSlideStyles, type FrontendSlidesStylePreview, type FrontendSlidesStyleSpec } from "@/src/services/frontend-slides/style-catalog";
@@ -24,7 +25,7 @@ import {
   shouldAppendReplayMessage,
   shouldDeferAgentAction,
 } from "./generation-state-routing";
-import type { AgentActionProposal, AgentChatResponse, AgentChatUIChunk, AgentChatUIMessage } from "@/src/types/agent-chat";
+import type { AgentActionProposal, AgentChatResponse, AgentChatUIMessage } from "@/src/types/agent-chat";
 import {
   buildRevisionFromProposal,
   resolveProposalConfirmation,
@@ -620,21 +621,7 @@ export default function PresentationStudio() {
       messages: [],
       abortSignal: callbacks.signal,
     });
-    const reader = stream.getReader();
-    const streamState: { result?: AgentChatResponse; error?: string } = {};
-
-    while (true) {
-      const { done, value: chunk } = await reader.read();
-      if (done) break;
-      const dispatchResult = dispatchAgentChatUIChunk(chunk as AgentChatUIChunk, callbacks);
-      if (dispatchResult.result) streamState.result = dispatchResult.result;
-      if (dispatchResult.error) streamState.error = dispatchResult.error;
-    }
-
-    if (streamState.error) throw new Error(streamState.error);
-    if (!streamState.result?.reply) throw new Error("Agent chat stream ended without a result");
-
-    return streamState.result;
+    return consumeAgentStream(stream, callbacks);
   }, [activeArtifact, brief, pendingProposal, selectedStyle, workflowError]);
 
   const handleAgentSend = useCallback(async (

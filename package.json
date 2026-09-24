@@ -10,7 +10,10 @@
     "generate:style-previews": "node scripts/generate-style-previews.mjs",
     "mastra": "mastra dev",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "check:runtime-assets": "node scripts/check-runtime-assets.mjs",
+    "check": "npm test && npm run lint && npm run typecheck && npm run build && npm run check:runtime-assets"
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.1",
@@ -44,5 +47,10 @@
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.0.0"
+  },
+  "packageManager": "npm@10.9.2",
+  "engines": {
+    "node": ">=22.0.0",
+    "npm": ">=10.0.0"
   }
 }
