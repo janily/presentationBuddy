@@ -3,7 +3,7 @@ name: Quality checks
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, fix/reliability-performance-audit-20260924]
 
 permissions:
   contents: read
