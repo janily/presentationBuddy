@@ -1,0 +1,331 @@
+diff --git a/src/app/api/analyze/route.test.ts b/src/app/api/analyze/route.test.ts
+new file mode 100644
+index 0000000..0171d19
+--- /dev/null
++++ b/src/app/api/analyze/route.test.ts
+@@ -0,0 +1,71 @@
++import { beforeEach, describe, expect, it, vi } from "vitest";
++import { NextRequest } from "next/server";
++
++const mocks = vi.hoisted(() => ({
++  start: vi.fn(), resume: vi.fn(), cancel: vi.fn(), createRun: vi.fn(),
++}));
++vi.mock("@/src/mastra", () => ({ mastra: { getWorkflow: () => ({ createRunAsync: mocks.createRun }) } }));
++vi.mock("@mastra/ai-sdk", () => ({ toAISdkFormat: () => new ReadableStream({ start(c) { c.close(); } }) }));
++const { POST } = await import("./route");
++
++function request(body: unknown) {
++  return new NextRequest("http://localhost/api/analyze", {
++    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
++  });
++}
++const styleSpec = {
++  id: "custom-a", name: "Custom A", source: "frontend-slides-custom", vibe: "calm", layout: "grid",
++  typography: { display: "Arial", body: "Arial" },
++  palette: { background: "#ffffff", surface: "#eeeeee", text: "#111111", accent: "#ff0000", secondary: "#0000ff" },
++  signatureElements: ["grid"],
++};
++const outline = {
++  title: "Demo", narrativeGoal: "Teach", sections: ["Introduction"], designGuidance: [],
++  slides: [{ pageNumber: 1, title: "Demo", purpose: "Teach", keyPoints: ["One"], designSuggestion: "Grid" }],
++};
++
++beforeEach(() => {
++  vi.clearAllMocks();
++  mocks.start.mockReturnValue({ fullStream: new ReadableStream({ start(c) { c.close(); } }) });
++  mocks.resume.mockReturnValue({ fullStream: new ReadableStream({ start(c) { c.close(); } }) });
++  mocks.cancel.mockResolvedValue(undefined);
++  mocks.createRun.mockResolvedValue({ runId: "run-test", stream: mocks.start, resumeStream: mocks.resume, cancel: mocks.cancel });
++});
++
++describe("analyze API boundary", () => {
++  it("passes every validated presentation option to the workflow", async () => {
++    const presentationBrief = {
++      topic: "Systems", audience: "Engineers", pageCount: 6, style: "Custom A", requirements: "Chinese",
++      purpose: "teaching-tutorial", density: "reading-first", contentReadiness: "ready", styleSpec,
++      autoApproveOutline: true,
++      artifact: { operationId: "op-1", deckId: "deck-1", baseVersion: 0, targetVersion: 1 },
++    };
++    const response = await POST(request({ presentationBrief }));
++    await response.text();
++    expect(response.status).toBe(200);
++    expect(mocks.start.mock.calls[0][0].inputData).toEqual(presentationBrief);
++  });
++
++  it("keeps style options when starting from the agent chat context", async () => {
++    const response = await POST(request({ agentRequest: {
++      message: "Generate this", context: { topic: "Systems", density: "speaker-led", styleSpec },
++    } }));
++    await response.text();
++    expect(mocks.start.mock.calls[0][0].inputData).toMatchObject({ topic: "Systems", density: "speaker-led", styleSpec });
++  });
++
++  it("returns 400 instead of 500 for malformed JSON without starting a model", async () => {
++    const response = await POST(new NextRequest("http://localhost/api/analyze", { method: "POST", body: "{" }));
++    expect(response.status).toBe(400);
++    expect(await response.json()).toMatchObject({ code: "invalid_json" });
++    expect(mocks.createRun).not.toHaveBeenCalled();
++  });
++
++  it("still resumes the approved outline rather than starting a new run", async () => {
++    const response = await POST(request({ workflowRunId: "old-run", approvedOutline: outline }));
++    await response.text();
++    expect(mocks.createRun).toHaveBeenCalledWith({ runId: "old-run" });
++    expect(mocks.resume).toHaveBeenCalledWith({ step: "presentation-outline-suggestion-step", resumeData: { approvedOutline: outline } });
++    expect(mocks.start).not.toHaveBeenCalled();
++  });
++});
+diff --git a/src/app/api/preview/[filename]/route.test.ts b/src/app/api/preview/[filename]/route.test.ts
+new file mode 100644
+index 0000000..7c006c0
+--- /dev/null
++++ b/src/app/api/preview/[filename]/route.test.ts
+@@ -0,0 +1,44 @@
++import { beforeEach, describe, expect, it, vi } from "vitest";
++
++const mocks = vi.hoisted(() => ({ readFile: vi.fn(), resolveDir: vi.fn() }));
++vi.mock("fs/promises", () => ({ readFile: mocks.readFile }));
++vi.mock("@/src/utils/save-html-to-file", () => ({ resolveGeneratedSlidesDir: mocks.resolveDir }));
++const { GET } = await import("./route");
++const config = (await import("../../../../../next.config")).default;
++const get = (filename: string) => GET(new Request("http://localhost/api/preview/deck.html"), { params: Promise.resolve({ filename }) });
++
++beforeEach(() => {
++  mocks.readFile.mockReset().mockResolvedValue("<!doctype html><html>deck</html>");
++  mocks.resolveDir.mockReturnValue({ dir: "/data/generated-slides", source: "custom", servedByStatic: false });
++});
++
++describe("generated HTML serving", () => {
++  it("isolates scripts even when the preview URL is opened directly", async () => {
++    const response = await get("deck.html");
++    expect(response.status).toBe(200);
++    expect(response.headers.get("Content-Security-Policy")).toContain("sandbox allow-scripts");
++    expect(response.headers.get("Content-Security-Policy")).not.toContain("allow-same-origin");
++    expect(response.headers.get("X-Content-Type-Options")).toBe("nosniff");
++    expect(response.headers.get("Referrer-Policy")).toBe("no-referrer");
++    expect(response.headers.get("Cache-Control")).toContain("no-store");
++    expect(await response.text()).toContain("deck");
++  });
++
++  it("also protects the public static generated-slides path", async () => {
++    const headers = await config.headers?.();
++    const rule = headers?.find((item) => item.source === "/generated-slides/:path*");
++    expect(rule?.headers.find((item) => item.key === "Content-Security-Policy")?.value).toContain("sandbox allow-scripts");
++  });
++
++  it.each(["../private.html", "sub/deck.html", "sub\\deck.html", "deck.txt", "bad\0.html"])("rejects unsafe filename %j", async (filename) => {
++    expect((await get(filename)).status).toBe(400);
++    expect(mocks.readFile).not.toHaveBeenCalled();
++  });
++
++  it("distinguishes missing files from server storage failures", async () => {
++    mocks.readFile.mockRejectedValueOnce(Object.assign(new Error("missing"), { code: "ENOENT" }));
++    expect((await get("missing.html")).status).toBe(404);
++    mocks.readFile.mockRejectedValueOnce(Object.assign(new Error("permission denied"), { code: "EACCES" }));
++    expect((await get("deck.html")).status).toBe(500);
++  });
++});
+diff --git a/src/components/presentation-studio/agent-chat-ui-stream.test.ts b/src/components/presentation-studio/agent-chat-ui-stream.test.ts
+index 2533ad0..e28a619 100644
+--- a/src/components/presentation-studio/agent-chat-ui-stream.test.ts
++++ b/src/components/presentation-studio/agent-chat-ui-stream.test.ts
+@@ -57 +57,18 @@ describe("agent chat UI stream", () => {
+ });
++
++it("ignores every late chunk after the request has been cancelled", () => {
++  const { callbacks, state } = createCallbacks();
++  const controller = new AbortController();
++  callbacks.signal = controller.signal;
++  controller.abort();
++  const chunks: AgentChatUIChunk[] = [
++    { type: "text-delta", id: "late", delta: "stale text" },
++    { type: "data-agentStatus", data: { operationId: "old", state: "connecting", message: "stale progress" } },
++    { type: "data-agentReasoning", data: { operationId: "old", delta: "stale reasoning", state: "delta" } },
++    { type: "data-assistantSnapshot", data: { operationId: "old", text: "stale snapshot" } },
++    { type: "data-agentDecision", data: { operationId: "old", payload: { reply: "stale decision", readyToGenerate: true, brief: null } } },
++    { type: "error", errorText: "stale error" },
++  ];
++  for (const chunk of chunks) expect(dispatchAgentChatUIChunk(chunk, callbacks)).toEqual({});
++  expect(state).toEqual({ progress: [], text: "", decision: null, reasoning: "" });
++});
+diff --git a/src/components/presentation-studio/consume-agent-stream.test.ts b/src/components/presentation-studio/consume-agent-stream.test.ts
+new file mode 100644
+index 0000000..83f155d
+--- /dev/null
++++ b/src/components/presentation-studio/consume-agent-stream.test.ts
+@@ -0,0 +1,54 @@
++import { describe, expect, it, vi } from "vitest";
++import { consumeAgentStream } from "./consume-agent-stream";
++import type { AgentChatStreamCallbacks } from "./agent-chat-ui-stream";
++import type { AgentChatUIChunk } from "@/src/types/agent-chat";
++function callbacks(signal = new AbortController().signal): AgentChatStreamCallbacks {
++  return { signal, onProgress: vi.fn(), onAssistantDelta: vi.fn(), onReasoningDelta: vi.fn(), onAssistantSnapshot: vi.fn(), onDecision: vi.fn() };
++}
++const payload = { reply: "Done", readyToGenerate: false, brief: null };
++
++describe("agent stream resource lifecycle", () => {
++  it("returns the completed decision and releases the reader", async () => {
++    const stream = new ReadableStream<AgentChatUIChunk>({ start(c) {
++      c.enqueue({ type: "data-agentDecision", data: { operationId: "one", payload } }); c.close();
++    } });
++    await expect(consumeAgentStream(stream, callbacks())).resolves.toEqual(payload);
++    expect(stream.locked).toBe(false);
++  });
++  it("fails and cancels immediately on an error chunk, even if the source stays open", async () => {
++    const cancel = vi.fn();
++    const stream = new ReadableStream<AgentChatUIChunk>({ start(c) { c.enqueue({ type: "error", errorText: "provider failed" }); }, cancel });
++    await expect(consumeAgentStream(stream, callbacks())).rejects.toThrow("provider failed");
++    expect(cancel).toHaveBeenCalledOnce();
++    expect(stream.locked).toBe(false);
++  });
++  it("cancels an idle reader when the user stops", async () => {
++    const controller = new AbortController();
++    const cancel = vi.fn();
++    const stream = new ReadableStream<AgentChatUIChunk>({ cancel });
++    const task = consumeAgentStream(stream, callbacks(controller.signal));
++    controller.abort();
++    await expect(task).rejects.toMatchObject({ name: "AbortError" });
++    expect(cancel).toHaveBeenCalledOnce();
++    expect(stream.locked).toBe(false);
++  });
++  it("rejects an incomplete response without leaking the reader", async () => {
++    const stream = new ReadableStream<AgentChatUIChunk>({ start(c) { c.close(); } });
++    await expect(consumeAgentStream(stream, callbacks())).rejects.toThrow("without a result");
++    expect(stream.locked).toBe(false);
++  });
++});
++
++it("does not wait forever for an uncooperative source cancel handler", async () => {
++  const stream = new ReadableStream<AgentChatUIChunk>({
++    start(c) { c.enqueue({ type: "error", errorText: "failed" }); },
++    cancel() { return new Promise(() => undefined); },
++  });
++  const task = consumeAgentStream(stream, callbacks());
++  const state = await Promise.race([
++    task.then(() => "resolved", (error: Error) => error.message),
++    new Promise((resolve) => setTimeout(() => resolve("hung"), 50)),
++  ]);
++  expect(state).toBe("failed");
++  expect(stream.locked).toBe(false);
++});
+diff --git a/src/components/presentation-studio/html-preview.test.ts b/src/components/presentation-studio/html-preview.test.ts
+new file mode 100644
+index 0000000..7a3cc45
+--- /dev/null
++++ b/src/components/presentation-studio/html-preview.test.ts
+@@ -0,0 +1,27 @@
++import { createElement } from "react";
++import { renderToStaticMarkup } from "react-dom/server";
++import { describe, expect, it } from "vitest";
++import HtmlPreview from "./html-preview";
++import PresentationPreviewPane from "./presentation-preview-pane";
++
++describe("HTML preview boundaries", () => {
++  it("runs deck navigation scripts without granting access to the studio origin", () => {
++    const markup = renderToStaticMarkup(createElement(HtmlPreview, { html: "<html>deck</html>" }));
++    expect(markup).toContain('sandbox="allow-scripts"');
++    expect(markup).not.toContain("allow-same-origin");
++    expect(markup).toContain('referrerPolicy="no-referrer"');
++    expect(markup).toContain("下载 HTML");
++  });
++
++  it("keeps the same root and preview child across revision progress transitions", () => {
++    const base = { outline: [], html: "<html>deck</html>", preservePreviewDuringGeneration: true };
++    const preview = PresentationPreviewPane({ ...base, step: "preview" });
++    const revising = PresentationPreviewPane({ ...base, step: "generating" });
++    expect(preview.type).toBe(revising.type);
++    const firstChild = (element: typeof preview) => {
++      const children = element.props.children;
++      return Array.isArray(children) ? children[0] : children;
++    };
++    expect(firstChild(preview).type).toBe(firstChild(revising).type);
++  });
++});
+diff --git a/src/components/presentation-studio/presentation-workspace.test.ts b/src/components/presentation-studio/presentation-workspace.test.ts
+new file mode 100644
+index 0000000..cea2bdd
+--- /dev/null
++++ b/src/components/presentation-studio/presentation-workspace.test.ts
+@@ -0,0 +1,15 @@
++import { createElement } from "react";
++import { renderToStaticMarkup } from "react-dom/server";
++import { describe, expect, it } from "vitest";
++import PresentationWorkspace from "./presentation-workspace";
++
++describe("responsive workspace", () => {
++  it("bounds both mobile panels within the dynamic viewport instead of auto-sized overflowing rows", () => {
++    const html = renderToStaticMarkup(createElement(PresentationWorkspace, { previewContent: "Preview", agentContent: "Chat" }));
++    expect(html).toContain("h-dvh");
++    expect(html).toContain("grid-rows-[minmax(0,0.8fr)_minmax(0,1fr)]");
++    expect(html).toContain("lg:grid-rows-1");
++    expect(html).toContain('aria-label="演示预览"');
++    expect(html).toContain('aria-label="AI 助手"');
++  });
++});
+diff --git a/src/hooks/use-presentation-workflow.test.ts b/src/hooks/use-presentation-workflow.test.ts
+new file mode 100644
+index 0000000..534c680
+--- /dev/null
++++ b/src/hooks/use-presentation-workflow.test.ts
+@@ -0,0 +1,61 @@
++import { createElement } from "react";
++import { renderToStaticMarkup } from "react-dom/server";
++import { beforeEach, describe, expect, it, vi } from "vitest";
++import type { MyUIMessage } from "../types/presentation-workflow";
++const state = vi.hoisted(() => ({ messages: [] as unknown[] }));
++vi.mock("@ai-sdk/react", () => ({ useChat: () => ({
++  messages: state.messages, sendMessage: vi.fn(), setMessages: vi.fn(), status: "ready", error: undefined,
++  clearError: vi.fn(), stop: vi.fn(),
++}) }));
++const { usePresentationWorkflow } = await import("./use-presentation-workflow");
++function Probe() {
++  return createElement("script", { type: "application/json" }, JSON.stringify(usePresentationWorkflow()));
++}
++function render(messages: unknown[]) {
++  state.messages = messages as MyUIMessage[];
++  const markup = renderToStaticMarkup(createElement(Probe));
++  return JSON.parse(markup.replace(/^<script[^>]*>/, "").replace(/<\/script>$/, "")) as ReturnType<typeof usePresentationWorkflow>;
++}
++beforeEach(() => { state.messages = []; });
++
++describe("workflow event selection", () => {
++  it("uses a newer run announcement instead of a previous run payload", () => {
++    const value = render([
++      { id: "old", role: "assistant", parts: [
++        { type: "data-workflow", data: { runId: "old-run" } },
++        { type: "data-presentationHtml", data: { status: "completed", html: "old deck" } },
++      ] },
++      { id: "new", role: "assistant", parts: [{ type: "data-workflowRunId", data: "new-run" }] },
++    ]);
++    expect(value.activeRunId).toBe("new-run");
++    expect(value.htmlGenerationStep).toBeUndefined();
++  });
++
++  it("finds the suspended outline independently of step insertion order", () => {
++    const outline = { title: "Approved", slides: [] };
++    const value = render([{ id: "one", role: "assistant", parts: [{ type: "data-workflow", data: {
++      runId: "current", steps: {
++        "presentation-outline-suggestion-step": { suspendPayload: { suggestedOutline: outline, reason: "Review" } },
++        "presentation-html-generation-step": { status: "pending" },
++      },
++    } }] }]);
++    expect(value.suspenseData?.outline).toEqual(outline);
++  });
++
++  it("retains the latest current-run outline and HTML data", () => {
++    const value = render([{ id: "one", role: "assistant", parts: [
++      { type: "data-workflowRunId", data: "run-1" },
++      { type: "data-presentationOutline", data: { status: "completed", outline: { title: "Current" } } },
++      { type: "data-presentationHtml", data: { status: "in-progress", progress: 50 } },
++      { type: "data-workflow", data: { data: { runId: "run-1" } } },
++    ] }]);
++    expect(value.activeRunId).toBe("run-1");
++    expect(value.outlineStep?.data.outline?.title).toBe("Current");
++    expect(value.htmlGenerationStep?.data.progress).toBe(50);
++  });
++
++  it("does not treat user-supplied workflow parts as server state", () => {
++    const value = render([{ id: "user", role: "user", parts: [{ type: "data-workflowRunId", data: "fake" }] }]);
++    expect(value.activeRunId).toBeNull();
++  });
++});
