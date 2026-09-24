@@ -1,52 +1,65 @@
 name: Quality checks
 
 on:
+  pull_request:
   push:
-    branches: [fix/reliability-performance-audit-20260924]
+    branches: [main, fix/reliability-performance-audit-20260924]
 
 permissions:
   contents: read
 
 concurrency:
-  group: quality-${{ github.ref }}
+  group: quality-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  apply-verified-audit:
-    # Temporary delivery step for this audit only; removed after verification.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/fix/reliability-performance-audit-20260924' && contains(github.event.head_commit.message, '[apply-audit]')
+  quality:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    permissions:
-      contents: write
     env:
       NEXT_TELEMETRY_DISABLED: '1'
+      # No production credentials or paid model calls in this verification.
       MODEL_API_KEY: ci-placeholder-not-a-real-key
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.sha }}
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
-      - name: Verify and apply the reviewed plain-text changes
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Unit and integration tests
+        id: tests
+        continue-on-error: true
+        run: npm test
+      - name: Lint
+        id: lint
+        continue-on-error: true
+        run: npm run lint
+      - name: Type check
+        id: types
+        continue-on-error: true
+        run: npm run typecheck
+      - name: Production build
+        id: build
+        continue-on-error: true
+        run: npm run build
+      - name: Verify deployment runtime assets
+        id: assets
+        if: steps.build.outcome == 'success'
+        continue-on-error: true
+        run: npm run check:runtime-assets
+      - name: Require every quality check to pass
+        if: always()
+        env:
+          TESTS: ${{ steps.tests.outcome }}
+          LINT: ${{ steps.lint.outcome }}
+          TYPES: ${{ steps.types.outcome }}
+          BUILD: ${{ steps.build.outcome }}
+          ASSETS: ${{ steps.assets.outcome }}
         run: |
-          test "$GITHUB_REF" = refs/heads/fix/reliability-performance-audit-20260924
-          sha256sum --check .audit-staging/SHA256SUMS
-          git apply --check .audit-staging/*.patch
-          git apply .audit-staging/*.patch
-          git diff --check
-          git rm -- pnpm-lock.yaml pnpm-workspace.yaml
-      - name: Install the exact dependency graph
-        run: npm ci --ignore-scripts --no-audit --no-fund --fetch-retries=1 --fetch-timeout=30000
-      - name: Verify tests, lint, types, build and deployment assets
-        run: npm run check
-      - name: Commit only the verified audit files
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -- README.md next.config.ts package.json package-lock.json src docs/audits scripts/check-runtime-assets.mjs
-          git rm -r -- .audit-staging
-          git commit -m 'fix: preserve generation intent, isolate previews and release streaming resources'
-          git push origin HEAD:fix/reliability-performance-audit-20260924
+          for result in "$TESTS" "$LINT" "$TYPES" "$BUILD" "$ASSETS"; do
+            if [ "$result" != success ]; then exit 1; fi
+          done
