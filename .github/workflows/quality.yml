@@ -18,45 +18,42 @@ jobs:
     timeout-minutes: 20
     env:
       NEXT_TELEMETRY_DISABLED: '1'
-      # Build checks must never call a paid model or use production credentials.
       MODEL_API_KEY: ci-placeholder-not-a-real-key
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Archive the exact source revision for reproducible review
-        run: git archive --format=tar.gz --output=quality-source.tar.gz HEAD
-      - uses: actions/upload-artifact@v4
-        with:
-          name: quality-source
-          path: quality-source.tar.gz
-          retention-days: 3
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: pnpm
+          cache: npm
       - name: Install locked dependencies
         id: install
-        run: pnpm install --frozen-lockfile --ignore-scripts
+        run: npm ci --ignore-scripts
+      - name: Capture dependencies for offline verification
+        run: tar -czf quality-dependencies.tar.gz node_modules
+      - uses: actions/upload-artifact@v4
+        with:
+          name: quality-dependencies
+          path: quality-dependencies.tar.gz
+          retention-days: 1
+          compression-level: 0
       - name: Unit and integration tests
         id: tests
         continue-on-error: true
-        run: pnpm test
+        run: npm test
       - name: Lint
         id: lint
         continue-on-error: true
-        run: pnpm lint
+        run: npm run lint
       - name: Type check
         id: types
         continue-on-error: true
-        run: pnpm exec tsc --noEmit
+        run: npx --no-install tsc --noEmit
       - name: Production build
         id: build
         continue-on-error: true
-        run: pnpm build
+        run: npm run build
       - name: Require every quality check to pass
         if: always()
         env:
