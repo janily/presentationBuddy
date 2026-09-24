@@ -1,0 +1,330 @@
+diff --git a/next.config.ts b/next.config.ts
+index 7e001df..e83e76c 100644
+--- a/next.config.ts
++++ b/next.config.ts
+@@ -1,2 +1,3 @@
+ import type { NextConfig } from "next";
++import { GENERATED_HTML_HEADERS } from "./src/utils/generated-html-security";
+ 
+@@ -4,3 +5,20 @@ const nextConfig: NextConfig = {
+   serverExternalPackages: ["@mastra/*"],
+-  /* config options here */
++  outputFileTracingIncludes: {
++    "/api/analyze": [
++      "./.claude/skills/frontend-slides/*.md",
++      "./.claude/skills/frontend-slides/viewport-base.css",
++      "./.claude/skills/frontend-slides/bold-template-pack/templates/*/design.md",
++    ],
++    "/api/style-discovery": [
++      "./.claude/skills/frontend-slides/SKILL.md",
++      "./.claude/skills/frontend-slides/STYLE_PRESETS.md",
++    ],
++  },
++  async headers() {
++    return [{
++      // Local/self-hosted saves use public/, bypassing the API route.
++      source: "/generated-slides/:path*",
++      headers: Object.entries(GENERATED_HTML_HEADERS).map(([key, value]) => ({ key, value })),
++    }];
++  },
+ };
+diff --git a/package-lock.json b/package-lock.json
+index fa1c25d..e59c1f6 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -41,2 +41,6 @@
+         "vitest": "^4.0.0"
++      },
++      "engines": {
++        "node": ">=22.0.0",
++        "npm": ">=10.0.0"
+       }
+diff --git a/package.json b/package.json
+index 6e4a1cd..0995007 100644
+--- a/package.json
++++ b/package.json
+@@ -12,3 +12,6 @@
+     "test": "vitest run",
+-    "test:watch": "vitest"
++    "test:watch": "vitest",
++    "typecheck": "tsc --noEmit",
++    "check:runtime-assets": "node scripts/check-runtime-assets.mjs",
++    "check": "npm test && npm run lint && npm run typecheck && npm run build && npm run check:runtime-assets"
+   },
+@@ -46,2 +49,7 @@
+     "vitest": "^4.0.0"
++  },
++  "packageManager": "npm@10.9.2",
++  "engines": {
++    "node": ">=22.0.0",
++    "npm": ">=10.0.0"
+   }
+diff --git a/scripts/check-runtime-assets.mjs b/scripts/check-runtime-assets.mjs
+new file mode 100644
+index 0000000..4e865f1
+--- /dev/null
++++ b/scripts/check-runtime-assets.mjs
+@@ -0,0 +1,20 @@
++import { readFile, readdir } from "node:fs/promises";
++import path from "node:path";
++import assert from "node:assert/strict";
++
++const root = process.cwd();
++const skill = ".claude/skills/frontend-slides";
++const templates = await readdir(path.join(skill, "bold-template-pack/templates"));
++const requirements = {
++  analyze: ["SKILL.md", "html-template.md", "viewport-base.css", "animation-patterns.md", "STYLE_PRESETS.md",
++    ...templates.map((name) => `bold-template-pack/templates/${name}/design.md`)],
++  "style-discovery": ["SKILL.md", "STYLE_PRESETS.md"],
++};
++for (const [route, assets] of Object.entries(requirements)) {
++  const traceFile = path.join(root, `.next/server/app/api/${route}/route.js.nft.json`);
++  const trace = JSON.parse(await readFile(traceFile, "utf8"));
++  const files = new Set(trace.files.map((file) => path.resolve(path.dirname(traceFile), file)));
++  const missing = assets.filter((asset) => !files.has(path.join(root, skill, asset)));
++  assert.equal(missing.length, 0, `${route}: deployment trace is missing ${missing.join(", ")}`);
++  console.log(`${route}: ${assets.length} required runtime assets traced`);
++}
+diff --git a/src/app/api/analyze/route.ts b/src/app/api/analyze/route.ts
+index ed0a575..81c261f 100644
+--- a/src/app/api/analyze/route.ts
++++ b/src/app/api/analyze/route.ts
+@@ -115,3 +115,8 @@ export async function POST(request: NextRequest) {
+   try {
+-    const body = await request.json();
++    let body: unknown;
++    try {
++      body = await request.json();
++    } catch {
++      return NextResponse.json({ error: "Request body must be valid JSON", code: "invalid_json" }, { status: 400 });
++    }
+     const validation = validatePresentationWorkflowRequest(body);
+@@ -236,3 +241,3 @@ export async function POST(request: NextRequest) {
+ 
+-    const { topic, audience, pageCount, style, requirements, artifact } =
++    const { topic, audience, pageCount, style, requirements } =
+       validation.data;
+@@ -254,10 +259,5 @@ export async function POST(request: NextRequest) {
+       stream = run.stream({
+-        inputData: {
+-          topic,
+-          audience,
+-          pageCount,
+-          style,
+-          requirements,
+-          artifact,
+-        },
++        // The schema is the boundary: do not silently drop styleSpec, density,
++        // content readiness or outline/revision options after validation.
++        inputData: validation.data,
+       });
+diff --git a/src/app/api/preview/[filename]/route.ts b/src/app/api/preview/[filename]/route.ts
+index 4b4ef26..57e87b3 100644
+--- a/src/app/api/preview/[filename]/route.ts
++++ b/src/app/api/preview/[filename]/route.ts
+@@ -4,2 +4,3 @@ import path from "path";
+ import { resolveGeneratedSlidesDir } from "@/src/utils/save-html-to-file";
++import { GENERATED_HTML_HEADERS } from "@/src/utils/generated-html-security";
+ 
+@@ -10,9 +11,3 @@ export async function GET(
+   const { filename } = await params;
+-
+-  if (
+-    !filename.endsWith(".html")
+-    || filename.includes("..")
+-    || filename.includes("/")
+-    || filename.includes("\\")
+-  ) {
++  if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]*\.html$/.test(filename)) {
+     return NextResponse.json({ error: "Invalid filename" }, { status: 400 });
+@@ -22,20 +17,12 @@ export async function GET(
+     const output = resolveGeneratedSlidesDir();
+-    const filePath = path.join(output.dir, filename);
+-    const html = await readFile(filePath, "utf8");
+-
++    const html = await readFile(path.join(output.dir, filename), "utf8");
+     return new NextResponse(html, {
+-      headers: {
+-        "Content-Type": "text/html; charset=utf-8",
+-        "Cache-Control": output.source === "vercel"
+-          ? "no-store"
+-          : "public, max-age=31536000, immutable",
+-      },
++      headers: { ...GENERATED_HTML_HEADERS, "Content-Type": "text/html; charset=utf-8" },
+     });
+   } catch (error) {
+-    console.error("Failed to serve generated presentation preview:", {
+-      filename,
+-      error,
+-    });
+-
+-    return NextResponse.json({ error: "File not found" }, { status: 404 });
++    if ((error as NodeJS.ErrnoException)?.code === "ENOENT") {
++      return NextResponse.json({ error: "File not found" }, { status: 404 });
++    }
++    console.error("Failed to serve generated presentation preview:", { filename, error });
++    return NextResponse.json({ error: "Unable to read presentation file" }, { status: 500 });
+   }
+diff --git a/src/components/presentation-studio/agent-chat-ui-stream.ts b/src/components/presentation-studio/agent-chat-ui-stream.ts
+index f41ac96..6c4718b 100644
+--- a/src/components/presentation-studio/agent-chat-ui-stream.ts
++++ b/src/components/presentation-studio/agent-chat-ui-stream.ts
+@@ -20,2 +20,4 @@ export function dispatchAgentChatUIChunk(
+ ): AgentChatDispatchResult {
++  if (callbacks.signal.aborted) return {};
++
+   switch (chunk.type) {
+diff --git a/src/components/presentation-studio/consume-agent-stream.ts b/src/components/presentation-studio/consume-agent-stream.ts
+new file mode 100644
+index 0000000..7e4df39
+--- /dev/null
++++ b/src/components/presentation-studio/consume-agent-stream.ts
+@@ -0,0 +1,35 @@
++import type { UIMessageChunk } from "ai";
++import type { AgentChatResponse, AgentChatUIChunk } from "@/src/types/agent-chat";
++import { dispatchAgentChatUIChunk, type AgentChatStreamCallbacks } from "./agent-chat-ui-stream";
++
++export async function consumeAgentStream(
++  stream: ReadableStream<UIMessageChunk>,
++  callbacks: AgentChatStreamCallbacks,
++): Promise<AgentChatResponse> {
++  const reader = stream.getReader();
++  let result: AgentChatResponse | undefined;
++  const cancel = () => { void reader.cancel(callbacks.signal.reason).catch(() => undefined); };
++  callbacks.signal.addEventListener("abort", cancel, { once: true });
++
++  try {
++    callbacks.signal.throwIfAborted();
++    while (true) {
++      const { done, value } = await reader.read();
++      callbacks.signal.throwIfAborted();
++      if (done) break;
++      // The SDK validates standard framing but erases application data-part
++      // generics on its transport return type. Our route owns those data parts.
++      const dispatched = dispatchAgentChatUIChunk(value as AgentChatUIChunk, callbacks);
++      if (dispatched.error) throw new Error(dispatched.error);
++      if (dispatched.result) result = dispatched.result;
++    }
++    if (!result?.reply) throw new Error("Agent chat stream ended without a result");
++    return result;
++  } finally {
++    callbacks.signal.removeEventListener("abort", cancel);
++    // Cancel releases a still-open source on errors/callback exceptions; after
++    // normal EOF it is a no-op. Never retain a lock after any exit path.
++    void reader.cancel().catch(() => undefined);
++    reader.releaseLock();
++  }
++}
+diff --git a/src/components/presentation-studio/html-preview.tsx b/src/components/presentation-studio/html-preview.tsx
+index 39c0d56..b8c8e48 100644
+--- a/src/components/presentation-studio/html-preview.tsx
++++ b/src/components/presentation-studio/html-preview.tsx
+@@ -2,2 +2,4 @@
+ 
++import { memo, useMemo } from "react";
++import { buildPreviewDocument } from "@/src/utils/generated-html-security";
+ import { Download } from "lucide-react";
+@@ -20,3 +22,4 @@ function downloadHtml(html: string) {
+ 
+-export default function HtmlPreview({ html }: HtmlPreviewProps) {
++function HtmlPreview({ html }: HtmlPreviewProps) {
++  const previewDocument = useMemo(() => buildPreviewDocument(html), [html]);
+   return (
+@@ -28,3 +31,4 @@ export default function HtmlPreview({ html }: HtmlPreviewProps) {
+       </div>
+-      <iframe title="Generated HTML presentation" sandbox="allow-scripts allow-same-origin" srcDoc={html} className="min-h-0 flex-1" />
++      <iframe title="Generated HTML presentation" sandbox="allow-scripts"
++        referrerPolicy="no-referrer" srcDoc={previewDocument} className="min-h-0 flex-1" />
+     </div>
+@@ -32 +36,3 @@ export default function HtmlPreview({ html }: HtmlPreviewProps) {
+ }
++
++export default memo(HtmlPreview);
+diff --git a/src/components/presentation-studio/presentation-preview-pane.tsx b/src/components/presentation-studio/presentation-preview-pane.tsx
+index 60a0358..9094fd9 100644
+--- a/src/components/presentation-studio/presentation-preview-pane.tsx
++++ b/src/components/presentation-studio/presentation-preview-pane.tsx
+@@ -251,12 +251,11 @@ export default function PresentationPreviewPane({ step, currentStep, html, gener
+ 
+-  if (activeStep === "preview" && activeHtml) {
+-    return <HtmlPreview html={activeHtml} />;
+-  }
+-
+-  if (activeStep === "generating") {
+-    if (preservePreviewDuringGeneration && activeHtml) {
+-      return (
+-        <div className="relative h-full min-h-[620px] overflow-hidden">
+-          <HtmlPreview html={activeHtml} />
+-          <div className="absolute left-1/2 top-4 flex max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-3 rounded-lg border border-[var(--border-light)] bg-white/95 px-4 py-3 shadow-lg backdrop-blur">
++  const isRevising = activeStep === "generating" && preservePreviewDuringGeneration;
++  if (activeHtml && (activeStep === "preview" || isRevising)) {
++    // Keep the iframe at the same React tree position while revision status
++    // changes so the current slide, focus and script state are not reset.
++    return (
++      <div className="relative h-full min-h-[620px] overflow-hidden">
++        <HtmlPreview html={activeHtml} />
++        {isRevising ? (
++          <div role="status" aria-live="polite" className="absolute left-1/2 top-4 flex max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-3 rounded-lg border border-[var(--border-light)] bg-white/95 px-4 py-3 shadow-lg backdrop-blur">
+             <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[var(--accent-terracotta)]" />
+@@ -267,6 +266,8 @@ export default function PresentationPreviewPane({ step, currentStep, html, gener
+           </div>
+-        </div>
+-      );
+-    }
++        ) : null}
++      </div>
++    );
++  }
+ 
++  if (activeStep === "generating") {
+     return <GenerationProgress htmlGeneration={htmlGeneration} />;
+diff --git a/src/components/presentation-studio/presentation-studio.tsx b/src/components/presentation-studio/presentation-studio.tsx
+index 24bc3a9..0ae14e8 100644
+--- a/src/components/presentation-studio/presentation-studio.tsx
++++ b/src/components/presentation-studio/presentation-studio.tsx
+@@ -15,3 +15,4 @@ import { getQuickActionDefinition, type AgentQuickActionChoice, type AgentQuickC
+ import { appendCompletionMessage } from "./agent-message-model";
+-import { dispatchAgentChatUIChunk, type AgentChatStreamCallbacks } from "./agent-chat-ui-stream";
++import type { AgentChatStreamCallbacks } from "./agent-chat-ui-stream";
++import { consumeAgentStream } from "./consume-agent-stream";
+ import { applyReasoningEvent, stopStreamingAssistantMessage } from "./agent-message-stream-state";
+@@ -26,3 +27,3 @@ import {
+ } from "./generation-state-routing";
+-import type { AgentActionProposal, AgentChatResponse, AgentChatUIChunk, AgentChatUIMessage } from "@/src/types/agent-chat";
++import type { AgentActionProposal, AgentChatResponse, AgentChatUIMessage } from "@/src/types/agent-chat";
+ import {
+@@ -622,17 +623,3 @@ export default function PresentationStudio() {
+     });
+-    const reader = stream.getReader();
+-    const streamState: { result?: AgentChatResponse; error?: string } = {};
+-
+-    while (true) {
+-      const { done, value: chunk } = await reader.read();
+-      if (done) break;
+-      const dispatchResult = dispatchAgentChatUIChunk(chunk as AgentChatUIChunk, callbacks);
+-      if (dispatchResult.result) streamState.result = dispatchResult.result;
+-      if (dispatchResult.error) streamState.error = dispatchResult.error;
+-    }
+-
+-    if (streamState.error) throw new Error(streamState.error);
+-    if (!streamState.result?.reply) throw new Error("Agent chat stream ended without a result");
+-
+-    return streamState.result;
++    return consumeAgentStream(stream, callbacks);
+   }, [activeArtifact, brief, pendingProposal, selectedStyle, workflowError]);
+diff --git a/src/components/presentation-studio/presentation-workspace.tsx b/src/components/presentation-studio/presentation-workspace.tsx
+index b1d8f4d..23d5bf1 100644
+--- a/src/components/presentation-studio/presentation-workspace.tsx
++++ b/src/components/presentation-studio/presentation-workspace.tsx
+@@ -11,4 +11,4 @@ export default function PresentationWorkspace({ previewContent, agentContent }:
+   return (
+-    <div className="grid h-screen grid-cols-1 lg:grid-cols-[minmax(0,1fr)_400px]">
+-      <section className="relative h-full min-h-0 overflow-y-auto bg-white">
++    <div className="grid h-dvh grid-cols-1 grid-rows-[minmax(0,0.8fr)_minmax(0,1fr)] overflow-hidden lg:grid-rows-1 lg:grid-cols-[minmax(0,1fr)_400px]">
++      <section aria-label="演示预览" className="relative h-full min-h-0 overflow-y-auto bg-white">
+         {previewContent}
+@@ -16,3 +16,3 @@ export default function PresentationWorkspace({ previewContent, agentContent }:
+ 
+-      <aside className="flex h-full min-h-0 flex-col overflow-hidden border-t border-[var(--border-light)] bg-[var(--bg-elevated)] lg:border-l lg:border-t-0">
++      <aside aria-label="AI 助手" className="flex h-full min-h-0 flex-col overflow-hidden border-t border-[var(--border-light)] bg-[var(--bg-elevated)] lg:border-l lg:border-t-0">
+         {agentContent}
