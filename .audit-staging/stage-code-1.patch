@@ -1,0 +1,356 @@
+diff --git a/src/hooks/use-presentation-workflow.ts b/src/hooks/use-presentation-workflow.ts
+index 2686124..5817cba 100644
+--- a/src/hooks/use-presentation-workflow.ts
++++ b/src/hooks/use-presentation-workflow.ts
+@@ -34,4 +34,3 @@ export const usePresentationWorkflow = () => {
+   const [approvalError, setApprovalError] = useState<string | null>(null);
+-  const { sendMessage, messages, setMessages, status, error, clearError, stop } = useChat<MyUIMessage>({
+-    transport: new DefaultChatTransport({
++  const [transport] = useState(() => new DefaultChatTransport<MyUIMessage>({
+       api: "/api/analyze",
+@@ -93,25 +92,41 @@ export const usePresentationWorkflow = () => {
+       },
+-    }) as never,
++    }));
++  const { sendMessage, messages, setMessages, status, error, clearError, stop } = useChat<MyUIMessage>({
++    transport: transport as never,
+   });
+ 
+-  const outlineStep = useMemo(() => {
+-    return messages
+-      .flatMap((m) => m.parts)
+-      .findLast((item) => item.type === "data-presentationOutline");
+-  }, [messages]);
++  const { outlineStep, htmlGenerationStep, lastWorkflowPart, activeRunId } = useMemo(() => {
++    let outlineStep: Extract<MyUIMessage["parts"][number], { type: "data-presentationOutline" }> | undefined;
++    let htmlGenerationStep: Extract<MyUIMessage["parts"][number], { type: "data-presentationHtml" }> | undefined;
++    let lastWorkflowPart: Extract<MyUIMessage["parts"][number], { type: "data-workflow" }> | undefined;
++    let activeRunId: string | null = null;
++
++    // One backwards pass, no flattened history copies on every streamed update.
++    // A new run ID is a boundary: never combine its status with an older deck.
++    scan: for (let m = messages.length - 1; m >= 0; m--) {
++      if (messages[m].role !== "assistant") continue;
++      const beforeMessage = { outlineStep, htmlGenerationStep, lastWorkflowPart };
++      const parts = messages[m].parts;
++      for (let p = parts.length - 1; p >= 0; p--) {
++        const part = parts[p];
++        const runId = part.type === "data-workflowRunId"
++          ? getNonEmptyString(part.data)
++          : part.type === "data-workflow" ? getWorkflowPayloadRunId(part.data) : null;
++        if (runId && activeRunId && runId !== activeRunId) {
++          // Identifiers can precede content in a message. Discard any content
++          // tentatively collected from this older run while scanning backwards.
++          ({ outlineStep, htmlGenerationStep, lastWorkflowPart } = beforeMessage);
++          break scan;
++        }
++        activeRunId ??= runId;
++        if (part.type === "data-presentationOutline") outlineStep ??= part;
++        if (part.type === "data-presentationHtml") htmlGenerationStep ??= part;
++        if (part.type === "data-workflow") lastWorkflowPart ??= part;
+ 
+-  const htmlGenerationStep = useMemo(() => {
+-    return messages
+-      .flatMap((m) => m.parts)
+-      .findLast((item) => item.type === "data-presentationHtml");
++      }
++      if (activeRunId && outlineStep && htmlGenerationStep && lastWorkflowPart) break;
++    }
++    return { outlineStep, htmlGenerationStep, lastWorkflowPart, activeRunId };
+   }, [messages]);
+ 
+-  const lastWorkflowPart = messages
+-    .flatMap((m) => m.parts)
+-    .findLast((p) => p.type === "data-workflow");
+-
+-  const lastWorkflowRunIdPart = messages
+-    .flatMap((m) => m.parts)
+-    .findLast((p) => p.type === "data-workflowRunId");
+-
+   const workflowFailure = useMemo(
+@@ -121,9 +136,2 @@ export const usePresentationWorkflow = () => {
+ 
+-  const activeRunId = useMemo(() => {
+-    const workflowPayloadRunId = getWorkflowPayloadRunId(lastWorkflowPart?.data);
+-    if (workflowPayloadRunId) return workflowPayloadRunId;
+-
+-    return getNonEmptyString(lastWorkflowRunIdPart?.data);
+-  }, [lastWorkflowPart, lastWorkflowRunIdPart]);
+-
+   const sendPresentationBrief = (brief: PresentationBriefData) => {
+@@ -186,4 +194,4 @@ export const usePresentationWorkflow = () => {
+ 
+-    const lastStepKey = Object.keys(steps).pop();
+-    const lastStep = lastStepKey ? steps[lastStepKey] : null;
++    const lastStep = steps["presentation-outline-suggestion-step"]
++      ?? Object.values(steps).find((step) => step.suspendPayload?.suggestedOutline);
+ 
+diff --git a/src/mastra/workflows/presentation-generation-workflow.ts b/src/mastra/workflows/presentation-generation-workflow.ts
+index 5286d4c..db189f0 100644
+--- a/src/mastra/workflows/presentation-generation-workflow.ts
++++ b/src/mastra/workflows/presentation-generation-workflow.ts
+@@ -1,2 +1,3 @@
+ import { createStep, createWorkflow } from "@mastra/core";
++import { withTimeout } from "@/src/utils/with-timeout";
+ import z from "zod";
+@@ -119,27 +120,4 @@ function logTimeoutConfiguration() {
+ 
+-function timeoutAfter(ms: number, message: string) {
+-  return new Promise<never>((_, reject) => {
+-    setTimeout(() => reject(new Error(message)), ms);
+-  });
+-}
+-
+-async function nextWithTimeout<T>(
+-  iterator: AsyncIterator<T>,
+-  ms: number,
+-  message: string,
+-) {
+-  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+-
+-  try {
+-    return await Promise.race([
+-      iterator.next(),
+-      new Promise<IteratorResult<T>>((_, reject) => {
+-        timeoutId = setTimeout(() => reject(new Error(message)), ms);
+-      }),
+-    ]);
+-  } finally {
+-    if (timeoutId) {
+-      clearTimeout(timeoutId);
+-    }
+-  }
++function nextWithTimeout<T>(iterator: AsyncIterator<T>, ms: number, message: string) {
++  return withTimeout(iterator.next(), ms, message);
+ }
+@@ -248,9 +226,7 @@ async function getCompletedStreamText(stream: { text?: Promise<string> }) {
+ 
+-  return Promise.race([
++  return withTimeout(
+     stream.text,
+-    timeoutAfter(
+-      HTML_STREAM_IDLE_TIMEOUT_MS,
+-      `HTML generation stream closed but text aggregation did not finish within ${Math.round(HTML_STREAM_IDLE_TIMEOUT_MS / 1000)} seconds`,
+-    ),
+-  ]);
++    HTML_STREAM_IDLE_TIMEOUT_MS,
++    `HTML generation stream closed but text aggregation did not finish within ${Math.round(HTML_STREAM_IDLE_TIMEOUT_MS / 1000)} seconds`,
++  );
+ }
+@@ -537,9 +513,8 @@ export const presentationOutlineSuggestionStep = createStep({
+ 
+-      outline = await Promise.race([
++      outline = await withTimeout(
+         stream.object,
+-        timeoutAfter(
+-          OUTLINE_STREAM_IDLE_TIMEOUT_MS,
+-          `Outline generation did not finish after the stream closed within ${Math.round(OUTLINE_STREAM_IDLE_TIMEOUT_MS / 1000)} seconds`,
+-        ),
+-      ]);
++        OUTLINE_STREAM_IDLE_TIMEOUT_MS,
++        `Outline generation did not finish after the stream closed within ${Math.round(OUTLINE_STREAM_IDLE_TIMEOUT_MS / 1000)} seconds`,
++        abortSignal,
++      );
+       validateGeneratedOutline(outline, inputData);
+@@ -706,3 +681,3 @@ export const presentationHtmlGenerationStep = createStep({
+         const attemptStartedAt = Date.now();
+-        const stream = await Promise.race([
++        const stream = await withTimeout(
+           frontendSlidesAgent.stream(
+@@ -714,7 +689,6 @@ export const presentationHtmlGenerationStep = createStep({
+           ),
+-          timeoutAfter(
+-            FRONTEND_SLIDES_TIMEOUT_MS,
+-            `frontend-slides ${attempt} generation did not start within ${Math.round(FRONTEND_SLIDES_TIMEOUT_MS / 1000)} seconds`,
+-          ),
+-        ]);
++          FRONTEND_SLIDES_TIMEOUT_MS,
++          `frontend-slides ${attempt} generation did not start within ${Math.round(FRONTEND_SLIDES_TIMEOUT_MS / 1000)} seconds`,
++          abortSignal,
++        );
+         throwIfPresentationHtmlGenerationCancelled(abortSignal);
+@@ -728,9 +702,8 @@ export const presentationHtmlGenerationStep = createStep({
+             throwIfPresentationHtmlGenerationCancelled(abortSignal);
+-            const { done, value } = await Promise.race([
++            const { done, value } = await withTimeout(
+               reader.read(),
+-              timeoutAfter(
+-                HTML_STREAM_IDLE_TIMEOUT_MS,
+-                `frontend-slides ${attempt} generation stream was idle for ${Math.round(HTML_STREAM_IDLE_TIMEOUT_MS / 1000)} seconds`,
+-              ),
+-            ]);
++              Math.min(HTML_STREAM_IDLE_TIMEOUT_MS, Math.max(1, FRONTEND_SLIDES_TIMEOUT_MS - (Date.now() - attemptStartedAt))),
++              `frontend-slides ${attempt} generation stream was idle or exceeded its deadline`,
++              abortSignal,
++            );
+             throwIfPresentationHtmlGenerationCancelled(abortSignal);
+diff --git a/src/services/frontend-slides/skill-loader.ts b/src/services/frontend-slides/skill-loader.ts
+index d1be4ca..c7d514e 100644
+--- a/src/services/frontend-slides/skill-loader.ts
++++ b/src/services/frontend-slides/skill-loader.ts
+@@ -2,2 +2,3 @@ import { readFile } from "node:fs/promises";
+ import path from "node:path";
++import { getProjectRoot } from "@/src/utils/project-root";
+ import type { FrontendSlidesStyleSpec } from "./style-schema";
+@@ -23,13 +24,2 @@ export type FrontendSlidesDiscoveryContext = {
+ 
+-function getProjectRoot() {
+-  let projectRoot = process.cwd();
+-
+-  if (projectRoot.includes(".mastra")) {
+-    const mastraIndex = projectRoot.indexOf(".mastra");
+-    projectRoot = projectRoot.substring(0, mastraIndex).replace(/[\\/]$/, "");
+-  }
+-
+-  return projectRoot;
+-}
+-
+ export function resolveFrontendSlidesSkillDir() {
+@@ -38,4 +28,20 @@ export function resolveFrontendSlidesSkillDir() {
+ 
+-async function readSkillFile(relativePath: string) {
+-  return readFile(path.join(resolveFrontendSlidesSkillDir(), relativePath), "utf8");
++const fileCache = new Map<string, Promise<string>>();
++const baseFiles = new Set(["SKILL.md", "html-template.md", "viewport-base.css", "animation-patterns.md", "STYLE_PRESETS.md"]);
++
++function readSkillFile(relativePath: string) {
++  if (!baseFiles.has(relativePath) && !/^bold-template-pack\/templates\/[a-z0-9]+(?:-[a-z0-9]+)*\/design\.md$/.test(relativePath)) {
++    throw new Error("Invalid bundled template path");
++  }
++  const fullPath = path.join(resolveFrontendSlidesSkillDir(), relativePath);
++  // Production assets are immutable. Preserve live skill edits during dev.
++  if (process.env.NODE_ENV === "development") return readFile(fullPath, "utf8");
++  const cached = fileCache.get(fullPath);
++  if (cached) return cached;
++  const pending = readFile(fullPath, "utf8").catch((error) => {
++    fileCache.delete(fullPath);
++    throw error;
++  });
++  fileCache.set(fullPath, pending);
++  return pending;
+ }
+@@ -55,5 +61,10 @@ async function loadSelectedBoldTemplateDesign(styleSpec?: FrontendSlidesStyleSpe
+ 
++  const { slug, designMd } = styleSpec.boldTemplate;
++  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || designMd !== `bold-template-pack/templates/${slug}/design.md`) {
++    throw new Error("Invalid bundled template path");
++  }
++
+   return {
+     name: styleSpec.name,
+-    slug: styleSpec.boldTemplate.slug,
++    slug,
+     path: styleSpec.boldTemplate.designMd,
+diff --git a/src/utils/generated-html-security.ts b/src/utils/generated-html-security.ts
+new file mode 100644
+index 0000000..6b8d006
+--- /dev/null
++++ b/src/utils/generated-html-security.ts
+@@ -0,0 +1,29 @@
++// Generated decks are executable documents, never trusted application code.
++// Keep inline navigation and external fonts/images, but no network API calls,
++// external scripts, forms, plugins, origin storage or parent-window access.
++export const GENERATED_HTML_CONTENT_POLICY = [
++  "default-src 'none'",
++  "script-src 'unsafe-inline'",
++  "style-src 'unsafe-inline' https:",
++  "img-src data: blob: https:",
++  "font-src data: https:",
++  "connect-src 'none'",
++  "object-src 'none'",
++  "base-uri 'none'",
++  "form-action 'none'",
++].join("; ");
++
++export const GENERATED_HTML_HEADERS = {
++  "Content-Security-Policy": `sandbox allow-scripts; ${GENERATED_HTML_CONTENT_POLICY}`,
++  "X-Content-Type-Options": "nosniff",
++  "Referrer-Policy": "no-referrer",
++  "Cache-Control": "private, no-store",
++};
++
++export function buildPreviewDocument(html: string) {
++  // Put policy before ANY generated markup/scripts. An additional doctype/head
++  // in the generated document is ignored by the HTML parser; the leading
++  // doctype preserves standards mode. sandbox itself must be an iframe/header
++  // policy because browsers do not enforce that directive from a meta tag.
++  return `<!doctype html><meta http-equiv="Content-Security-Policy" content="${GENERATED_HTML_CONTENT_POLICY}">${html}`;
++}
+diff --git a/src/utils/project-root.ts b/src/utils/project-root.ts
+new file mode 100644
+index 0000000..11a602c
+--- /dev/null
++++ b/src/utils/project-root.ts
+@@ -0,0 +1,9 @@
++import path from "node:path";
++
++/** mastra dev runs in a .mastra/output subtree, not at the project root. */
++export function getProjectRoot(cwd = process.cwd()) {
++  const normalized = path.resolve(cwd);
++  const segments = normalized.split(path.sep);
++  const index = segments.indexOf(".mastra");
++  return index < 0 ? normalized : segments.slice(0, index).join(path.sep) || path.parse(normalized).root;
++}
+diff --git a/src/utils/save-html-to-file.ts b/src/utils/save-html-to-file.ts
+index 8ece4f9..0579927 100644
+--- a/src/utils/save-html-to-file.ts
++++ b/src/utils/save-html-to-file.ts
+@@ -3,2 +3,3 @@ import path from "path";
+ import { randomUUID } from "crypto";
++import { getProjectRoot } from "./project-root";
+ 
+@@ -14,14 +15,2 @@ export type GeneratedSlidesDir = {
+ 
+-function getProjectRoot() {
+-  let projectRoot = process.cwd();
+-
+-  // When running `mastra dev`, process.cwd() points to .mastra/output.
+-  if (projectRoot.includes(".mastra")) {
+-    const mastraIndex = projectRoot.indexOf(".mastra");
+-    projectRoot = projectRoot.substring(0, mastraIndex).replace(/[\\/]$/, "");
+-  }
+-
+-  return projectRoot;
+-}
+-
+ export function resolveGeneratedSlidesDir(): GeneratedSlidesDir {
+@@ -66,2 +55,5 @@ export async function saveHtmlToFile(
+   const prefix = options?.prefix ?? "presentation";
++  if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(prefix)) {
++    throw new Error("Invalid filename prefix");
++  }
+   const fileName = `${prefix}-${randomUUID()}.html`;
+diff --git a/src/utils/with-timeout.ts b/src/utils/with-timeout.ts
+new file mode 100644
+index 0000000..3c9a3a1
+--- /dev/null
++++ b/src/utils/with-timeout.ts
+@@ -0,0 +1,28 @@
++/** Bound an async wait without retaining a losing timer per streamed token.
++ * The caller still owns cancellation of the underlying operation/reader.
++ */
++export function withTimeout<T>(
++  operation: PromiseLike<T>,
++  ms: number,
++  message: string,
++  signal?: AbortSignal,
++): Promise<T> {
++  return new Promise<T>((resolve, reject) => {
++    const timer = setTimeout(() => { cleanup(); reject(new Error(message)); }, ms);
++    function cleanup() {
++      clearTimeout(timer);
++      signal?.removeEventListener("abort", abort);
++    }
++    function abort() {
++      cleanup();
++      reject(signal?.reason ?? new DOMException("Aborted", "AbortError"));
++    }
++    // Always observe the operation, including late rejection after cancellation.
++    Promise.resolve(operation).then(
++      (value) => { cleanup(); resolve(value); },
++      (error) => { cleanup(); reject(error); },
++    );
++    if (signal?.aborted) { abort(); return; }
++    signal?.addEventListener("abort", abort, { once: true });
++  });
++}
