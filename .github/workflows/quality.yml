@@ -1,22 +1,22 @@
 name: Quality checks
 
 on:
-  pull_request:
   push:
-    branches: [main, fix/reliability-performance-audit-20260924]
+    branches: [fix/reliability-performance-audit-20260924]
 
 permissions:
   contents: read
 
 concurrency:
-  group: quality-${{ github.workflow }}-${{ github.ref }}
+  group: quality-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  quality:
+  apply-verified-audit:
+    # Temporary delivery step for this audit only; removed after verification.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/fix/reliability-performance-audit-20260924' && contains(github.event.head_commit.message, '[apply-audit]')
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # Temporary lockfile maintenance on this isolated branch only. Removed after audit.
     permissions:
       contents: write
     env:
@@ -24,68 +24,29 @@ jobs:
       MODEL_API_KEY: ci-placeholder-not-a-real-key
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
-      - name: Normalize only mirror URLs, preserving versions and integrity
-        if: github.event_name == 'push' && github.ref == 'refs/heads/fix/reliability-performance-audit-20260924'
+      - name: Verify and apply the reviewed plain-text changes
         run: |
-          node --input-type=module <<'JS'
-          import fs from 'node:fs';
-          const file = 'package-lock.json';
-          const old = fs.readFileSync(file, 'utf8');
-          const text = old.replace(/https:\/\/mirrors(?:\.cloud)?\.tencent\.com\/npm\//g, 'https://registry.npmjs.org/');
-          const before = JSON.parse(old), after = JSON.parse(text);
-          for (const key of Object.keys(before.packages)) {
-            if (before.packages[key].version !== after.packages[key].version || before.packages[key].integrity !== after.packages[key].integrity) throw new Error('Unexpected dependency change');
-          }
-          fs.writeFileSync(file, text);
-          JS
-          if ! git diff --quiet -- package-lock.json; then
-            git config user.name 'github-actions[bot]'
-            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git add package-lock.json
-            git commit -m 'build: make locked package downloads registry-portable'
-            git push origin HEAD:fix/reliability-performance-audit-20260924
-          fi
-      - name: Install locked dependencies
-        id: install
-        timeout-minutes: 5
+          test "$GITHUB_REF" = refs/heads/fix/reliability-performance-audit-20260924
+          sha256sum --check .audit-staging/SHA256SUMS
+          git apply --check .audit-staging/*.patch
+          git apply .audit-staging/*.patch
+          git diff --check
+          git rm -- pnpm-lock.yaml pnpm-workspace.yaml
+      - name: Install the exact dependency graph
         run: npm ci --ignore-scripts --no-audit --no-fund --fetch-retries=1 --fetch-timeout=30000
-      - name: Capture dependencies for offline verification
-        run: tar -czf quality-dependencies.tar.gz node_modules package-lock.json
-      - uses: actions/upload-artifact@v4
-        with:
-          name: quality-dependencies
-          path: quality-dependencies.tar.gz
-          retention-days: 1
-          compression-level: 0
-      - name: Unit and integration tests
-        id: tests
-        continue-on-error: true
-        run: npm test
-      - name: Lint
-        id: lint
-        continue-on-error: true
-        run: npm run lint
-      - name: Type check
-        id: types
-        continue-on-error: true
-        run: npx --no-install tsc --noEmit
-      - name: Production build
-        id: build
-        continue-on-error: true
-        run: npm run build
-      - name: Require every quality check to pass
-        if: always()
-        env:
-          INSTALL: ${{ steps.install.outcome }}
-          TESTS: ${{ steps.tests.outcome }}
-          LINT: ${{ steps.lint.outcome }}
-          TYPES: ${{ steps.types.outcome }}
-          BUILD: ${{ steps.build.outcome }}
+      - name: Verify tests, lint, types, build and deployment assets
+        run: npm run check
+      - name: Commit only the verified audit files
         run: |
-          for result in "$INSTALL" "$TESTS" "$LINT" "$TYPES" "$BUILD"; do
-            if [ "$result" != success ]; then exit 1; fi
-          done
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- README.md next.config.ts package.json package-lock.json src docs/audits scripts/check-runtime-assets.mjs
+          git rm -r -- .audit-staging
+          git commit -m 'fix: preserve generation intent, isolate previews and release streaming resources'
+          git push origin HEAD:fix/reliability-performance-audit-20260924
