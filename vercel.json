@@ -1,3 +1,4 @@
 {
-  "installCommand": "pnpm install --no-frozen-lockfile"
+  "installCommand": "npm ci --no-audit --no-fund",
+  "buildCommand": "npm run build"
 }
