@@ -37,12 +37,12 @@ function StyleDiscovery({ previews, selectedStyleId, isLoading, batch, remaining
   onMore?: () => void;
 }) {
   return (
-    <div className="h-full min-h-[620px] overflow-auto bg-[#f5f2ec] p-6">
+    <div className="h-full min-h-0 overflow-auto bg-[#f5f2ec] p-6">
       <div className="mx-auto max-w-7xl">
         <div className="mb-5">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--accent-terracotta)]">Frontend Slides · Style Discovery</p>
           <h2 className="mt-2 text-3xl font-semibold text-[var(--text-primary)]">请选择一个真实视觉方向</h2>
-          <p className="mt-2 text-[var(--text-secondary)]">每个选项都是按当前演示主题生成的标题页，而不是抽象风格名称。</p>
+          <p className="mt-2 text-[var(--text-secondary)]">每个选项展示一套预设风格的静态示例；生成时会将所选风格应用到你的演示内容。</p>
           <p className="mt-2 text-sm text-[var(--text-muted)]">第 {batch} 批{remaining > 0 ? ` · 还有 ${remaining} 种可看` : " · 已展示全部可用方向"}</p>
         </div>
         {isLoading ? (
@@ -91,8 +91,8 @@ const generationSteps = [
 
 function EmptyPreview() {
   return (
-    <div className="flex h-full min-h-[620px] items-center justify-center p-8 text-center">
-      <div className="max-w-md">
+    <div className="flex h-full min-h-0 flex-col overflow-auto p-8 text-center">
+      <div className="m-auto w-full max-w-md shrink-0">
         <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--accent-terracotta)]/10 text-[var(--accent-terracotta)]">
           <Sparkles className="h-8 w-8" />
         </div>
@@ -175,7 +175,7 @@ function OutlineProgress({ outlineGeneration }: { outlineGeneration?: OutlineSte
 
 function OutlinePreview({ outline, isLoading, outlineGeneration }: { outline: SlideOutlineItem[]; isLoading: boolean; outlineGeneration?: OutlineStepData }) {
   return (
-    <div className="h-full min-h-[calc(100vh-112px)] overflow-auto bg-[linear-gradient(135deg,#faf7f1_0%,#fff_60%,#f7efe5_100%)] p-6">
+    <div className="h-full min-h-0 overflow-auto bg-[linear-gradient(135deg,#faf7f1_0%,#fff_60%,#f7efe5_100%)] p-6">
       <div className="mx-auto max-w-5xl space-y-4 pb-8">
         <div className="rounded-3xl border border-[var(--border-light)] bg-white/85 p-6 shadow-sm backdrop-blur">
           <h2 className="text-2xl font-semibold text-[var(--text-primary)]" style={{ fontFamily: "var(--font-fraunces), Georgia, serif" }}>
@@ -208,8 +208,8 @@ function GenerationProgress({ htmlGeneration }: { htmlGeneration?: HtmlGeneratio
   const generatorLabel = htmlGeneration?.generator === "frontend-slides" ? "frontend-slides" : null;
 
   return (
-    <div className="flex h-full min-h-[620px] items-center justify-center bg-[linear-gradient(135deg,#faf7f1_0%,#fff_56%,#f7efe5_100%)] p-8">
-      <div className="w-full max-w-xl rounded-3xl border border-[var(--border-light)] bg-[var(--bg-card)]/95 p-8 shadow-lg backdrop-blur">
+    <div className="flex h-full min-h-0 flex-col overflow-auto bg-[linear-gradient(135deg,#faf7f1_0%,#fff_56%,#f7efe5_100%)] p-8">
+      <div className="m-auto w-full max-w-xl shrink-0 rounded-3xl border border-[var(--border-light)] bg-[var(--bg-card)]/95 p-8 shadow-lg backdrop-blur">
         <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--accent-terracotta)]/10 text-[var(--accent-terracotta)]">
           <ActiveIcon className="h-7 w-7 animate-pulse" />
         </div>
@@ -249,26 +249,27 @@ export default function PresentationPreviewPane({ step, currentStep, html, gener
     return <StyleDiscovery previews={stylePreviews} selectedStyleId={selectedStyleId} isLoading={isDiscoveringStyles} batch={styleBatch} remaining={remainingStyleCount} onSelect={onSelectStyle} onMore={onMoreStyles} />;
   }
 
-  if (activeStep === "preview" && activeHtml) {
-    return <HtmlPreview html={activeHtml} />;
-  }
-
-  if (activeStep === "generating") {
-    if (preservePreviewDuringGeneration && activeHtml) {
-      return (
-        <div className="relative h-full min-h-[620px] overflow-hidden">
-          <HtmlPreview html={activeHtml} />
-          <div className="absolute left-1/2 top-4 flex max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-3 rounded-lg border border-[var(--border-light)] bg-white/95 px-4 py-3 shadow-lg backdrop-blur">
+  const isRevising = activeStep === "generating" && preservePreviewDuringGeneration;
+  if (activeHtml && (activeStep === "preview" || isRevising)) {
+    // Keep the iframe at the same React tree position while revision status
+    // changes so the current slide, focus and script state are not reset.
+    return (
+      <div className="relative h-full min-h-0 overflow-hidden">
+        <HtmlPreview html={activeHtml} />
+        {isRevising ? (
+          <div role="status" aria-live="polite" className="absolute left-1/2 top-4 flex max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-3 rounded-lg border border-[var(--border-light)] bg-white/95 px-4 py-3 shadow-lg backdrop-blur">
             <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[var(--accent-terracotta)]" />
             <div className="min-w-0">
               <p className="text-sm font-semibold text-[var(--text-primary)]">正在生成新版本</p>
               <p className="truncate text-xs text-[var(--text-muted)]">{htmlGeneration?.message ?? "正在保留当前预览并应用修改…"}</p>
             </div>
           </div>
-        </div>
-      );
-    }
+        ) : null}
+      </div>
+    );
+  }
 
+  if (activeStep === "generating") {
     return <GenerationProgress htmlGeneration={htmlGeneration} />;
   }
 

@@ -1,5 +1,6 @@
 import { mastra } from "@/src/mastra";
-import { createUIMessageStream, createUIMessageStreamResponse } from "ai";
+import { createUIMessageStreamResponse, type UIMessageChunk } from "ai";
+import { createManagedWorkflowStream } from "@/src/utils/managed-workflow-stream";
 import type { NextRequest } from "next/server";
 import { toAISdkFormat } from "@mastra/ai-sdk";
 import { NextResponse } from "next/server";
@@ -13,6 +14,26 @@ import { buildRevisionWorkflowPlan } from "./revision-workflow-plan";
 import { getAgentProposal } from "@/src/services/agent-proposals/proposal-store";
 
 export const maxDuration = 300;
+
+function workflowResponse(
+  request: NextRequest,
+  run: { runId: string; cancel: () => unknown },
+  createStream: () => ReadableStream<UIMessageChunk>,
+  deadline: number | undefined,
+  announceRunId = true,
+) {
+  return createUIMessageStreamResponse({
+    stream: createManagedWorkflowStream<UIMessageChunk>({
+      signal: request.signal,
+      createStream,
+      deadline,
+      initialChunks: announceRunId ? [{ type: "data-workflowRunId", data: run.runId }] : [],
+      cancelWorkflow: () => run.cancel(),
+      onCancelError: (error) => console.warn("Presentation workflow cleanup failed", { workflowRunId: run.runId, error }),
+      onError: (error) => ({ type: "error", errorText: streamErrorMessage(error) }),
+    }),
+  });
+}
 
 function validationErrorResponse(error: z.ZodError, action: "start" | "resume" | "revise") {
   const fields = formatValidationErrors(error);
@@ -61,6 +82,10 @@ function isCancellationError(error: unknown) {
 }
 
 function streamErrorMessage(error: unknown) {
+  if (error instanceof Error && error.name === "TimeoutError") {
+    console.warn("Presentation workflow reached the request deadline");
+    return "Presentation generation exceeded this request's time limit. Please retry with fewer slides.";
+  }
   const classification = classifyProcessingError(error);
 
   const logContext = {
@@ -112,8 +137,16 @@ function classifyProcessingError(error: unknown) {
 }
 
 export async function POST(request: NextRequest) {
+  // Leave time to send a useful SSE error before Vercel terminates the function.
+  // Self-hosted deployments retain their existing workflow step budgets.
+  const deadline = process.env.VERCEL === "1" ? Date.now() + maxDuration * 1000 - 15_000 : undefined;
   try {
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: "Request body must be valid JSON", code: "invalid_json" }, { status: 400 });
+    }
     const validation = validatePresentationWorkflowRequest(body);
 
     if (!validation.success) {
@@ -145,15 +178,6 @@ export async function POST(request: NextRequest) {
         ? mastra.getWorkflow("presentationOutlineRevisionWorkflow")
         : mastra.getWorkflow("presentationRevisionWorkflow");
       const run = await workflow.createRunAsync();
-      const stream = run.stream({ inputData: plan.inputData } as never);
-
-      request.signal.addEventListener("abort", () => {
-        console.info("Presentation revision workflow cancellation requested by client abort", {
-          workflowRunId: run.runId,
-        });
-        void run.cancel();
-      }, { once: true });
-
       const proposalExecutionStartedAt = artifact.proposalId
         ? getAgentProposal(artifact.proposalId)?.executionStartedAt
         : undefined;
@@ -172,18 +196,10 @@ export async function POST(request: NextRequest) {
         proposalConfirmToWorkflowStartMs,
       });
 
-      return createUIMessageStreamResponse({
-        stream: createUIMessageStream({
-          execute: ({ writer }) => {
-            writer.write({
-              type: "data-workflowRunId",
-              data: run.runId,
-            });
-            writer.merge(toAISdkFormat(stream.fullStream as never, { from: "workflow" }));
-          },
-          onError: streamErrorMessage,
-        }),
-      });
+      return workflowResponse(request, run, () => {
+        const stream = run.stream({ inputData: plan.inputData } as never);
+        return toAISdkFormat(stream.fullStream as never, { from: "workflow" });
+      }, deadline);
     }
 
     if (validation.action === "resume") {
@@ -195,21 +211,15 @@ export async function POST(request: NextRequest) {
         slideCount: approvedOutline.slides.length,
       });
 
-      let stream;
       try {
         const run = await workflow.createRunAsync({ runId: workflowRunId });
-        stream = run.resumeStream({
-          step: "presentation-outline-suggestion-step",
-          resumeData: {
-            approvedOutline,
-          } as never,
-        });
-        request.signal.addEventListener("abort", () => {
-          console.info("Presentation workflow resume cancellation requested by client abort", {
-            workflowRunId,
+        return workflowResponse(request, run, () => {
+          const stream = run.resumeStream({
+            step: "presentation-outline-suggestion-step",
+            resumeData: { approvedOutline } as never,
           });
-          void run.cancel();
-        }, { once: true });
+          return toAISdkFormat(stream.fullStream as never, { from: "workflow" });
+        }, deadline, false);
       } catch (error) {
         console.error("Presentation workflow resume failed:", {
           workflowRunId,
@@ -222,57 +232,34 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      return createUIMessageStreamResponse({
-        stream: createUIMessageStream({
-          execute: ({ writer }) => {
-            writer.merge(toAISdkFormat(stream.fullStream as never, {
-              from: "workflow",
-            }));
-          },
-          onError: streamErrorMessage,
-        }),
-      });
     }
 
-    const { topic, audience, pageCount, style, requirements, artifact } =
+    const { topic, audience, pageCount, style, requirements } =
       validation.data;
     const workflow = mastra.getWorkflow("presentationGenerationWorkflow");
 
     console.log("Received presentation generation request:", {
-      topic,
-      audience,
+      topicLength: topic.length,
+      audienceLength: audience?.length ?? 0,
       pageCount,
       style,
-      requirements,
+      requirementsLength: requirements?.length ?? 0,
     });
 
-    type PresentationWorkflowRun = Awaited<ReturnType<typeof workflow.createRunAsync>>;
-    let run: PresentationWorkflowRun;
-    let stream: ReturnType<PresentationWorkflowRun["stream"]>;
     try {
-      run = await workflow.createRunAsync();
-      stream = run.stream({
-        inputData: {
-          topic,
-          audience,
-          pageCount,
-          style,
-          requirements,
-          artifact,
-        },
-      });
-      request.signal.addEventListener("abort", () => {
-        console.info("Presentation generation workflow cancellation requested by client abort", {
-          workflowRunId: run.runId,
+      const run = await workflow.createRunAsync();
+      return workflowResponse(request, run, () => {
+        const stream = run.stream({
+          // Keep every validated option, including custom style and density.
+          inputData: validation.data,
         });
-        void run.cancel();
-      }, { once: true });
+        return toAISdkFormat(stream.fullStream as never, { from: "workflow" });
+      }, deadline);
     } catch (error) {
       const classification = classifyProcessingError(error);
 
       console.error("Presentation workflow start failed:", {
         code: classification.code,
-        topic,
         error,
       });
 
@@ -284,20 +271,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    return createUIMessageStreamResponse({
-      stream: createUIMessageStream({
-        execute: ({ writer }) => {
-          writer.write({
-            type: "data-workflowRunId",
-            data: run.runId,
-          });
-          writer.merge(toAISdkFormat(stream.fullStream as never, {
-            from: "workflow",
-          }));
-        },
-        onError: streamErrorMessage,
-      }),
-    });
   } catch (error) {
     const classification = classifyProcessingError(error);
 

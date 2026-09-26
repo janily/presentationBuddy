@@ -1,0 +1,65 @@
+name: Quality checks
+
+on:
+  pull_request:
+  push:
+    branches: [main, fix/reliability-performance-audit-20260924, "fix/workflow-lifecycle-*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+      # No production credentials or paid model calls in this verification.
+      MODEL_API_KEY: ci-placeholder-not-a-real-key
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Unit and integration tests
+        id: tests
+        continue-on-error: true
+        run: npm test
+      - name: Lint
+        id: lint
+        continue-on-error: true
+        run: npm run lint
+      - name: Type check
+        id: types
+        continue-on-error: true
+        run: npm run typecheck
+      - name: Production build
+        id: build
+        continue-on-error: true
+        run: npm run build
+      - name: Verify deployment runtime assets
+        id: assets
+        if: steps.build.outcome == 'success'
+        continue-on-error: true
+        run: npm run check:runtime-assets
+      - name: Require every quality check to pass
+        if: always()
+        env:
+          TESTS: ${{ steps.tests.outcome }}
+          LINT: ${{ steps.lint.outcome }}
+          TYPES: ${{ steps.types.outcome }}
+          BUILD: ${{ steps.build.outcome }}
+          ASSETS: ${{ steps.assets.outcome }}
+        run: |
+          for result in "$TESTS" "$LINT" "$TYPES" "$BUILD" "$ASSETS"; do
+            if [ "$result" != success ]; then exit 1; fi
+          done

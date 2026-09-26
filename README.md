@@ -11,13 +11,13 @@ Presentation Buddy is a Next.js + Mastra application for turning a presentation 
 Install dependencies first:
 
 ```bash
-pnpm install
+npm ci
 ```
 
 Run the Next.js web application:
 
 ```bash
-pnpm dev
+npm run dev
 ```
 
 Open <http://localhost:3000> to use the presentation studio.
@@ -25,7 +25,7 @@ Open <http://localhost:3000> to use the presentation studio.
 If you want to run or inspect Mastra workflows directly, start the Mastra development server in a separate terminal:
 
 ```bash
-pnpm mastra
+npm run mastra
 ```
 
 ## Environment variables and model provider
@@ -104,3 +104,21 @@ When `GENERATED_SLIDES_DIR` is set, or when `VERCEL=1`, decks are served through
 For Zeabur, mount a persistent volume such as `/data`, then set `GENERATED_SLIDES_DIR=/data/generated-slides`. Without a volume, generated files can be lost after redeploys or restarts.
 
 For Vercel, the app writes generated decks to `/tmp/generated-slides` and exports `maxDuration = 300` on the analyze route. This is only suitable for short-lived previews; files in `/tmp` are not durable and may disappear after function restarts. For durable production history on serverless platforms, use object storage such as S3, R2, or GCS.
+
+
+## Quality checks and deployment boundaries
+
+Use Node.js 22+ and npm 10+ with the committed `package-lock.json`. `npm ci` is the canonical installation command; do not maintain a second, divergent pnpm lockfile.
+
+```bash
+npm ci
+npm run check
+```
+
+Generated HTML runs in an opaque-origin sandbox with inline navigation enabled. The application download button exports the original HTML. Embedded previews and direct `/api/preview/*` and `/generated-slides/*` responses restrict network APIs, external scripts, forms and origin access. Remote HTTPS fonts/images remain supported.
+
+`npm run check:runtime-assets` verifies that the production deployment trace includes the actual skill and template files needed at runtime. New template directories must continue to pass this check.
+
+**Deployment limitations:** workflow run storage uses in-memory LibSQL, artifact/proposal stores are process-local, and Vercel preview files use temporary disk. These are not durable multi-instance storage or multi-user access controls. A public production service needs authenticated ownership checks, rate/cost limits, shared durable workflow/proposal/artifact storage and a request/job timeout strategy before launch. This audit does not add those infrastructure services or claim that local success proves serverless multi-instance reliability.
+
+See `docs/audits/2026-09-24-report.md` for verified repairs, evidence and remaining work.

@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { getProjectRoot } from "@/src/utils/project-root";
 import type { FrontendSlidesStyleSpec } from "./style-schema";
 
 export type FrontendSlidesFinalContext = {
@@ -21,23 +22,28 @@ export type FrontendSlidesDiscoveryContext = {
   stylePresets: string;
 };
 
-function getProjectRoot() {
-  let projectRoot = process.cwd();
-
-  if (projectRoot.includes(".mastra")) {
-    const mastraIndex = projectRoot.indexOf(".mastra");
-    projectRoot = projectRoot.substring(0, mastraIndex).replace(/[\\/]$/, "");
-  }
-
-  return projectRoot;
-}
-
 export function resolveFrontendSlidesSkillDir() {
   return path.join(getProjectRoot(), ".claude", "skills", "frontend-slides");
 }
 
-async function readSkillFile(relativePath: string) {
-  return readFile(path.join(resolveFrontendSlidesSkillDir(), relativePath), "utf8");
+const fileCache = new Map<string, Promise<string>>();
+const baseFiles = new Set(["SKILL.md", "html-template.md", "viewport-base.css", "animation-patterns.md", "STYLE_PRESETS.md"]);
+
+function readSkillFile(relativePath: string) {
+  if (!baseFiles.has(relativePath) && !/^bold-template-pack\/templates\/[a-z0-9]+(?:-[a-z0-9]+)*\/design\.md$/.test(relativePath)) {
+    throw new Error("Invalid bundled template path");
+  }
+  const fullPath = path.join(resolveFrontendSlidesSkillDir(), relativePath);
+  // Production assets are immutable. Preserve live skill edits during dev.
+  if (process.env.NODE_ENV === "development") return readFile(fullPath, "utf8");
+  const cached = fileCache.get(fullPath);
+  if (cached) return cached;
+  const pending = readFile(fullPath, "utf8").catch((error) => {
+    fileCache.delete(fullPath);
+    throw error;
+  });
+  fileCache.set(fullPath, pending);
+  return pending;
 }
 
 async function readOptionalSkillFile(relativePath: string) {
@@ -53,9 +59,14 @@ async function loadSelectedBoldTemplateDesign(styleSpec?: FrontendSlidesStyleSpe
     return undefined;
   }
 
+  const { slug, designMd } = styleSpec.boldTemplate;
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || designMd !== `bold-template-pack/templates/${slug}/design.md`) {
+    throw new Error("Invalid bundled template path");
+  }
+
   return {
     name: styleSpec.name,
-    slug: styleSpec.boldTemplate.slug,
+    slug,
     path: styleSpec.boldTemplate.designMd,
     content: await readSkillFile(styleSpec.boldTemplate.designMd),
   };

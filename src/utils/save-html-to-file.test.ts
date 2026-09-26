@@ -26,8 +26,10 @@ describe("saveHtmlToFile", () => {
 
   afterEach(() => {
     process.cwd = originalCwd;
-    process.env.GENERATED_SLIDES_DIR = originalGeneratedSlidesDir;
-    process.env.VERCEL = originalVercel;
+    if (originalGeneratedSlidesDir === undefined) delete process.env.GENERATED_SLIDES_DIR;
+    else process.env.GENERATED_SLIDES_DIR = originalGeneratedSlidesDir;
+    if (originalVercel === undefined) delete process.env.VERCEL;
+    else process.env.VERCEL = originalVercel;
     vi.useRealTimers();
   });
 
@@ -57,6 +59,17 @@ describe("saveHtmlToFile", () => {
 
     expect(mkdir).toHaveBeenCalledWith(path.join("/repo", "public", "generated-slides"), { recursive: true });
     expect(writeFile).toHaveBeenCalledWith(path.join("/repo", "public", "generated-slides", "presentation-fixed-id.html"), "<html />", "utf8");
+  });
+
+  it("preserves project names containing .mastra", () => {
+    process.cwd = () => "/projects/my.mastra-app";
+    expect(resolveGeneratedSlidesDir().dir).toBe("/projects/my.mastra-app/public/generated-slides");
+  });
+
+  it("rejects unsafe filename prefixes before accessing disk", async () => {
+    await expect(saveHtmlToFile("<html />", { prefix: "../escape" })).rejects.toThrow("Invalid filename prefix");
+    expect(mkdir).not.toHaveBeenCalled();
+    expect(writeFile).not.toHaveBeenCalled();
   });
 
   it("uses GENERATED_SLIDES_DIR and returns the preview API URL", async () => {

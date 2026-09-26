@@ -1,4 +1,5 @@
 import { createStep, createWorkflow } from "@mastra/core";
+import { withTimeout } from "@/src/utils/with-timeout";
 import z from "zod";
 import {
   assertFrontendSlidesDocument,
@@ -117,31 +118,8 @@ function logTimeoutConfiguration() {
   });
 }
 
-function timeoutAfter(ms: number, message: string) {
-  return new Promise<never>((_, reject) => {
-    setTimeout(() => reject(new Error(message)), ms);
-  });
-}
-
-async function nextWithTimeout<T>(
-  iterator: AsyncIterator<T>,
-  ms: number,
-  message: string,
-) {
-  let timeoutId: ReturnType<typeof setTimeout> | undefined;
-
-  try {
-    return await Promise.race([
-      iterator.next(),
-      new Promise<IteratorResult<T>>((_, reject) => {
-        timeoutId = setTimeout(() => reject(new Error(message)), ms);
-      }),
-    ]);
-  } finally {
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-    }
-  }
+function nextWithTimeout<T>(iterator: AsyncIterator<T>, ms: number, message: string) {
+  return withTimeout(iterator.next(), ms, message);
 }
 
 function getTextDelta(chunk: unknown) {
@@ -246,13 +224,11 @@ function updateHtmlProgressSteps(
 async function getCompletedStreamText(stream: { text?: Promise<string> }) {
   if (!stream.text) return "";
 
-  return Promise.race([
+  return withTimeout(
     stream.text,
-    timeoutAfter(
-      HTML_STREAM_IDLE_TIMEOUT_MS,
-      `HTML generation stream closed but text aggregation did not finish within ${Math.round(HTML_STREAM_IDLE_TIMEOUT_MS / 1000)} seconds`,
-    ),
-  ]);
+    HTML_STREAM_IDLE_TIMEOUT_MS,
+    `HTML generation stream closed but text aggregation did not finish within ${Math.round(HTML_STREAM_IDLE_TIMEOUT_MS / 1000)} seconds`,
+  );
 }
 
 const PRESENTATION_HTML_CANCELLED_MESSAGE = "Presentation HTML generation was cancelled by the client";
@@ -535,13 +511,12 @@ export const presentationOutlineSuggestionStep = createStep({
         });
       }
 
-      outline = await Promise.race([
+      outline = await withTimeout(
         stream.object,
-        timeoutAfter(
-          OUTLINE_STREAM_IDLE_TIMEOUT_MS,
-          `Outline generation did not finish after the stream closed within ${Math.round(OUTLINE_STREAM_IDLE_TIMEOUT_MS / 1000)} seconds`,
-        ),
-      ]);
+        OUTLINE_STREAM_IDLE_TIMEOUT_MS,
+        `Outline generation did not finish after the stream closed within ${Math.round(OUTLINE_STREAM_IDLE_TIMEOUT_MS / 1000)} seconds`,
+        abortSignal,
+      );
       validateGeneratedOutline(outline, inputData);
     } catch (error) {
       stopOutlineHeartbeat();
@@ -704,7 +679,7 @@ export const presentationHtmlGenerationStep = createStep({
       const runFrontendSlidesAttempt = async (prompt: string, attempt: "initial" | "repair") => {
         throwIfPresentationHtmlGenerationCancelled(abortSignal);
         const attemptStartedAt = Date.now();
-        const stream = await Promise.race([
+        const stream = await withTimeout(
           frontendSlidesAgent.stream(
             [{ role: "user", content: prompt }],
             {
@@ -712,11 +687,10 @@ export const presentationHtmlGenerationStep = createStep({
               modelSettings: { maxOutputTokens: HTML_MAX_OUTPUT_TOKENS },
             },
           ),
-          timeoutAfter(
-            FRONTEND_SLIDES_TIMEOUT_MS,
-            `frontend-slides ${attempt} generation did not start within ${Math.round(FRONTEND_SLIDES_TIMEOUT_MS / 1000)} seconds`,
-          ),
-        ]);
+          FRONTEND_SLIDES_TIMEOUT_MS,
+          `frontend-slides ${attempt} generation did not start within ${Math.round(FRONTEND_SLIDES_TIMEOUT_MS / 1000)} seconds`,
+          abortSignal,
+        );
         throwIfPresentationHtmlGenerationCancelled(abortSignal);
         let output = "";
         let lastProgressWrite = 0;
@@ -726,13 +700,12 @@ export const presentationHtmlGenerationStep = createStep({
         try {
           while (Date.now() - attemptStartedAt <= FRONTEND_SLIDES_TIMEOUT_MS) {
             throwIfPresentationHtmlGenerationCancelled(abortSignal);
-            const { done, value } = await Promise.race([
+            const { done, value } = await withTimeout(
               reader.read(),
-              timeoutAfter(
-                HTML_STREAM_IDLE_TIMEOUT_MS,
-                `frontend-slides ${attempt} generation stream was idle for ${Math.round(HTML_STREAM_IDLE_TIMEOUT_MS / 1000)} seconds`,
-              ),
-            ]);
+              Math.min(HTML_STREAM_IDLE_TIMEOUT_MS, Math.max(1, FRONTEND_SLIDES_TIMEOUT_MS - (Date.now() - attemptStartedAt))),
+              `frontend-slides ${attempt} generation stream was idle or exceeded its deadline`,
+              abortSignal,
+            );
             throwIfPresentationHtmlGenerationCancelled(abortSignal);
             if (done) {
               streamCompletedNormally = true;

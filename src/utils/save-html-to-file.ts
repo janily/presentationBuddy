@@ -1,6 +1,7 @@
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
+import { getProjectRoot } from "./project-root";
 
 export type SaveHtmlToFileOptions = {
   prefix?: string;
@@ -11,18 +12,6 @@ export type GeneratedSlidesDir = {
   servedByStatic: boolean;
   source: "custom" | "vercel" | "public";
 };
-
-function getProjectRoot() {
-  let projectRoot = process.cwd();
-
-  // When running `mastra dev`, process.cwd() points to .mastra/output.
-  if (projectRoot.includes(".mastra")) {
-    const mastraIndex = projectRoot.indexOf(".mastra");
-    projectRoot = projectRoot.substring(0, mastraIndex).replace(/[\\/]$/, "");
-  }
-
-  return projectRoot;
-}
 
 export function resolveGeneratedSlidesDir(): GeneratedSlidesDir {
   if (process.env.GENERATED_SLIDES_DIR) {
@@ -64,6 +53,9 @@ export async function saveHtmlToFile(
   options?: SaveHtmlToFileOptions,
 ): Promise<string> {
   const prefix = options?.prefix ?? "presentation";
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(prefix)) {
+    throw new Error("Invalid filename prefix");
+  }
   const fileName = `${prefix}-${randomUUID()}.html`;
   const output = resolveGeneratedSlidesDir();
   const filePath = path.join(output.dir, fileName);
