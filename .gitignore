@@ -44,6 +44,7 @@ next-env.d.ts
 .frontend-slides-runs/
 .claude/settings.local.json
 .claude/worktrees/
+.worktrees/
 dev-server.out.log
 dev-server.err.log
 generated-slides
