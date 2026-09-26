@@ -34,7 +34,7 @@ Create a `.env.local` file in the repository root. Presentation agents use the s
 
 ```bash
 # Optional. Defaults to openrouter. Supported values: openrouter, openai, google,
-# and openai-compatible. Individual agents can override this with
+# openai-compatible, grsai, and grsaiapi. Individual agents can override this with
 # PRESENTATION_OUTLINE_PROVIDER or PRESENTATION_HTML_PROVIDER.
 MODEL_PROVIDER=openrouter
 
@@ -65,7 +65,11 @@ FRONTEND_SLIDES_MASTRA_MODEL=google/gemini-3-flash-preview
 FRONTEND_SLIDES_MASTRA_PROVIDER=openrouter
 ```
 
-Model values may be raw provider model IDs such as `google/gemini-3-flash-preview`. For backward compatibility, the helper also accepts `openrouter/`, `openai/`, `google/`, and `google-generative-ai/` prefixes and strips them before sending the model ID to the selected provider.
+`grsai` and `grsaiapi` are aliases for `openai-compatible`. Set `MODEL_PROVIDER=grsaiapi`, `MODEL_BASE_URL` to your service's OpenAI-compatible base URL, and `MODEL_API_KEY` to your service key. Use model IDs supported by your service. If an agent-specific provider is set, update it to `grsaiapi` as well or remove it to inherit `MODEL_PROVIDER`.
+
+For Grsai, use `MODEL_BASE_URL=https://grsaiapi.com/v1` (or `https://grsai.dakka.com.cn/v1`). A host-only URL is normalized to `/v1` for these aliases. Compatible providers use schema instructions in the system prompt with local output validation instead of requiring native JSON Schema support. If the conversation stream fails or returns no structured object, it retries once using non-streaming JSON generation.
+
+Model values may be raw provider model IDs such as `google/gemini-3-flash-preview`. Only prefixes matching the selected provider are stripped; OpenRouter vendor prefixes and OpenAI-compatible model IDs are preserved.
 
 The presentation workflow always generates the final deck through the Mastra `frontendSlidesComposerAgent` with the full `frontend-slides` skill context. Output must be a complete document with exactly the approved slide count. If the first attempt fails or is incomplete, the same frontend-slides agent performs one full regeneration; the workflow never switches to another HTML generator.
 

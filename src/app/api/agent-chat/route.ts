@@ -1,4 +1,5 @@
-﻿import { mastra } from "@/src/mastra";
+import { usesJsonPromptInjection } from "@/src/utils/model-provider";
+import { mastra } from "@/src/mastra";
 import { briefDecisionSchema } from "@/src/mastra/agents/presentation-brief-conversation-agent";
 import {
   presentationInputSchema,
@@ -310,23 +311,6 @@ function createAgentChatStreamResponse(
   return createUIMessageStreamResponse({ stream });
 }
 
-function parseJsonObject(text: string) {
-  const trimmed = text.trim();
-  const fencedMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  const candidate = fencedMatch?.[1]?.trim() ?? trimmed;
-
-  try {
-    return JSON.parse(candidate);
-  } catch {
-    const objectMatch = candidate.match(/\{[\s\S]*\}/);
-    if (!objectMatch?.[0]) {
-      throw new Error("Model did not return a JSON object");
-    }
-
-    return JSON.parse(objectMatch[0]);
-  }
-}
-
 function extractReplyText(partial: unknown): string {
   if (partial && typeof partial === "object" && "reply" in partial) {
     const reply = (partial as { reply?: unknown }).reply;
@@ -353,7 +337,10 @@ async function generateBriefDecision(
   operationId: string,
 ): Promise<BriefDecision | undefined> {
   const stream = await conversationAgent.stream(history, {
-    structuredOutput: { schema: briefDecisionSchema },
+    structuredOutput: {
+      schema: briefDecisionSchema,
+      jsonPromptInjection: usesJsonPromptInjection(process.env.PRESENTATION_BRIEF_PROVIDER),
+    },
     abortSignal,
   });
 
@@ -427,15 +414,7 @@ async function generateBriefDecision(
 
   if (!decision) {
     console.warn("agent_chat.structured_returned_empty", { operationId });
-    // Preserve any reply the user already saw; do not invent an intent.
-    return {
-      reply: streamedReply || "我已经理解你的要求，请继续补充你希望我执行的具体调整。",
-      readyToGenerate: false,
-      nextAction: "chat",
-      revision: null,
-      styleId: null,
-      brief: null,
-    };
+    return generateBriefDecisionFallback(conversationAgent, history, emit, abortSignal, operationId);
   }
 
   // The streamed reply and the final decision come from the same run, so they
@@ -453,39 +432,16 @@ async function generateBriefDecisionFallback(
   emit({ type: "progress", state: "retrying", message: "正在校验回复格式…" });
   console.warn("agent_chat.fallback_started", { operationId });
 
-  const stream = await conversationAgent.stream([
-    ...history,
-    {
-      role: "user",
-      content: `Return the next assistant decision as strict JSON only. Do not wrap it in Markdown.
-
-The JSON shape must be:
-{
-  "reply": "string shown to the user",
-  "readyToGenerate": boolean,
-  "nextAction": "chat" | "revise-content" | "revise-structure" | "change-palette" | "discover-styles" | "more-styles" | "select-style" | "execute-proposal" | "generate",
-  "revision": null | { "instruction": "string", "targetSlides": number[], "requiresOutlineReview": boolean },
-  "styleId": null | "string",
-  "brief": null | {
-    "topic": "string",
-    "audience": "string",
-    "pageCount": number,
-    "style": "string",
-    "requirements": "string"
-  }
-}`,
+  // Use the documented non-streaming endpoint when streaming/structured output
+  // fails. Mastra injects the full schema into the system prompt and validates it.
+  const result = await conversationAgent.generate(history, {
+    structuredOutput: {
+      schema: briefDecisionSchema,
+      jsonPromptInjection: true,
     },
-  ], {
     abortSignal,
   });
-
-  let text = "";
-  for await (const delta of stream.textStream) {
-    text += delta;
-  }
-
-  const parsed = parseJsonObject(text);
-  const decision = briefDecisionSchema.parse(parsed);
+  const decision = briefDecisionSchema.parse(result.object);
   // Fallback JSON was internal; surface the reply as a snapshot so the user
   // sees the final wording rather than raw JSON tokens.
   emit({ type: "assistant-snapshot", text: decision.reply });

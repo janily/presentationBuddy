@@ -28,7 +28,7 @@ function normalizeProviderName(value: string | undefined): ModelProviderName {
     return "openai-compatible";
   }
 
-  if (provider === "grsai") {
+  if (provider === "grsai" || provider === "grsaiapi") {
     return "openai-compatible";
   }
 
@@ -79,6 +79,12 @@ function getMastraProviderId(provider: ModelProviderName) {
   return provider;
 }
 
+// Compatible gateways may ignore native response_format/json_schema options.
+// Mastra can instead include the schema in the system prompt and validate locally.
+export function usesJsonPromptInjection(providerEnvValue?: string): boolean {
+  return normalizeProviderName(providerEnvValue?.trim() || process.env.MODEL_PROVIDER) === "openai-compatible";
+}
+
 export function getModelId(envValue: string | undefined, defaultModel: string, provider: ModelProviderName = DEFAULT_PROVIDER) {
   const model = envValue?.trim() || defaultModel;
   const matchingPrefix = PROVIDER_STRIPPABLE_PREFIXES[provider].find((prefix) => model.startsWith(prefix));
@@ -94,7 +100,14 @@ export function getConfiguredModel(
   const requestedProvider = providerEnvValue?.trim() || process.env.MODEL_PROVIDER;
   const provider = normalizeProviderName(requestedProvider);
   const model = getModelId(modelEnvValue, defaultModel, provider);
-  const url = getProviderBaseUrl(provider);
+  let url = getProviderBaseUrl(provider);
+  if (url && ["grsai", "grsaiapi"].includes(requestedProvider?.trim().toLowerCase() ?? "")) {
+    const parsedUrl = new URL(url);
+    if (parsedUrl.pathname === "/") {
+      parsedUrl.pathname = "/v1";
+      url = parsedUrl.toString();
+    }
+  }
   const configuredModel = {
     id: `${getMastraProviderId(provider)}/${model}` as const,
     url,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { emptyOutline, formatSlideNotes, toApprovedOutline, toSlideItem } from "./presentation-outline-utils";
+import { emptyOutline, formatSlideNotes, getCompleteOutline, toApprovedOutline, toSlideItem, toStreamingSlideItem } from "./presentation-outline-utils";
 import type { PresentationOutlineData } from "@/src/types/presentation-workflow";
 
 describe("presentation outline utilities", () => {
@@ -44,6 +44,40 @@ describe("presentation outline utilities", () => {
 
   it("formats notes without empty optional text", () => {
     expect(formatSlideNotes({ purpose: "Purpose", keyPoints: ["Point"], designSuggestion: "" })).toBe("Purpose Point");
+  });
+
+  it("formats notes before streamed key points arrive", () => {
+    expect(formatSlideNotes({ purpose: "Show urgency" })).toBe("Show urgency");
+  });
+
+  it("does not promote a partial streamed slide to an approvable outline", () => {
+    const partial = { ...baseOutline, slides: [{ pageNumber: 1, title: "Market" }] };
+
+    expect(getCompleteOutline(partial)).toBeNull();
+    expect(toStreamingSlideItem(partial.slides[0], 0)).toMatchObject({
+      title: "Market",
+      keyPoints: [],
+    });
+  });
+
+  it("switches to a complete outline once all streamed fields arrive", () => {
+    expect(getCompleteOutline(baseOutline)).toEqual(baseOutline);
+    expect(toStreamingSlideItem(baseOutline.slides[0], 0)).toEqual(toSlideItem(baseOutline.slides[0]));
+  });
+
+  it.each([null, {}, { keyPoints: null }, { keyPoints: "unfinished" }])("renders incomplete stream values safely: %j", (value) => {
+    // JSON transport can carry incomplete shapes before schema validation.
+    const slide = JSON.parse(JSON.stringify(value));
+    expect(toStreamingSlideItem(slide, 1)).toMatchObject({
+      title: "Drafting slide 2...",
+      keyPoints: [],
+    });
+    expect(getCompleteOutline({ ...baseOutline, slides: [slide] })).toBeNull();
+  });
+
+  it("renders streamed key points without exposing null entries", () => {
+    const slide = JSON.parse('{"title":"Market","keyPoints":["First point",null]}');
+    expect(toStreamingSlideItem(slide, 0).keyPoints).toEqual(["First point"]);
   });
 
   it("converts selected edited items back to an approved outline", () => {

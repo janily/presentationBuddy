@@ -1,4 +1,5 @@
 import type { PresentationOutlineData } from "@/src/types/presentation-workflow";
+import { presentationOutlineSchema } from "@/src/mastra/workflows/presentation-generation-schemas";
 import type { FrontendSlidesDensity, FrontendSlidesPurpose, FrontendSlidesStyleSpec } from "@/src/services/frontend-slides/style-catalog";
 
 export interface PresentationBrief {
@@ -33,8 +34,39 @@ export const emptyOutline = (brief: PresentationBrief): PresentationOutlineData 
 });
 
 export const formatSlideNotes = (
-  slide: Pick<PresentationOutlineData["slides"][number], "purpose" | "keyPoints" | "designSuggestion">,
-) => [slide.purpose, ...slide.keyPoints, slide.designSuggestion].filter(Boolean).join(" ");
+  slide: Partial<Pick<PresentationOutlineData["slides"][number], "purpose" | "keyPoints" | "designSuggestion">>,
+) => [slide.purpose, ...(Array.isArray(slide.keyPoints) ? slide.keyPoints : []), slide.designSuggestion]
+  .filter((value) => typeof value === "string" && value.length > 0).join(" ");
+
+// A streamed outline can have a title and slides while slide fields are still missing.
+export const getCompleteOutline = (outline: unknown): PresentationOutlineData | null => {
+  const result = presentationOutlineSchema.safeParse(outline);
+  return result.success ? result.data : null;
+};
+
+export const toStreamingSlideItem = (
+  slide: Partial<PresentationOutlineData["slides"][number]> | null | undefined,
+  index: number,
+): SlideOutlineItem => {
+  const title = typeof slide?.title === "string" && slide.title.trim() || `Drafting slide ${index + 1}...`;
+  const keyPoints = Array.isArray(slide?.keyPoints)
+    ? slide.keyPoints.filter((point): point is string => typeof point === "string" && point.length > 0)
+    : [];
+  const purpose = typeof slide?.purpose === "string" && slide.purpose.trim() || "Drafting purpose and key points...";
+  const designSuggestion = typeof slide?.designSuggestion === "string" && slide.designSuggestion.trim() || "Choosing an appropriate visual treatment...";
+  const notes = formatSlideNotes({ purpose, keyPoints, designSuggestion });
+
+  return {
+    id: `${slide?.pageNumber ?? index + 1}-${title}`,
+    title,
+    notes,
+    selected: true,
+    purpose,
+    keyPoints,
+    designSuggestion,
+    originalNotes: notes,
+  };
+};
 
 export const toSlideItem = (slide: PresentationOutlineData["slides"][number]): SlideOutlineItem => {
   const notes = formatSlideNotes(slide);

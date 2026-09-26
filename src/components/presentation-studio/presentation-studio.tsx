@@ -33,7 +33,7 @@ import {
 } from "./proposal-routing";
 import PresentationPreviewPane from "./presentation-preview-pane";
 import PresentationWorkspace from "./presentation-workspace";
-import { emptyOutline, toApprovedOutline, toSlideItem, type PresentationBrief, type SlideOutlineItem } from "./presentation-outline-utils";
+import { emptyOutline, getCompleteOutline, toApprovedOutline, toSlideItem, toStreamingSlideItem, type PresentationBrief } from "./presentation-outline-utils";
 import { deriveStudioPhase, type StudioErrorSource, type StudioPhase } from "./use-studio-phase";
 
 type PreviewPaneStep = "brief" | "outlining" | "review" | "generating" | "preview";
@@ -194,16 +194,12 @@ export default function PresentationStudio() {
   }, [outlineStep, suspenseData]);
 
   const baseOutline = useMemo(() => {
-    if (workflowOutline?.title && workflowOutline.slides) {
-      return workflowOutline as PresentationOutlineData;
-    }
-
-    return brief ? emptyOutline(brief) : null;
+    return getCompleteOutline(workflowOutline) ?? (brief ? emptyOutline(brief) : null);
   }, [brief, workflowOutline]);
 
   const outline = useMemo(() => {
     if (baseOutline?.slides?.length) return baseOutline.slides.map(toSlideItem);
-    return workflowOutline?.slides?.map(toStreamingSlideItem) ?? [];
+    return Array.isArray(workflowOutline?.slides) ? workflowOutline.slides.map(toStreamingSlideItem) : [];
   }, [baseOutline, workflowOutline]);
 
   const selectedSlides = useMemo(() => outline.filter((item) => item.selected), [outline]);
@@ -1216,22 +1212,3 @@ export default function PresentationStudio() {
     />
   );
 }
-
-const toStreamingSlideItem = (slide: Partial<PresentationOutlineData["slides"][number]>, index: number): SlideOutlineItem => {
-  const title = slide.title?.trim() || `Drafting slide ${index + 1}...`;
-  const keyPoints = slide.keyPoints?.filter(Boolean) ?? [];
-  const purpose = slide.purpose?.trim() || "Drafting purpose and key points...";
-  const designSuggestion = slide.designSuggestion?.trim() || "Choosing an appropriate visual treatment...";
-  const notes = [purpose, ...keyPoints, designSuggestion].filter(Boolean).join(" ");
-
-  return {
-    id: `${slide.pageNumber ?? index + 1}-${title}`,
-    title,
-    notes,
-    selected: true,
-    purpose,
-    keyPoints,
-    designSuggestion,
-    originalNotes: notes,
-  };
-};

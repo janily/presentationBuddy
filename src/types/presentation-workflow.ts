@@ -71,7 +71,9 @@ export type AgentRequestData = {
 
 export type OutlineStepData = {
   status: "loading" | "streaming" | "completed" | "failed";
-  outline?: Partial<PresentationOutlineData>;
+  outline?: Partial<Omit<PresentationOutlineData, "slides">> & {
+    slides?: (Partial<SlideOutlineData> | null)[];
+  };
   message?: string;
   progress?: number;
   lastUpdatedAt?: number;

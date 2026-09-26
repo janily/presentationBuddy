@@ -1,3 +1,4 @@
+import { usesJsonPromptInjection } from "../../utils/model-provider";
 import { createStep, createWorkflow } from "@mastra/core";
 import z from "zod";
 import {
@@ -493,6 +494,7 @@ export const presentationOutlineSuggestionStep = createStep({
         {
           structuredOutput: {
             schema: presentationOutlineSchema,
+            jsonPromptInjection: usesJsonPromptInjection(process.env.PRESENTATION_OUTLINE_PROVIDER),
           },
           abortSignal,
         },
@@ -571,7 +573,7 @@ export const presentationOutlineSuggestionStep = createStep({
             },
           ],
           {
-            structuredOutput: { schema: presentationOutlineSchema },
+            structuredOutput: { schema: presentationOutlineSchema, jsonPromptInjection: true },
             abortSignal,
           },
         );
