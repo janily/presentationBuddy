@@ -9,6 +9,7 @@ import {
   PresentationRevisionRequestData,
 } from "../types/presentation-workflow";
 import { getWorkflowFailureInfo } from "../utils/workflow-failure";
+import { presentationOutlineSchema } from "../mastra/workflows/presentation-generation-schemas";
 
 const getNonEmptyString = (value: unknown) => typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 
@@ -23,8 +24,8 @@ const getWorkflowSteps = (workflowData: unknown) => {
   if (!workflowData || typeof workflowData !== "object") return null;
 
   const data = workflowData as {
-    steps?: Record<string, { suspendPayload?: Record<string, unknown> }>;
-    data?: { steps?: Record<string, { suspendPayload?: Record<string, unknown> }> };
+    steps?: Record<string, { status?: string; suspendPayload?: Record<string, unknown> }>;
+    data?: { steps?: Record<string, { status?: string; suspendPayload?: Record<string, unknown> }> };
   };
 
   return data.steps ?? data.data?.steps ?? null;
@@ -184,19 +185,22 @@ export const usePresentationWorkflow = () => {
     const steps = getWorkflowSteps(workflowData);
     if (!steps) return null;
 
-    const lastStepKey = Object.keys(steps).pop();
-    const lastStep = lastStepKey ? steps[lastStepKey] : null;
-
-    const outline = lastStep?.suspendPayload?.suggestedOutline as
-      | PresentationOutlineData
-      | undefined;
-    const reason = (lastStep?.suspendPayload?.reason || "") as string;
+    const outlineStep = steps["presentation-outline-suggestion-step"];
+    if (outlineStep?.status !== "suspended") return null;
+    const result = presentationOutlineSchema.safeParse(outlineStep.suspendPayload?.suggestedOutline);
+    if (!result.success) return null;
+    const outline = result.data;
+    const reason = getNonEmptyString(outlineStep.suspendPayload?.reason) ?? "";
 
     return {
       outline,
       reason,
     };
   }, [lastWorkflowPart]);
+
+  const canApproveOutline = Boolean(
+    activeRunId && suspenseData?.outline && !workflowFailure && !error && status === "ready",
+  );
 
   const approveOutline = useCallback((approvedOutline: PresentationOutlineData) => {
     if (!activeRunId) {
@@ -242,7 +246,7 @@ export const usePresentationWorkflow = () => {
     suspenseData,
     activeRunId,
     approvalError,
-    canApproveOutline: Boolean(activeRunId),
+    canApproveOutline,
     outlineStep,
     htmlGenerationStep,
     workflowFailure,

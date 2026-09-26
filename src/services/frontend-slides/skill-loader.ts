@@ -37,7 +37,13 @@ export function resolveFrontendSlidesSkillDir() {
 }
 
 async function readSkillFile(relativePath: string) {
-  return readFile(path.join(resolveFrontendSlidesSkillDir(), relativePath), "utf8");
+  const skillDir = resolveFrontendSlidesSkillDir();
+  const filePath = path.resolve(skillDir, relativePath);
+  const relative = path.relative(skillDir, filePath);
+  if (path.isAbsolute(relativePath) || relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+    throw new Error("Cannot load a file outside the frontend-slides skill directory");
+  }
+  return readFile(filePath, "utf8");
 }
 
 async function readOptionalSkillFile(relativePath: string) {

@@ -234,7 +234,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const { topic, audience, pageCount, style, requirements, artifact } =
+    const { topic, audience, pageCount, style, requirements } =
       validation.data;
     const workflow = mastra.getWorkflow("presentationGenerationWorkflow");
 
@@ -252,14 +252,9 @@ export async function POST(request: NextRequest) {
     try {
       run = await workflow.createRunAsync();
       stream = run.stream({
-        inputData: {
-          topic,
-          audience,
-          pageCount,
-          style,
-          requirements,
-          artifact,
-        },
+        // Forward the validated brief as a whole so new design/discovery fields
+        // cannot silently disappear between the HTTP boundary and the workflow.
+        inputData: validation.data,
       });
       request.signal.addEventListener("abort", () => {
         console.info("Presentation generation workflow cancellation requested by client abort", {

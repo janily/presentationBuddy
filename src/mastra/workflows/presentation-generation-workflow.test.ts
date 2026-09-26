@@ -1,5 +1,32 @@
-import { describe, expect, it, vi } from "vitest";
-import { runWithFrontendSlidesRepair } from "./presentation-generation-workflow";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { runWithFrontendSlidesRepair, withPresentationTimeout } from "./presentation-generation-workflow";
+
+describe("presentation stream deadlines", () => {
+  afterEach(() => { vi.useRealTimers(); });
+
+  it("clears timers after successful stream reads instead of accumulating one per chunk", async () => {
+    vi.useFakeTimers();
+    for (let i = 0; i < 100; i++) {
+      await expect(withPresentationTimeout(Promise.resolve(i), 240_000, "idle")).resolves.toBe(i);
+    }
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("clears the timeout when the underlying read fails", async () => {
+    vi.useFakeTimers();
+    await expect(withPresentationTimeout(Promise.reject(new Error("provider failed")), 240_000, "idle")).rejects.toThrow("provider failed");
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("rejects a stalled read at the configured deadline", async () => {
+    vi.useFakeTimers();
+    const pending = withPresentationTimeout(new Promise(() => undefined), 100, "stream idle");
+    const assertion = expect(pending).rejects.toThrow("stream idle");
+    await vi.advanceTimersByTimeAsync(100);
+    await assertion;
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});
 
 describe("frontend-slides generation retry", () => {
   it("does not run repair after the request is cancelled", async () => {

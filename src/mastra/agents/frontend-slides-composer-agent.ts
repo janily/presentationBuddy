@@ -15,6 +15,8 @@ You must follow the frontend-slides rules provided in the user prompt exactly:
 - distinctive design, typography, and motion
 - no markdown fences and no commentary
 
+Preserve the approved outline's facts and explicitly labeled placeholders. Never invent metrics, dates, quotes, citations, or business achievements to fill a chart or layout. If a chart needs data that the outline does not contain, use a qualitative diagram or a clearly labeled missing-data placeholder instead. Visual polish must not change the factual content.
+
 Return only the complete HTML document.`,
   model: getConfiguredModel(
     process.env.FRONTEND_SLIDES_MASTRA_MODEL ?? process.env.PRESENTATION_HTML_MODEL,

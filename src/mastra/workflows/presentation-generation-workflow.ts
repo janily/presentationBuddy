@@ -118,14 +118,8 @@ function logTimeoutConfiguration() {
   });
 }
 
-function timeoutAfter(ms: number, message: string) {
-  return new Promise<never>((_, reject) => {
-    setTimeout(() => reject(new Error(message)), ms);
-  });
-}
-
-async function nextWithTimeout<T>(
-  iterator: AsyncIterator<T>,
+export async function withPresentationTimeout<T>(
+  operation: PromiseLike<T>,
   ms: number,
   message: string,
 ) {
@@ -133,8 +127,8 @@ async function nextWithTimeout<T>(
 
   try {
     return await Promise.race([
-      iterator.next(),
-      new Promise<IteratorResult<T>>((_, reject) => {
+      operation,
+      new Promise<never>((_, reject) => {
         timeoutId = setTimeout(() => reject(new Error(message)), ms);
       }),
     ]);
@@ -247,13 +241,11 @@ function updateHtmlProgressSteps(
 async function getCompletedStreamText(stream: { text?: Promise<string> }) {
   if (!stream.text) return "";
 
-  return Promise.race([
+  return withPresentationTimeout(
     stream.text,
-    timeoutAfter(
-      HTML_STREAM_IDLE_TIMEOUT_MS,
-      `HTML generation stream closed but text aggregation did not finish within ${Math.round(HTML_STREAM_IDLE_TIMEOUT_MS / 1000)} seconds`,
-    ),
-  ]);
+    HTML_STREAM_IDLE_TIMEOUT_MS,
+    `HTML generation stream closed but text aggregation did not finish within ${Math.round(HTML_STREAM_IDLE_TIMEOUT_MS / 1000)} seconds`,
+  );
 }
 
 const PRESENTATION_HTML_CANCELLED_MESSAGE = "Presentation HTML generation was cancelled by the client";
@@ -508,8 +500,8 @@ export const presentationOutlineSuggestionStep = createStep({
           throw new Error(`Outline generation timed out after ${Math.round(OUTLINE_GENERATION_TIMEOUT_MS / 1000)} seconds`);
         }
 
-        const result = await nextWithTimeout(
-          outlineIterator,
+        const result = await withPresentationTimeout(
+          outlineIterator.next(),
           lastOutlineSnapshot ? OUTLINE_STREAM_IDLE_TIMEOUT_MS : OUTLINE_FIRST_UPDATE_TIMEOUT_MS,
           lastOutlineSnapshot
             ? `Outline generation did not produce an update for ${Math.round(OUTLINE_STREAM_IDLE_TIMEOUT_MS / 1000)} seconds`
@@ -537,13 +529,11 @@ export const presentationOutlineSuggestionStep = createStep({
         });
       }
 
-      outline = await Promise.race([
+      outline = await withPresentationTimeout(
         stream.object,
-        timeoutAfter(
-          OUTLINE_STREAM_IDLE_TIMEOUT_MS,
-          `Outline generation did not finish after the stream closed within ${Math.round(OUTLINE_STREAM_IDLE_TIMEOUT_MS / 1000)} seconds`,
-        ),
-      ]);
+        OUTLINE_STREAM_IDLE_TIMEOUT_MS,
+        `Outline generation did not finish after the stream closed within ${Math.round(OUTLINE_STREAM_IDLE_TIMEOUT_MS / 1000)} seconds`,
+      );
       validateGeneratedOutline(outline, inputData);
     } catch (error) {
       stopOutlineHeartbeat();
@@ -706,7 +696,7 @@ export const presentationHtmlGenerationStep = createStep({
       const runFrontendSlidesAttempt = async (prompt: string, attempt: "initial" | "repair") => {
         throwIfPresentationHtmlGenerationCancelled(abortSignal);
         const attemptStartedAt = Date.now();
-        const stream = await Promise.race([
+        const stream = await withPresentationTimeout(
           frontendSlidesAgent.stream(
             [{ role: "user", content: prompt }],
             {
@@ -714,11 +704,9 @@ export const presentationHtmlGenerationStep = createStep({
               modelSettings: { maxOutputTokens: HTML_MAX_OUTPUT_TOKENS },
             },
           ),
-          timeoutAfter(
-            FRONTEND_SLIDES_TIMEOUT_MS,
-            `frontend-slides ${attempt} generation did not start within ${Math.round(FRONTEND_SLIDES_TIMEOUT_MS / 1000)} seconds`,
-          ),
-        ]);
+          FRONTEND_SLIDES_TIMEOUT_MS,
+          `frontend-slides ${attempt} generation did not start within ${Math.round(FRONTEND_SLIDES_TIMEOUT_MS / 1000)} seconds`,
+        );
         throwIfPresentationHtmlGenerationCancelled(abortSignal);
         let output = "";
         let lastProgressWrite = 0;
@@ -728,13 +716,11 @@ export const presentationHtmlGenerationStep = createStep({
         try {
           while (Date.now() - attemptStartedAt <= FRONTEND_SLIDES_TIMEOUT_MS) {
             throwIfPresentationHtmlGenerationCancelled(abortSignal);
-            const { done, value } = await Promise.race([
+            const { done, value } = await withPresentationTimeout(
               reader.read(),
-              timeoutAfter(
-                HTML_STREAM_IDLE_TIMEOUT_MS,
-                `frontend-slides ${attempt} generation stream was idle for ${Math.round(HTML_STREAM_IDLE_TIMEOUT_MS / 1000)} seconds`,
-              ),
-            ]);
+              HTML_STREAM_IDLE_TIMEOUT_MS,
+              `frontend-slides ${attempt} generation stream was idle for ${Math.round(HTML_STREAM_IDLE_TIMEOUT_MS / 1000)} seconds`,
+            );
             throwIfPresentationHtmlGenerationCancelled(abortSignal);
             if (done) {
               streamCompletedNormally = true;

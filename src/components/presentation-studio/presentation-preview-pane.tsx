@@ -41,8 +41,8 @@ function StyleDiscovery({ previews, selectedStyleId, isLoading, batch, remaining
       <div className="mx-auto max-w-7xl">
         <div className="mb-5">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--accent-terracotta)]">Frontend Slides · Style Discovery</p>
-          <h2 className="mt-2 text-3xl font-semibold text-[var(--text-primary)]">请选择一个真实视觉方向</h2>
-          <p className="mt-2 text-[var(--text-secondary)]">每个选项都是按当前演示主题生成的标题页，而不是抽象风格名称。</p>
+          <h2 className="mt-2 text-3xl font-semibold text-[var(--text-primary)]">选择演示文稿的视觉风格</h2>
+          <p className="mt-2 text-[var(--text-secondary)]">下方是字体、配色与布局的风格样例。生成时会使用你的主题和已确认内容。</p>
           <p className="mt-2 text-sm text-[var(--text-muted)]">第 {batch} 批{remaining > 0 ? ` · 还有 ${remaining} 种可看` : " · 已展示全部可用方向"}</p>
         </div>
         {isLoading ? (
@@ -55,7 +55,7 @@ function StyleDiscovery({ previews, selectedStyleId, isLoading, batch, remaining
             {previews.map(({ style, previewImage }) => {
               const selected = selectedStyleId === style.id;
               return (
-                <button key={style.id} type="button" onClick={() => onSelect?.(style)} className={`overflow-hidden rounded-2xl border-2 bg-white text-left shadow-sm transition hover:-translate-y-1 hover:shadow-xl ${selected ? "border-[var(--accent-terracotta)] ring-4 ring-[var(--accent-terracotta)]/10" : "border-transparent"}`}>
+                <button key={style.id} type="button" aria-pressed={selected} onClick={() => onSelect?.(style)} className={`overflow-hidden rounded-2xl border-2 bg-white text-left shadow-sm transition hover:-translate-y-1 hover:shadow-xl ${selected ? "border-[var(--accent-terracotta)] ring-4 ring-[var(--accent-terracotta)]/10" : "border-transparent"}`}>
                   <div className="aspect-video w-full overflow-hidden bg-black">
                     <Image src={previewImage} alt={`${style.name} 风格预览`} width={960} height={540} unoptimized className="h-full w-full object-cover" />
                   </div>
@@ -191,7 +191,18 @@ function OutlinePreview({ outline, isLoading, outlineGeneration }: { outline: Sl
                 {isLoading ? <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--accent-terracotta)]" /> : null}
               </div>
               <h3 className="text-lg font-semibold text-[var(--text-primary)]">{slide.title}</h3>
-              <p className="mt-3 line-clamp-4 text-sm text-[var(--text-secondary)]">{slide.notes}</p>
+              <p className="mt-3 text-sm leading-6 text-[var(--text-secondary)]">{slide.purpose || slide.notes}</p>
+              {slide.keyPoints?.length ? (
+                <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-[var(--text-secondary)]">
+                  {slide.keyPoints.map((point, pointIndex) => <li key={pointIndex}>{point}</li>)}
+                </ul>
+              ) : null}
+              {slide.designSuggestion ? (
+                <details className="mt-4 border-t border-[var(--border-light)] pt-3 text-sm text-[var(--text-muted)]">
+                  <summary className="cursor-pointer">查看版式建议</summary>
+                  <p className="mt-2 leading-6">{slide.designSuggestion}</p>
+                </details>
+              ) : null}
             </article>
           ))}
         </div>

@@ -15,6 +15,12 @@ Your output must be practical for a human to review before generation. Include:
 - One entry for each slide/page with title, purpose, key points, and design suggestions
 - Global design guidance for visual style, typography, color, and layout
 
+Content fidelity:
+- Treat the user's supplied content as the source of truth. Preserve supplied facts and distinguish them from suggestions.
+- Never invent business metrics, percentages, dates, experiment results, customer quotes, citations, or completed achievements to make a slide look convincing.
+- If a value is missing, use a clearly labeled placeholder such as "待补充：留存率变化" in the user's language, or describe the trend qualitatively. Do not replace missing values with realistic-looking examples unless the user explicitly requests fictional sample data.
+- A proposed target or future action must be labeled as a proposal, never as an observed result.
+
 Keep recommendations specific, audience-aware, and directly actionable.`,
   model: getConfiguredModel(
     process.env.PRESENTATION_OUTLINE_MODEL,
