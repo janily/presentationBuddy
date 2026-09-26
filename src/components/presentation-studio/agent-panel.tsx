@@ -4,7 +4,7 @@ import type { SourceMaterialsController } from "@/src/hooks/use-source-materials
 import { MaterialAttachments, SentAttachments } from "./material-attachments";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, Brain, FileText, RefreshCcw, RotateCcw, Send, Sparkles, Square } from "lucide-react";
+import { AlertTriangle, Brain, FileText, RefreshCcw, RotateCcw, Send, Sparkles, Square, X } from "lucide-react";
 import type { StudioErrorSource, StudioPhase } from "./use-studio-phase";
 import type { AgentMessage } from "./agent-message-model";
 import type { AgentQuickActionChoice, AgentQuickCommand } from "./agent-quick-actions";
@@ -79,14 +79,39 @@ const emptyStatePrompts = [
 
 function TypingDots() {
   return (
-    <div className="flex items-center gap-1 px-1 py-0.5" aria-label="助手思考中">
+    <div className="flex items-center gap-1 px-1 py-0.5" aria-hidden="true">
       {[0, 1, 2].map((item) => (
         <span
           key={item}
-          className="h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--text-muted)]"
+          className="h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--accent-terracotta)] motion-reduce:animate-none"
           style={{ animationDelay: `${item * 120}ms` }}
         />
       ))}
+    </div>
+  );
+}
+
+function PendingReply({ message }: { message?: string | null }) {
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  useEffect(() => {
+    const startedAt = Date.now();
+    const timer = window.setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const isSlow = elapsedSeconds >= 8;
+  const label = message && message !== "正在准备回复…"
+    ? message
+    : isSlow ? "还在准备回复，请稍候" : "正在准备回复";
+
+  return (
+    <div className="flex min-h-9 items-center gap-2 py-1 text-sm text-[var(--text-muted)]" role="status">
+      <TypingDots />
+      <span aria-live="polite">{label}</span>
+      {isSlow ? <span className="shrink-0 text-xs tabular-nums" aria-live="off">{elapsedSeconds} 秒</span> : null}
     </div>
   );
 }
@@ -366,7 +391,7 @@ export default function AgentPanel({
     const lastMessage = messages.at(-1);
     if (!lastMessage) return "";
     if (lastMessage.role === "assistant" || lastMessage.role === "user") {
-      return `${lastMessage.id}:${lastMessage.content}`;
+      return `${lastMessage.id}:${lastMessage.content}:${lastMessage.reasoningSummary ?? ""}:${lastMessage.streamState ?? ""}`;
     }
     return lastMessage.id;
   }, [messages]);
@@ -387,8 +412,14 @@ export default function AgentPanel({
   const sendPrompt = async (prompt: string) => {
     const trimmedPrompt = prompt.trim();
     if ((!trimmedPrompt && !pendingAttachments.length) || isSending || attachmentsBlocked) return;
-    const accepted = await onSend(trimmedPrompt || "请根据这些资料制作演示文稿");
-    if (accepted !== false) setInput(current => current === prompt ? "" : current);
+    const isDraft = input === prompt;
+    if (isDraft) setInput("");
+    try {
+      const accepted = await onSend(trimmedPrompt || "请根据这些资料制作演示文稿");
+      if (accepted === false && isDraft) setInput(current => current || prompt);
+    } catch {
+      if (isDraft) setInput(current => current || prompt);
+    }
   };
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -455,11 +486,16 @@ export default function AgentPanel({
 
             const isStreamingText = message.role === "assistant" && message.isStreaming;
             const hasVisibleContent = message.content.trim().length > 0;
+            const hasReasoning = message.role === "assistant" && (message.reasoningSummary !== undefined || message.streamState === "reasoning" || message.streamState === "finalizing");
+
+            if (isStreamingText && !hasVisibleContent && !hasReasoning) {
+              return <PendingReply key={message.id} message={progressMessage} />;
+            }
 
             return (
               <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
                 <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-6 ${message.role === "user" ? "whitespace-pre-wrap bg-[var(--accent-terracotta)] text-white" : "border border-[var(--border-light)] bg-[var(--bg-card)] text-[var(--text-secondary)]"}`}>
-                  {message.role === "assistant" && (message.reasoningSummary !== undefined || message.streamState === "reasoning" || message.streamState === "finalizing") ? (
+                  {hasReasoning ? (
                     <ReasoningSummary summary={message.reasoningSummary} state={message.streamState} />
                   ) : null}
                   <SentAttachments attachments={message.attachments} />
@@ -468,12 +504,6 @@ export default function AgentPanel({
                       ? <AgentMarkdown>{message.content}</AgentMarkdown>
                       : message.content
                     : null}
-                  {isStreamingText && !hasVisibleContent ? (
-                    <div className="flex items-center gap-2">
-                      <TypingDots />
-                      {progressMessage ? <span className="text-[var(--text-muted)]">{progressMessage}</span> : null}
-                    </div>
-                  ) : null}
                   {isStreamingText && hasVisibleContent ? <span className="ml-1 inline-block h-4 w-1 animate-pulse rounded bg-[var(--text-muted)] align-[-2px]" /> : null}
                   {message.role === "assistant" && message.streamState === "cancelled" ? (
                     <span className="mt-2 block text-xs text-[var(--text-muted)]">已停止</span>
@@ -494,15 +524,8 @@ export default function AgentPanel({
 
           {statusText ? <StatusRow text={statusText} onCancel={phase === "generating" ? onCancel : undefined} /> : null}
 
-          {isSending && !messages.some((message) => message.role === "assistant" && message.kind === "text" && message.isStreaming) ? (
-            <div className="flex justify-start">
-              <div className="flex items-center gap-2 rounded-2xl border border-[var(--border-light)] bg-[var(--bg-card)] px-4 py-3">
-                <TypingDots />
-                {progressMessage ? (
-                  <span className="text-sm text-[var(--text-muted)]">{progressMessage}</span>
-                ) : null}
-              </div>
-            </div>
+          {isSending && !statusText && !messages.some((message) => message.role === "assistant" && message.isStreaming) ? (
+            <PendingReply message={progressMessage} />
           ) : null}
         </div>
       )}
@@ -542,27 +565,34 @@ export default function AgentPanel({
                 sendPrompt(input);
               }
             }}
-            placeholder={phaseConfig.placeholder}
-            className="input min-h-20 flex-1 resize-none"
+            placeholder={isSending ? "可以先写下一条，回复完成后发送…" : phaseConfig.placeholder}
+            className="input min-h-20 min-w-0 flex-1 resize-none"
           />
           {isSending ? (
             <button
               type="button"
-              onClick={onCancel}
-              className="self-end rounded-xl border border-[var(--border-light)] bg-white p-3 text-[var(--text-secondary)] transition hover:border-[var(--accent-terracotta)] hover:text-[var(--accent-terracotta)]"
+              onClick={(event) => {
+                // Cancelling changes this DOM button back to type="submit".
+                // Suppress the click's default action before React updates it.
+                event.preventDefault();
+                onCancel();
+              }}
+              className="inline-flex h-11 w-20 shrink-0 items-center justify-center gap-1.5 self-end rounded-xl border border-[var(--accent-terracotta)]/25 bg-[var(--accent-terracotta)]/10 text-sm font-medium text-[var(--accent-terracotta)] transition-colors hover:bg-[var(--accent-terracotta)]/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent-terracotta)]"
               aria-label="停止本次请求"
               title="停止本次请求"
             >
-              <Square className="h-5 w-5" />
+              <X className="h-4 w-4" aria-hidden="true" />
+              停止
             </button>
           ) : (
             <button
               type="submit"
               disabled={!canSend}
-              className="self-end rounded-xl bg-[var(--accent-terracotta)] p-3 text-white shadow-md transition hover:bg-[var(--accent-terracotta-light)] disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex h-11 w-20 shrink-0 items-center justify-center gap-1.5 self-end rounded-xl bg-[var(--accent-terracotta)] text-sm font-medium text-white shadow-md transition-colors hover:bg-[var(--accent-terracotta-light)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent-terracotta)] disabled:cursor-not-allowed disabled:opacity-50"
               aria-label="发送演示文稿请求"
             >
-              <Send className="h-5 w-5" />
+              <Send className="h-4 w-4" aria-hidden="true" />
+              发送
             </button>
           )}
         </form>

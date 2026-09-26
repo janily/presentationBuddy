@@ -311,7 +311,13 @@ function createAgentChatStreamResponse(
     },
   });
 
-  return createUIMessageStreamResponse({ stream });
+  return createUIMessageStreamResponse({
+    stream,
+    headers: {
+      "Cache-Control": "no-cache, no-transform",
+      "X-Accel-Buffering": "no",
+    },
+  });
 }
 
 function extractReplyText(partial: unknown): string {
@@ -546,7 +552,7 @@ export async function POST(request: Request) {
         isGenerating: Boolean(isGenerating),
       });
 
-      emit({ type: "progress", state: "connecting", message: "正在连接模型…" });
+      emit({ type: "progress", state: "connecting", message: "正在准备回复…" });
       console.log("agent_chat.first_event_written", {
         operationId,
         durationMs: Date.now() - requestStartedAt,

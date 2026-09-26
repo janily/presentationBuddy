@@ -792,7 +792,7 @@ export default function PresentationStudio() {
     setAgentProgressMessage(
       proposalResolution.kind === "execute"
         ? "正在确认方案并准备执行…"
-        : "正在连接模型…",
+        : null,
     );
 
     const updateAssistantMessage = (contentUpdater: (content: string) => string, isStreaming = true) => {
