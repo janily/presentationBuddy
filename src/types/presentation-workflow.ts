@@ -19,6 +19,7 @@ export type PresentationOutlineData = {
 };
 
 export type PresentationBriefData = {
+  sourceIds?: string[];
   topic: string;
   audience: string;
   pageCount: number;

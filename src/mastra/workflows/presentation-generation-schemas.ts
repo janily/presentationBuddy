@@ -56,6 +56,8 @@ export const revisionSpecSchema = z.object({
 });
 
 export const presentationInputSchema = z.object({
+  sourceIds: z.array(z.string().uuid()).max(5).optional(),
+  sourceContext: z.string().max(80000).optional(),
   topic: z.string().trim().min(1, "Topic is required"),
   audience: z.string().optional(),
   pageCount: z

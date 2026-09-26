@@ -14,6 +14,7 @@ export type FrontendSlidesInput = {
   style: string;
   narrativeGoal: string;
   designGuidance: string[];
+  sourceContext?: string;
   density?: FrontendSlidesDensity;
   styleSpec?: FrontendSlidesStyleSpec;
   revisionKind?: RevisionKind;
@@ -26,7 +27,8 @@ export function mapOutlineToFrontendSlides(
   outline: PresentationOutlineData,
   style?: string,
   options?: {
-    density?: FrontendSlidesDensity;
+    sourceContext?: string;
+  density?: FrontendSlidesDensity;
     styleSpec?: FrontendSlidesStyleSpec;
     revisionKind?: RevisionKind;
     revisionInstruction?: string;
@@ -34,6 +36,7 @@ export function mapOutlineToFrontendSlides(
   },
 ): FrontendSlidesInput {
   return {
+    sourceContext: options?.sourceContext,
     title: outline.title,
     style: style?.trim() || "modern professional",
     narrativeGoal: outline.narrativeGoal,

@@ -1,5 +1,8 @@
 "use client";
 
+import type { SourceMaterialsController } from "@/src/hooks/use-source-materials";
+import { MaterialAttachments, SentAttachments } from "./material-attachments";
+
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Brain, FileText, RefreshCcw, RotateCcw, Send, Sparkles, Square } from "lucide-react";
 import type { StudioErrorSource, StudioPhase } from "./use-studio-phase";
@@ -14,7 +17,8 @@ interface AgentPanelProps {
   phase: StudioPhase;
   isSending: boolean;
   progressMessage?: string | null;
-  onSend: (message: string) => void;
+  materials: SourceMaterialsController;
+  onSend: (message: string) => void | Promise<boolean | void>;
   onQuickAction: (command: AgentQuickCommand) => void;
   onApplyRevision: (choice: AgentQuickActionChoice) => void;
   onExecuteProposal: (proposalId: string) => void;
@@ -336,6 +340,7 @@ export default function AgentPanel({
   isSending,
   progressMessage,
   onSend,
+  materials,
   onQuickAction,
   onApplyRevision,
   onExecuteProposal,
@@ -350,7 +355,10 @@ export default function AgentPanel({
   const [isPinnedToBottom, setIsPinnedToBottom] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const phaseConfig = phaseCopy[phase];
-  const canSend = input.trim().length > 0 && !isSending;
+  const pendingAttachments = materials.items.filter(item => !item.sent);
+  const attachmentsBlocked = pendingAttachments.some(item => item.status === "uploading" || item.status === "reading")
+    || (pendingAttachments.length > 0 && (phase === "generating" || phase === "outlining"));
+  const canSend = (input.trim().length > 0 || pendingAttachments.length > 0) && !isSending && !attachmentsBlocked;
   const prompts = useMemo(() => phaseConfig.prompts, [phaseConfig.prompts]);
   const isEmpty = phase === "briefing" && messages.length === 0;
   const statusText = phase === "outlining" ? "正在生成大纲…" : phase === "generating" ? "正在生成演示文稿…" : null;
@@ -376,12 +384,11 @@ export default function AgentPanel({
     setIsPinnedToBottom(distanceFromBottom < 48);
   };
 
-  const sendPrompt = (prompt: string) => {
+  const sendPrompt = async (prompt: string) => {
     const trimmedPrompt = prompt.trim();
-    if (!trimmedPrompt || isSending) return;
-
-    setInput("");
-    onSend(trimmedPrompt);
+    if ((!trimmedPrompt && !pendingAttachments.length) || isSending || attachmentsBlocked) return;
+    const accepted = await onSend(trimmedPrompt || "请根据这些资料制作演示文稿");
+    if (accepted !== false) setInput(current => current === prompt ? "" : current);
   };
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -390,7 +397,10 @@ export default function AgentPanel({
   };
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
+    <section className="flex min-h-0 flex-1 flex-col overflow-hidden"
+      onDragOver={event => { if (event.dataTransfer.types.includes("Files")) event.preventDefault(); }}
+      onDrop={event => { event.preventDefault(); if (!isSending) materials.add(Array.from(event.dataTransfer.files)); }}
+    >
       <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--border-light)] px-4 py-3">
         <div className="flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-[var(--accent-terracotta)]" />
@@ -452,6 +462,7 @@ export default function AgentPanel({
                   {message.role === "assistant" && (message.reasoningSummary !== undefined || message.streamState === "reasoning" || message.streamState === "finalizing") ? (
                     <ReasoningSummary summary={message.reasoningSummary} state={message.streamState} />
                   ) : null}
+                  <SentAttachments attachments={message.attachments} />
                   {hasVisibleContent
                     ? message.role === "assistant"
                       ? <AgentMarkdown>{message.content}</AgentMarkdown>
@@ -513,12 +524,18 @@ export default function AgentPanel({
           </div>
         ) : null}
 
+        <MaterialAttachments materials={materials} disabled={isSending} />
+        {pendingAttachments.length > 0 && (phase === "generating" || phase === "outlining") && <p className="text-xs text-[var(--text-muted)]">资料已暂存，请等待当前任务完成或停止后发送。</p>}
         <form onSubmit={handleSubmit} className="flex gap-2">
           <label className="sr-only" htmlFor="agent-prompt">演示文稿请求</label>
           <textarea
             id="agent-prompt"
             value={input}
             onChange={(event) => setInput(event.target.value)}
+            onPaste={event => {
+              const files = Array.from(event.clipboardData.files).filter(file => file.type.startsWith("image/"));
+              if (files.length && !isSending) { event.preventDefault(); materials.add(files); }
+            }}
             onKeyDown={(event) => {
               if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
                 event.preventDefault();

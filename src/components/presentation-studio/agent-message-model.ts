@@ -1,9 +1,10 @@
+import type { MaterialAttachment } from "@/src/types/materials";
 import type { StudioErrorSource } from "./use-studio-phase";
 import type { AgentQuickActionDefinition } from "./agent-quick-actions";
 import type { AgentActionProposal } from "@/src/types/agent-chat";
 
 export type AgentMessage =
-  | { id: string; role: "assistant" | "user"; kind?: "text"; content: string; reasoningSummary?: string; streamState?: "connecting" | "reasoning" | "answering" | "finalizing" | "done" | "cancelled" | "error"; isStreaming?: boolean; retryPrompt?: string }
+  | { id: string; role: "assistant" | "user"; kind?: "text"; content: string; attachments?: MaterialAttachment[]; reasoningSummary?: string; streamState?: "connecting" | "reasoning" | "answering" | "finalizing" | "done" | "cancelled" | "error"; isStreaming?: boolean; retryPrompt?: string }
   | { id: string; role: "system"; kind: "quick-choice"; action: AgentQuickActionDefinition }
   | { id: string; role: "system"; kind: "action-proposal"; proposal: AgentActionProposal }
   | { id: string; role: "system"; kind: "outline-review"; slideCount: number; canGenerate: boolean; disabledReason?: string | null }

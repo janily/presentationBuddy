@@ -108,3 +108,35 @@ When `GENERATED_SLIDES_DIR` is set, or when `VERCEL=1`, decks are served through
 For Zeabur, mount a persistent volume such as `/data`, then set `GENERATED_SLIDES_DIR=/data/generated-slides`. Without a volume, generated files can be lost after redeploys or restarts.
 
 For Vercel, the app writes generated decks to `/tmp/generated-slides` and exports `maxDuration = 300` on the analyze route. This is only suitable for short-lived previews; files in `/tmp` are not durable and may disappear after function restarts. For durable production history on serverless platforms, use object storage such as S3, R2, or GCS.
+
+## Uploaded source materials
+
+Use **上传资料** beside the chat input, drag files onto the chat panel, or paste an image. Markdown (`.md`, `.markdown`), PDF (including scanned documents), PNG, JPEG, and WebP are supported. Each presentation accepts up to 5 files with a combined size of 10 MiB; Markdown files are limited to 1 MiB. Files can be sent without a text message.
+
+Files are sent by the server directly to the material-understanding model. There is no local PDF text extraction or OCR. Markdown is passed verbatim as text; PDFs and images are passed as original inline binary data. A successful reading is validated and reused during chat, outline review, generation, and revisions. Uploaded images can be included in the deck; the server embeds their resized WebP data into exported HTML.
+
+The initial adapter targets the Grsai **Gemini-format** endpoint, separately from the existing chat-completions configuration:
+
+```bash
+# Optional: defaults to gemini-3.8-flash
+SOURCE_ANALYSIS_MODEL=gemini-3.8-flash
+# Optional: defaults to MODEL_BASE_URL; /v1 is replaced by the Gemini endpoint
+SOURCE_ANALYSIS_BASE_URL=https://grsaiapi.com
+# Optional: defaults to MODEL_API_KEY; keep this on the server
+SOURCE_ANALYSIS_API_KEY=...
+# Optional: private directory on the single application server
+MATERIALS_DIR=/data/private-materials
+```
+
+Use a model/gateway that accepts PDF and image `inlineData` at `/v1beta/models/{model}:generateContent`. Other OpenAI-compatible providers are not automatically compatible with this material adapter. If the gateway rejects a file, the app reports the error without falling back to OCR or silently omitting it.
+
+Original files and extracted material records live outside `public/`, defaulting to the OS temporary directory, and expire after 24 hours. Cleanup runs at most once per minute when new files are uploaded; expiry is checked on reads. Small workflow ownership records remain to reject expired or unauthorized resumes. An HttpOnly session cookie restricts material access. “重新开始” clears the current material associations; it does not recover previous decks. This implementation targets local development or one Node server/container, not Vercel or multiple replicas. The reverse proxy must permit multipart bodies slightly larger than 10 MiB and stream responses for up to 180 seconds.
+
+Optional provider checks use synthetic fixtures and incur model usage:
+
+```bash
+RUN_MATERIAL_MODEL_SMOKE=1 npx vitest run src/services/materials/model-smoke.test.ts
+RUN_MATERIAL_DECK_SMOKE=1 npx vitest run src/services/materials/model-smoke.test.ts
+```
+
+The first checks Markdown, images, text PDF, and scanned PDF; the second checks upload → model reading → outline approval → HTML with embedded images. These checks are skipped by default.

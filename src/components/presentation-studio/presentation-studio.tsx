@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DefaultChatTransport } from "ai";
+import { useSourceMaterials } from "@/src/hooks/use-source-materials";
+import type { MaterialAttachment } from "@/src/types/materials";
 import { usePresentationWorkflow } from "@/src/hooks/use-presentation-workflow";
 import type {
   ArtifactOperation,
@@ -124,6 +126,7 @@ function textHistory(messages: AgentMessage[]) {
 
 function toBriefData(brief: PresentationBrief, artifact?: ArtifactOperation): PresentationBriefData {
   return {
+    sourceIds: brief.sourceIds,
     topic: brief.topic,
     audience: brief.audience,
     pageCount: brief.slideCount,
@@ -138,6 +141,12 @@ function toBriefData(brief: PresentationBrief, artifact?: ArtifactOperation): Pr
 }
 
 export default function PresentationStudio() {
+  const materials = useSourceMaterials();
+  const materialSourceIds = materials.sourceIds;
+  const cancelMaterials = materials.cancel;
+  const resetMaterials = materials.reset;
+  const attachmentSending = useRef(false);
+  const materialsBusy = materials.isReading || materials.items.some(item => item.status === "reading");
   const {
     sendAgentRequest,
     sendRevision,
@@ -360,6 +369,7 @@ export default function PresentationStudio() {
     const isPaletteRevision = revision.kind === "palette";
     const revisedBrief: PresentationBrief = {
       ...baselineBrief,
+      sourceIds: [...materialSourceIds.current],
       style: revision.style
         ?? (isPaletteRevision
           ? `${baselineBrief.style}. Palette revision: ${revision.instruction}`
@@ -374,7 +384,9 @@ export default function PresentationStudio() {
 
     setHtmlWatchdogError(null);
     setLastCancelledArtifact(null);
-    setPendingArtifact({ operation, brief: revisedBrief, outline: revisionOutline, revision, mode: "revision" });
+    setPendingArtifact({ operation, brief: revisedBrief, outline: revisionOutline, revision,
+      mode: materialSourceIds.current.some(id => !baselineBrief.sourceIds?.includes(id)) ? "generation" : "revision",
+    });
     sendRevision({
       presentationBrief: toBriefData(revisedBrief),
       approvedOutline: revisionOutline,
@@ -382,7 +394,7 @@ export default function PresentationStudio() {
       artifact: operation,
     });
     return true;
-  }, [activeArtifact, activeHtmlGenerationStepData?.artifact?.deckId, activeHtmlGenerationStepData?.artifact?.version, baseOutline, brief, sendRevision]);
+  }, [activeArtifact, activeHtmlGenerationStepData?.artifact?.deckId, activeHtmlGenerationStepData?.artifact?.version, baseOutline, brief, sendRevision, materialSourceIds]);
 
   const beginStructureRevision = useCallback((proposal: AgentActionProposal) => {
     if (!activeArtifact) return false;
@@ -401,6 +413,7 @@ export default function PresentationStudio() {
     );
     const revisedBrief: PresentationBrief = {
       ...activeArtifact.brief,
+      sourceIds: [...materialSourceIds.current],
       slideCount,
       requirements: [
         activeArtifact.brief.requirements,
@@ -422,7 +435,7 @@ export default function PresentationStudio() {
         targetSlides: proposal.targetSlides,
         requiresOutlineReview: true,
       },
-      mode: "structure-revision",
+      mode: materialSourceIds.current.some(id => !activeArtifact.brief.sourceIds?.includes(id)) ? "generation" : "structure-revision",
     });
     sendRevision({
       presentationBrief: toBriefData(revisedBrief),
@@ -436,7 +449,7 @@ export default function PresentationStudio() {
       artifact: operation,
     });
     return true;
-  }, [activeArtifact, sendRevision]);
+  }, [activeArtifact, sendRevision, materialSourceIds]);
 
   const executeProposal = useCallback((proposal: AgentActionProposal) => {
     const revision = buildRevisionFromProposal(proposal);
@@ -454,6 +467,7 @@ export default function PresentationStudio() {
     setStylePreviews([]);
     setIsDiscoveringStyles(false);
     const nextBrief: PresentationBrief = {
+      sourceIds: [...materialSourceIds.current],
       topic: agentBrief.topic,
       audience: agentBrief.audience,
       slideCount: agentBrief.pageCount,
@@ -469,7 +483,8 @@ export default function PresentationStudio() {
 
     if (activeArtifact && baseOutline) {
       if (
-        nextBrief.slideCount !== activeArtifact.outline.slides.length
+        materialSourceIds.current.some(id => !activeArtifact.brief.sourceIds?.includes(id))
+        || nextBrief.slideCount !== activeArtifact.outline.slides.length
         || (revisionMessage ? isStructureChangingRevision(revisionMessage) : false)
       ) {
         const operation: ArtifactOperation = {
@@ -515,7 +530,7 @@ export default function PresentationStudio() {
     sendAgentRequest(nextBrief.requirements || nextBrief.topic, {
       ...toBriefData(nextBrief, operation),
     });
-  }, [activeArtifact, baseOutline, beginRevision, selectedStyle, sendAgentRequest, styleDiscoveryBrief]);
+  }, [activeArtifact, baseOutline, beginRevision, selectedStyle, sendAgentRequest, styleDiscoveryBrief, materialSourceIds]);
 
   // Kept temporarily for direct endpoint diagnostics; interactive discovery uses local assets below.
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -593,6 +608,7 @@ export default function PresentationStudio() {
       prepareSendMessagesRequest: () => ({
         body: {
           messages: textHistory(history),
+          sourceIds: materialSourceIds.current,
           hasGeneratedDeck,
           hasSelectedStyle: Boolean(selectedStyle ?? activeArtifact?.brief.styleSpec),
           isGenerating,
@@ -631,15 +647,15 @@ export default function PresentationStudio() {
     if (!streamState.result?.reply) throw new Error("Agent chat stream ended without a result");
 
     return streamState.result;
-  }, [activeArtifact, brief, pendingProposal, selectedStyle, workflowError]);
+  }, [activeArtifact, brief, pendingProposal, selectedStyle, workflowError, materialSourceIds]);
 
   const handleAgentSend = useCallback(async (
     message: string,
-    options: { force?: boolean; replay?: boolean } = {},
+    options: { force?: boolean; replay?: boolean; attachments?: MaterialAttachment[] } = {},
   ) => {
     if (agentReplyingRef.current && !options.force) return;
 
-    const userMessage: AgentMessage = { id: makeId(), role: "user", kind: "text", content: message };
+    const userMessage: AgentMessage = { id: makeId(), role: "user", kind: "text", content: message, attachments: options.attachments };
 
     if (phaseRef.current === "generating" && !options.force) {
       setQueuedGenerationMessage(message);
@@ -938,6 +954,7 @@ export default function PresentationStudio() {
   }, [beginRevision, phase]);
 
   const handleCancelCurrentOperation = useCallback(() => {
+    cancelMaterials();
     if (agentChatAbortRef.current) {
       agentChatAbortRef.current.abort();
       agentChatAbortRef.current = null;
@@ -966,7 +983,7 @@ export default function PresentationStudio() {
         { id: makeId(), role: "assistant", kind: "text", content: "已停止生成，当前预览保持不变。" },
       ]);
     }
-  }, [pendingArtifact, pendingProposal, phase, resetWorkflow]);
+  }, [pendingArtifact, pendingProposal, phase, resetWorkflow, cancelMaterials]);
 
   useEffect(() => {
     if (!workflowError || pendingProposal?.status !== "executing") return;
@@ -1020,6 +1037,8 @@ export default function PresentationStudio() {
   }, [approveOutline, baseOutline, canApproveOutline, outline, selectedSlides.length]);
 
   const handleStartOver = useCallback(() => {
+    resetMaterials();
+    attachmentSending.current = false;
     agentChatAbortRef.current?.abort();
     agentChatAbortRef.current = null;
     agentReplyingRef.current = false;
@@ -1040,7 +1059,7 @@ export default function PresentationStudio() {
     setIsDiscoveringStyles(false);
     deckIdRef.current = `deck-${makeId()}`;
     publishedArtifactKeyRef.current = null;
-  }, [resetWorkflow]);
+  }, [resetWorkflow, resetMaterials]);
 
   useEffect(() => {
     return () => {
@@ -1190,9 +1209,19 @@ export default function PresentationStudio() {
     <AgentPanel
       messages={agentMessages}
       phase={phase}
-      isSending={isAgentReplying}
-      progressMessage={agentProgressMessage}
-      onSend={handleAgentSend}
+      materials={materials}
+      isSending={isAgentReplying || materialsBusy}
+      progressMessage={materialsBusy ? "模型正在读取上传资料…" : agentProgressMessage}
+      onSend={async (message) => {
+        if (attachmentSending.current) return false;
+        attachmentSending.current = true;
+        try {
+          const attachments = await materials.prepare();
+          if (attachments === null) return false;
+          void handleAgentSend(message, { attachments });
+          return true;
+        } finally { attachmentSending.current = false; }
+      }}
       onQuickAction={handleQuickAction}
       onApplyRevision={handleApplyRevision}
       onExecuteProposal={handleExecuteProposal}

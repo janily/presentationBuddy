@@ -1,3 +1,5 @@
+import { resolveMaterials, bindMaterialRun, verifyMaterialRun } from "@/src/services/materials/store";
+import { materialOwner, materialError } from "@/src/services/materials/http";
 import { mastra } from "@/src/mastra";
 import { createUIMessageStream, createUIMessageStreamResponse } from "ai";
 import type { NextRequest } from "next/server";
@@ -120,6 +122,17 @@ export async function POST(request: NextRequest) {
       return validationErrorResponse(validation.error, validation.action);
     }
 
+    try {
+      if (validation.action === "resume") {
+        await verifyMaterialRun(validation.data.workflowRunId, materialOwner(request));
+      } else {
+        const brief = validation.action === "revise" ? validation.data.presentationBrief : validation.data;
+        // Never trust caller-supplied source content; resolve authorized records ourselves.
+        delete brief.sourceContext;
+        if (brief.sourceIds?.length) brief.sourceContext = await resolveMaterials(brief.sourceIds, materialOwner(request));
+      }
+    } catch (error) { return materialError(error); }
+
     if (validation.action === "revise") {
       const { revision, artifact } = validation.data;
       const currentArtifact = getPresentationArtifact(artifact.deckId);
@@ -140,11 +153,18 @@ export async function POST(request: NextRequest) {
         }, { status: 409 });
       }
 
-      const plan = buildRevisionWorkflowPlan(validation.data);
-      const workflow = plan.workflowKind === "outline-revision"
+      const hasNewSources = validation.data.presentationBrief.sourceIds?.some(id => !currentArtifact?.brief.sourceIds?.includes(id));
+      const plan = buildRevisionWorkflowPlan(hasNewSources
+        ? { ...validation.data, revision: { ...revision, requiresOutlineReview: true } }
+        : validation.data);
+      if (hasNewSources) Object.assign(plan.inputData, { autoApproveOutline: false });
+      const workflow = hasNewSources
+        ? mastra.getWorkflow("presentationGenerationWorkflow")
+        : plan.workflowKind === "outline-revision"
         ? mastra.getWorkflow("presentationOutlineRevisionWorkflow")
         : mastra.getWorkflow("presentationRevisionWorkflow");
       const run = await workflow.createRunAsync();
+      await bindMaterialRun(run.runId, materialOwner(request), plan.inputData.sourceIds ?? []);
       const stream = run.stream({ inputData: plan.inputData } as never);
 
       request.signal.addEventListener("abort", () => {
@@ -251,6 +271,7 @@ export async function POST(request: NextRequest) {
     let stream: ReturnType<PresentationWorkflowRun["stream"]>;
     try {
       run = await workflow.createRunAsync();
+      await bindMaterialRun(run.runId, materialOwner(request), validation.data.sourceIds ?? []);
       stream = run.stream({
         // Forward the validated brief as a whole so new design/discovery fields
         // cannot silently disappear between the HTTP boundary and the workflow.

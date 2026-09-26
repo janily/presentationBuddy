@@ -3,6 +3,7 @@ import { presentationOutlineSchema } from "@/src/mastra/workflows/presentation-g
 import type { FrontendSlidesDensity, FrontendSlidesPurpose, FrontendSlidesStyleSpec } from "@/src/services/frontend-slides/style-catalog";
 
 export interface PresentationBrief {
+  sourceIds?: string[];
   topic: string;
   audience: string;
   slideCount: number;

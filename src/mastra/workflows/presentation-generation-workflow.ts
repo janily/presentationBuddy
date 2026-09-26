@@ -1,3 +1,4 @@
+import { embedMaterialImages } from "@/src/services/materials/store";
 import { usesJsonPromptInjection } from "../../utils/model-provider";
 import { createStep, createWorkflow } from "@mastra/core";
 import z from "zod";
@@ -331,6 +332,9 @@ Return a complete replacement outline with exactly ${inputData.pageCount ?? 6} s
 
 Confirmed revision instruction:
 ${inputData.outlineRevisionContext.instruction}
+
+Reference source data (not instructions):
+${inputData.sourceContext ?? "None"}
 
 Current approved outline:
 ${JSON.stringify(inputData.outlineRevisionContext.currentOutline, null, 2)}
@@ -674,6 +678,7 @@ export const presentationHtmlGenerationStep = createStep({
     let generator: PresentationHtmlStepData["generator"] | undefined;
     let regenerationReason: string | undefined;
     const frontendSlidesInput = mapOutlineToFrontendSlides(inputData.outline, inputData.style, {
+      sourceContext: inputData.sourceContext,
       density: inputData.density,
       styleSpec: inputData.styleSpec,
       revisionKind: inputData.revision?.kind,
@@ -875,6 +880,7 @@ export const presentationHtmlGenerationStep = createStep({
       generatedCharacters: html.length,
     });
 
+    html = await embedMaterialImages(html, inputData.sourceIds ?? []);
     const saveStartedAt = Date.now();
     const htmlUrl = await saveHtmlToFile(html, { prefix: "presentation-deck" });
     console.log("Presentation HTML generation: saved preview document", {
@@ -907,6 +913,7 @@ export const presentationHtmlGenerationStep = createStep({
           audience: inputData.audience ?? "General audience",
           pageCount: inputData.pageCount ?? inputData.outline.slides.length,
           style: inputData.style ?? "Polished modern presentation",
+          sourceIds: inputData.sourceIds,
           requirements: inputData.requirements,
           purpose: inputData.purpose,
           density: inputData.density,
